@@ -9,20 +9,20 @@ import time
 import unittest
 from pathlib import Path
 
-from filemanager.core.common import FileEntry
-from filemanager.core.actions.base import ActionContext
-from filemanager.core.actions.filters import SearchFilter, SizeFilter, DateFilter
-from filemanager.core.actions.io import MoveStep, CopyStep, DeleteStep
-from filemanager.core.actions.modifications import RenameStep
-from filemanager.core.scanner import scan_directory
-from filemanager.core.operations import (
+from dataforge.core.common import FileEntry
+from dataforge.core.actions.base import ActionContext
+from dataforge.core.actions.filters import SearchFilter, SizeFilter, DateFilter
+from dataforge.core.actions.io import MoveStep, CopyStep, DeleteStep
+from dataforge.core.actions.modifications import RenameStep
+from dataforge.core.scanner import scan_directory
+from dataforge.core.operations import (
     transfer_path,
     delete_path,
     rename_path,
     resolve_collision_path,
 )
-from filemanager.modules.search import build_search_query, search_files
-from filemanager.ui.views.action_builder import ActionBuilderView
+from dataforge.modules.search import build_search_query, search_files
+from dataforge.ui.views.action_builder import ActionBuilderView
 
 
 def _make_files(root: Path, specs: dict[str, str]) -> list[Path]:
@@ -137,7 +137,7 @@ class TestActionPipelineEndToEnd(unittest.TestCase):
 
             # Step 3: delete originals (permanently for test)
             from unittest.mock import patch
-            with patch("filemanager.core.operations.files.send2trash"):
+            with patch("dataforge.core.operations.files.send2trash"):
                 delete_step = DeleteStep()
                 delete_step.execute(ctx)
 
@@ -263,32 +263,32 @@ class TestPluginPackagingPaths(unittest.TestCase):
     """Verify build scripts reference the correct plugin directory."""
 
     def test_build_exe_plugin_path_matches_loader(self):
-        """build_exe.py data path should reference filemanager/ui/plugins."""
+        """build_exe.py data path should reference dataforge/ui/plugins."""
         repo_root = Path(__file__).resolve().parents[1]
         build_script = repo_root / "build_exe.py"
         content = build_script.read_text(encoding="utf-8")
-        self.assertIn("filemanager/ui/plugins", content.replace("\\", "/"))
+        self.assertIn("dataforge/ui/plugins", content.replace("\\", "/"))
 
     def test_spec_file_plugin_path_matches_loader(self):
-        """FileManager.spec data path should reference filemanager/ui/plugins."""
+        """DataForge.spec data path should reference dataforge/ui/plugins."""
         repo_root = Path(__file__).resolve().parents[1]
-        spec_file = repo_root / "FileManager.spec"
+        spec_file = repo_root / "DataForge.spec"
         content = spec_file.read_text(encoding="utf-8")
         # Spec uses os.path.join or raw strings — normalize to forward slashes
         normalized = content.replace("\\\\", "/").replace("\\", "/")
-        self.assertIn("filemanager/ui/plugins", normalized)
+        self.assertIn("dataforge/ui/plugins", normalized)
 
     def test_plugin_directory_is_a_package(self):
-        """filemanager/ui/plugins/__init__.py must exist for imports to work."""
+        """dataforge/ui/plugins/__init__.py must exist for imports to work."""
         repo_root = Path(__file__).resolve().parents[1]
-        init = repo_root / "filemanager" / "ui" / "plugins" / "__init__.py"
+        init = repo_root / "dataforge" / "ui" / "plugins" / "__init__.py"
         self.assertTrue(init.exists(), "__init__.py missing from plugins directory")
 
     def test_plugin_loader_uses_full_package_name(self):
-        """PluginLoader should import with 'filemanager.ui.plugins' prefix."""
+        """PluginLoader should import with 'dataforge.ui.plugins' prefix."""
         repo_root = Path(__file__).resolve().parents[1]
-        loader_src = (repo_root / "filemanager" / "ui" / "plugin_loader.py").read_text(encoding="utf-8")
-        self.assertIn("filemanager.ui.plugins", loader_src)
+        loader_src = (repo_root / "dataforge" / "ui" / "plugin_loader.py").read_text(encoding="utf-8")
+        self.assertIn("dataforge.ui.plugins", loader_src)
 
 
 # ---------------------------------------------------------------------------

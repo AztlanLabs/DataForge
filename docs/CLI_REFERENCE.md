@@ -13,7 +13,7 @@ fm
 If you are working directly from source without an editable install, run:
 
 ```bash
-PYTHONPATH=. python -m filemanager.cli
+PYTHONPATH=. python -m dataforge.cli
 ```
 
 ## Command map
@@ -365,7 +365,7 @@ Forensic utilities for OS artifact parsing, keyword search, and file-signature l
 
 - `--parse-artifacts` - parse OS artifacts under `PATH`
 - `--search-keyword TEXT` - search for a keyword under `PATH`
-- `--list-types` - list known file-signature categories (from `filemanager/modules/file_signatures.py`); `PATH` is not required with this flag
+- `--list-types` - list known file-signature categories (from `dataforge/modules/file_signatures.py`); `PATH` is not required with this flag
 
 ### Example
 
@@ -394,7 +394,7 @@ fm hash-calc file1.bin file2.bin --algo sha256
 fm devices [--info MOUNTPOINT]
 ```
 
-Lists connected storage devices (internal, external, USB, network, optical) with usage stats, backed by `filemanager/modules/device_manager.py`.
+Lists connected storage devices (internal, external, USB, network, optical) with usage stats, backed by `dataforge/modules/device_manager.py`.
 
 ### Options
 

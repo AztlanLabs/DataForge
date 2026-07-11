@@ -1,8 +1,8 @@
 import sys
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt
-from filemanager.ui.app import FileManagerApp
-from filemanager.ui.splash import SplashScreen
+from dataforge.ui.app import DataForgeApp
+from dataforge.ui.splash import SplashScreen
 
 def main():
     # Enable High-DPI scaling
@@ -15,7 +15,7 @@ def main():
     splash.show()
     app.processEvents()
 
-    window = FileManagerApp(on_progress=splash.update_progress)
+    window = DataForgeApp(on_progress=splash.update_progress)
     window.show()
     splash.close()
 

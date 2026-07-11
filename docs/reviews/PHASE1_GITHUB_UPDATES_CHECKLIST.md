@@ -12,7 +12,7 @@
 
 **Go to:** Settings → General
 
-- [ ] **Repository name:** Keep as "FileManager" (or change if you control the repo)
+- [x] **Repository name:** Renamed to "DataForge"
   - *Note: repo name stays; we're updating the presentation*
 
 **Go to:** Settings → General → Repository details
@@ -31,7 +31,7 @@
 **Go to:** About → Topics (or Settings → General → Topics)
 
 **Remove:** (if present)
-- `filemanager`
+- `dataforge`
 - `file-management` (if too generic)
 
 **Add these topics:**
@@ -58,7 +58,7 @@
 
 ### 4. Update GUI Application (5 min)
 
-**File:** `filemanager/ui/app.py` (or relevant About view file)
+**File:** `dataforge/ui/app.py` (or relevant About view file)
 
 Find the About dialog and change:
 
@@ -123,7 +123,7 @@ After making changes, verify:
 
 Once Phase 1 is complete:
 
-**Phase 2 (optional, can defer):** Rename package `filemanager/` → `dataforge/`  
+**Phase 2:** ✅ Package renamed `filemanager/` → `dataforge/` (done)  
 **Phase 3 (recommended next):** Initialize git + CI/CD + release to PyPI
 
 See `05_PRODUCT_NAMING_AND_NEXT_STEPS.md` for full roadmap.
@@ -166,7 +166,7 @@ version = "v0.1.0 (Development build)"
 
 ## Questions?
 
-- **Should I keep the repo named "FileManager"?** Yes, for now. The product name is DataForge, but keeping the repo name avoids breaking existing links. Consider renaming after wider adoption.
+- **Should I keep the repo named "FileManager"?** No — the repository has been renamed to "DataForge" to match the product name.
 - **Do I need to update the Python package name now?** No, that's Phase 2 (optional, can defer 1-2 weeks). Focus on GitHub visibility first.
 - **What if I don't control the GitHub repo?** Ask the repo owner to make these changes, or create a fork with your own branding.
 

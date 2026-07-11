@@ -3,7 +3,7 @@ import os
 import sys
 from logging.handlers import RotatingFileHandler
 
-def setup_logger(name: str = "filemanager", log_file: str = None, level: int = logging.INFO):
+def setup_logger(name: str = "dataforge", log_file: str = None, level: int = logging.INFO):
     """
     Configure and return a standard logger.
     """
@@ -36,6 +36,6 @@ def setup_logger(name: str = "filemanager", log_file: str = None, level: int = l
     return logger
 
 # Default instance
-# We can determine a default log path (e.g. ~/.filemanager/app.log)
-default_log_path = os.path.join(os.path.expanduser("~"), ".filemanager", "app.log")
-logger = setup_logger("filemanager", default_log_path)
+# We can determine a default log path (e.g. ~/.dataforge/app.log)
+default_log_path = os.path.join(os.path.expanduser("~"), ".dataforge", "app.log")
+logger = setup_logger("dataforge", default_log_path)

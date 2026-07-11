@@ -2,11 +2,11 @@
 
 **Date:** 2026-07-10
 **Reviewer role:** Application security engineer, security auditor, and digital-forensics practitioner
-**Target:** FileManager (Python CLI + PyQt5 desktop app) — a tool that scans, mutates, deletes, cleans, recovers, and forensically analyses files.
+**Target:** DataForge (Python CLI + PyQt5 desktop app) — a tool that scans, mutates, deletes, cleans, recovers, and forensically analyses files.
 **Threat framing:** This app both (a) *operates on untrusted data* (arbitrary files, disk images, removable-media trash, evidence sets) and (b) *performs privileged/destructive actions* (permanent delete, cleanup of system dirs, cracking helpers). Those two facts are what make its security posture matter. This review evaluates it as **defensive/forensic tooling**, not as an attack platform.
 
 > **Positive baseline first (credit where due):**
-> - **No shell injection surface.** Every `subprocess` call uses an argv list; there is **no `shell=True`, `os.system`, `eval`, `exec`, `pickle`, or `yaml.load`** anywhere in `filemanager/` (verified by grep). External tools (`hashcat`, `john`, `photorec`, `exiftool`, `last`, `lsblk`, …) are invoked safely.
+> - **No shell injection surface.** Every `subprocess` call uses an argv list; there is **no `shell=True`, `os.system`, `eval`, `exec`, `pickle`, or `yaml.load`** anywhere in `dataforge/` (verified by grep). External tools (`hashcat`, `john`, `photorec`, `exiftool`, `last`, `lsblk`, …) are invoked safely.
 > - **Safe-delete-by-default.** Deletes route to the trash (`send2trash`) unless the user explicitly disables safe mode.
 > - **Preview → confirm → execute** is the standard mutation pattern in the GUI.
 > - **Cancellation tokens and timeouts** exist on long/external operations.
@@ -26,7 +26,7 @@
 | S7 | 🟠 Medium | System Cleanup classifies whole system/temp dirs as "junk" |
 | S8 | 🟠 Medium | Sensitive credential material handled with weak hygiene (world-readable temp, logs) |
 | S9 | 🟡 Low | XML parsing without hardening (`recently-used.xbel`) — entity-expansion DoS |
-| S10 | 🟡 Low | No config validation; blind merge of `~/.filemanager/config.json` |
+| S10 | 🟡 Low | No config validation; blind merge of `~/.dataforge/config.json` |
 | S11 | 🟡 Low | Opening scanned files via system handler (`xdg-open`/`startfile`) |
 | S12 | 🟡 Low | Forensic outputs/reports written with default (often world-readable) permissions |
 | S13 | 🟡 Low | Decompression-bomb exposure in image/PDF handling |
@@ -72,7 +72,7 @@
 - **Fix:** validate restored destinations — reject absolute paths outside a sane restore root, reject `..` traversal, and default to restoring into a chosen "Recovered" folder with the original path shown for reference. Require per-item confirmation when the target is outside the user's home. Never auto-`makedirs` arbitrary system paths.
 
 ## 🟠 S5 — Plugin loader executes arbitrary local Python
-- **Where:** `ui/plugin_loader.py:37-52` (`spec.loader.exec_module(module)` for every `*.py` in the plugins dir); plugin dir = `filemanager/ui/plugins/` (`ui/app.py:835`).
+- **Where:** `ui/plugin_loader.py:37-52` (`spec.loader.exec_module(module)` for every `*.py` in the plugins dir); plugin dir = `dataforge/ui/plugins/` (`ui/app.py:835`).
 - **Risk:** any `.py` file dropped into that directory is imported and executed **in-process with the user's full privileges** — no signing, no manifest, no sandbox, no allow-list. In a packaged/multi-user install, or if the app directory is writable by a lower-privileged process, this is a straightforward code-execution/persistence vector (drop a plugin, it runs on next launch).
 - **Fix:** document the trust boundary explicitly ("plugins are arbitrary code; only add plugins you trust"); load plugins from a **per-user** dir with checked permissions rather than the install tree; consider an opt-in flag to enable plugins at all; log every plugin load path at INFO. Sandboxing Python is hard — the realistic control is *provenance + explicit opt-in + least privilege on the directory*.
 
@@ -102,7 +102,7 @@
 
 ### S10 — No config validation (blind merge)
 - **Where:** `core/config.py:52-58` (`self.data.update(loaded)`).
-- **Risk:** a corrupted/hostile `~/.filemanager/config.json` can inject unknown keys and out-of-range values (e.g. `max_thread_workers: 100000` → thread exhaustion, `hash_algorithm: "…"` → downstream errors). Low, because it's the user's own file, but it's an easy robustness win and a supply-chain concern if the file is synced across machines.
+- **Risk:** a corrupted/hostile `~/.dataforge/config.json` can inject unknown keys and out-of-range values (e.g. `max_thread_workers: 100000` → thread exhaustion, `hash_algorithm: "…"` → downstream errors). Low, because it's the user's own file, but it's an easy robustness win and a supply-chain concern if the file is synced across machines.
 - **Fix:** validate types/ranges/enums on load; ignore unknown keys or migrate them explicitly; clamp worker counts.
 
 ### S11 — Opening scanned files with the OS default handler

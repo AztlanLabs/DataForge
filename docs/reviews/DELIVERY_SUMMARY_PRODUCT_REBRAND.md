@@ -93,8 +93,8 @@
 - **Impact:** High (immediate brand presence)
 
 ### **Phase 2: Namespace Migration** (4-8 hours)
-- Rename Python package: `filemanager/` → `dataforge/`
-- Update config directory: `~/.filemanager/` → `~/.dataforge/`
+- ✅ Rename Python package: `filemanager/` → `dataforge/` (done)
+- ✅ Update config directory: `~/.filemanager/` → `~/.dataforge/` (done)
 - Update all imports
 - **Timeline:** After Phase 1 approval (1-2 weeks)
 - **Effort:** Medium
@@ -199,7 +199,7 @@
 ## 📞 Questions Answered
 
 **Q: Should we rename the GitHub repo too?**  
-A: No. Keep repo name as "FileManager" for now; changing it breaks incoming links. Rename only if ownership allows and you coordinate with users. The product name is DataForge; repo name can stay generic.
+A: The repository has been renamed to "DataForge" to match the product name.
 
 **Q: Do we need to change the Python package name now?**  
 A: Not immediately. Phase 2 (optional, can defer 2-4 weeks). Focus on GitHub visibility (Phase 1) and release (Phase 3) first.

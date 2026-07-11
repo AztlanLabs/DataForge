@@ -7,13 +7,13 @@
 The application lives inside the repository subdirectory:
 
 ```text
-FileManager/
+DataForge/
 ```
 
 That means most development commands should be run from there:
 
 ```bash
-cd FileManager
+cd DataForge
 ```
 
 ## Local environment setup
@@ -30,7 +30,7 @@ pip install -e .
 - `requirements.txt` contains the runtime stack (CLI + GUI/media). `requirements-dev.txt` adds build/test tooling (`pytest`, `pyinstaller`) via `-r requirements.txt`.
 - `setup.py` installs the package and the `fm` console script.
 
-If you skip the editable install, use `PYTHONPATH=. python -m filemanager.cli ...` instead of `fm ...`.
+If you skip the editable install, use `PYTHONPATH=. python -m dataforge.cli ...` instead of `fm ...`.
 
 ## Run modes
 
@@ -52,7 +52,7 @@ fm --help
 PYTHONPATH=. pytest -q
 ```
 
-The nested project layout means plain `pytest -q` may not resolve `filemanager` unless the package is installed or the project root is placed on `PYTHONPATH`.
+The nested project layout means plain `pytest -q` may not resolve `dataforge` unless the package is installed or the project root is placed on `PYTHONPATH`.
 
 > [!NOTE]
 > **The full suite passes — 224 tests.** The earlier collection failure (a stale `rename_with_regex` import in `tests/test_comprehensive.py`) has been fixed; see [`reviews/01_CODE_REVIEW_AND_BUGS.md`](./reviews/01_CODE_REVIEW_AND_BUGS.md) (H1). Just run `PYTHONPATH=. pytest -q`.
@@ -61,8 +61,8 @@ The nested project layout means plain `pytest -q` may not resolve `filemanager` 
 
 ### Python package
 
-- `setup.py` defines the package name `filemanager-utils`
-- console script: `fm=filemanager.cli:main`
+- `setup.py` defines the package name `dataforge`
+- console script: `fm=dataforge.cli:main`
 
 ### Executable builds
 
@@ -84,8 +84,8 @@ python build_exe.py all
 Related files:
 
 - `build_exe.py`
-- `buildspec/release/FileManager.spec`
-- `buildspec/debug/FileManager-debug.spec`
+- `buildspec/release/DataForge.spec`
+- `buildspec/debug/DataForge-debug.spec`
 
 Generated artifacts land in:
 
@@ -98,25 +98,25 @@ Those folders should be treated as outputs, not maintained source.
 
 | Artifact | Path | Notes |
 | --- | --- | --- |
-| Config directory | `~/.filemanager/` | created on first run |
-| Config file | `~/.filemanager/config.json` | theme, exclusions, performance settings, dashboard paths |
-| Cache DB | `~/.filemanager/cache.db` | SQLite hash cache |
-| Log file | `~/.filemanager/app.log` | rotating file log |
+| Config directory | `~/.dataforge/` | created on first run |
+| Config file | `~/.dataforge/config.json` | theme, exclusions, performance settings, dashboard paths |
+| Cache DB | `~/.dataforge/cache.db` | SQLite hash cache |
+| Log file | `~/.dataforge/app.log` | rotating file log |
 
 ## Source map for contributors
 
 | Path | What to change there |
 | --- | --- |
-| `filemanager/core/common.py` | shared file metadata types |
-| `filemanager/core/scanner.py` | scan behavior, traversal, and exclusion honoring |
-| `filemanager/core/config.py` | persistent settings |
-| `filemanager/core/cache.py` | hash cache behavior |
-| `filemanager/core/operations/files.py` | low-level rename/move/copy/delete/archive primitives |
-| `filemanager/core/services/file_actions.py` | centralized batch file actions |
-| `filemanager/modules/` | feature logic reusable across CLI and GUI |
-| `filemanager/core/actions/` | Action Builder pipeline steps |
-| `filemanager/ui/views/` | top-level desktop screens |
-| `filemanager/ui/plugins/` | plugin views |
+| `dataforge/core/common.py` | shared file metadata types |
+| `dataforge/core/scanner.py` | scan behavior, traversal, and exclusion honoring |
+| `dataforge/core/config.py` | persistent settings |
+| `dataforge/core/cache.py` | hash cache behavior |
+| `dataforge/core/operations/files.py` | low-level rename/move/copy/delete/archive primitives |
+| `dataforge/core/services/file_actions.py` | centralized batch file actions |
+| `dataforge/modules/` | feature logic reusable across CLI and GUI |
+| `dataforge/core/actions/` | Action Builder pipeline steps |
+| `dataforge/ui/views/` | top-level desktop screens |
+| `dataforge/ui/plugins/` | plugin views |
 | `tests/` | behavioral and regression validation |
 
 ## Contributor rules of thumb
@@ -163,7 +163,7 @@ New top-level screens and plugins should inherit from `BaseView` and use its sha
 
 - The repository mixes application source with generated build output. Be deliberate about which files are source of truth.
 - **The working tree is not currently a git repository and has no CI.** There is no history, diffing, or automated test/lint gate. Putting the project under version control and running the (fixed) test suite in CI is the highest-leverage next step — see [`reviews/04_IMPROVEMENTS_AND_ROADMAP.md`](./reviews/04_IMPROVEMENTS_AND_ROADMAP.md), Phase 0.
-- The plugin loader registers every discovered `BaseView` subclass in `filemanager/ui/plugins/`; plugin import failures are now logged (via `logger.error`) and skipped. Plugins are arbitrary code executed with full app privileges — only add plugins you trust (see `reviews/02`, S5).
+- The plugin loader registers every discovered `BaseView` subclass in `dataforge/ui/plugins/`; plugin import failures are now logged (via `logger.error`) and skipped. Plugins are arbitrary code executed with full app privileges — only add plugins you trust (see `reviews/02`, S5).
 - The stray empty `26.1.2` file has been removed and a root `.gitignore` added (the tree still needs to be put under version control).
 - The current dependency story is split: `setup.py` is enough for the core package/CLI entrypoint; `requirements.txt` provisions the full GUI/media runtime, and `requirements-dev.txt` adds the build/test tooling.
 - Settings are saved immediately through `ConfigManager.set()`, so UI changes often persist at the moment a control is saved rather than on app shutdown.

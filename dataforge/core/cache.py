@@ -7,7 +7,7 @@ from .config import config
 class CacheManager:
     def __init__(self, db_path=None):
         if not db_path:
-            db_path = os.path.join(os.path.expanduser("~"), ".filemanager", "cache.db")
+            db_path = os.path.join(os.path.expanduser("~"), ".dataforge", "cache.db")
 
         self.db_path = db_path
         self.conn = None

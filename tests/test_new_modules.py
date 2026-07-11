@@ -8,22 +8,22 @@ import unittest
 from unittest.mock import patch, MagicMock
 from pathlib import Path
 
-from filemanager.modules.system_cleanup import (
+from dataforge.modules.system_cleanup import (
     scan_junk_files,
     estimate_cleanup_savings,
 )
-from filemanager.modules.performance import (
+from dataforge.modules.performance import (
     get_system_info,
     get_running_processes,
 )
-from filemanager.modules.recovery import (
+from dataforge.modules.recovery import (
     scan_trash,
     carve_files_from_image,
 )
-from filemanager.modules.metadata import MetadataEngine
-from filemanager.modules.hardware import get_hardware_report
-from filemanager.modules.forensics import calculate_hashes, parse_os_artifacts
-from filemanager.modules.password_tools import analyze_password_strength
+from dataforge.modules.metadata import MetadataEngine
+from dataforge.modules.hardware import get_hardware_report
+from dataforge.modules.forensics import calculate_hashes, parse_os_artifacts
+from dataforge.modules.password_tools import analyze_password_strength
 
 
 class TestNewModules(unittest.TestCase):
@@ -136,7 +136,7 @@ class TestNewModules(unittest.TestCase):
 
     def test_about_view(self):
         from PyQt5.QtWidgets import QApplication, QWidget
-        from filemanager.ui.views.about import AboutView
+        from dataforge.ui.views.about import AboutView
 
         app = QApplication.instance()
         if not app:

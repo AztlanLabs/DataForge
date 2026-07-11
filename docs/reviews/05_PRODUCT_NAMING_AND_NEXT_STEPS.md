@@ -152,7 +152,7 @@ The project "FileManager" is a powerful, comprehensive file and system intellige
 - [ ] Update `README.md` — ✅ DONE
 - [ ] Pin updated README to repo top
 - [ ] Update `setup.py` description field
-- [ ] Update GUI About dialog to show "DataForge" (currently shows "FileManager")
+- [x] Update GUI About dialog to show "DataForge"
 
 **Effort:** 30 minutes  
 **Impact:** Immediate — visitors see professional, distinctive brand on arrival
@@ -163,11 +163,11 @@ The project "FileManager" is a powerful, comprehensive file and system intellige
 
 **Code changes (optional but recommended for long-term):**
 
-- [ ] Rename Python package: `filemanager/` → `dataforge/`
+- [x] Rename Python package: `filemanager/` → `dataforge/`
 - [ ] Update all imports across codebase
-- [ ] Update config directory: `~/.filemanager/config.json` → `~/.dataforge/config.json`
+- [x] Update config directory: `~/.filemanager/config.json` → `~/.dataforge/config.json`
 - [ ] Add migration logic (read old config, migrate on first run)
-- [ ] Update `setup.py` package name (currently `filemanager-utils` → `dataforge`)
+- [x] Update `setup.py` package name (`filemanager-utils` → `dataforge`)
 - [ ] Update console script entry point (keep `fm` for CLI)
 - [ ] Update all documentation references
 - [ ] Update tests to reflect new paths
@@ -238,9 +238,9 @@ Three security items remain open; tracking here for visibility:
 
 | Finding | Severity | File | Fix Strategy |
 |---------|----------|------|--------------|
-| **S2** — Forensic HTML report does not escape interpolated data | Medium | `filemanager/modules/forensics.py:577-621` | Use `html.escape()` on all user-controlled strings in report generation |
-| **S4** — Trash restore trusts `.trashinfo` Path= field without validation | High | `filemanager/modules/recovery.py:215-240` | Validate restore path is within expected bounds; add user confirmation for out-of-tree restores |
-| **S7** — System Cleanup blanket-classifies `/tmp` and cache trees as junk | Medium | `filemanager/modules/system_cleanup.py:249` | Add type-aware classification; exclude in-use files/sockets; warn user about data loss risk |
+| **S2** — Forensic HTML report does not escape interpolated data | Medium | `dataforge/modules/forensics.py:577-621` | Use `html.escape()` on all user-controlled strings in report generation |
+| **S4** — Trash restore trusts `.trashinfo` Path= field without validation | High | `dataforge/modules/recovery.py:215-240` | Validate restore path is within expected bounds; add user confirmation for out-of-tree restores |
+| **S7** — System Cleanup blanket-classifies `/tmp` and cache trees as junk | Medium | `dataforge/modules/system_cleanup.py:249` | Add type-aware classification; exclude in-use files/sockets; warn user about data loss risk |
 
 **Recommendation:** Fix S4 (path traversal) before v1.0.0; S2 and S7 acceptable for v0.1.0 with clear documentation of limitations.
 

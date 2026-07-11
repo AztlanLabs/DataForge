@@ -663,7 +663,7 @@ DARK_PALETTE = _build_palette(
 )
 
 
-class FileManagerApp(QMainWindow):
+class DataForgeApp(QMainWindow):
     post_signal = pyqtSignal(object, tuple, dict)
 
     # Each sidebar group is gated to a minimum Experience Level (the
@@ -682,7 +682,7 @@ class FileManagerApp(QMainWindow):
 
     def __init__(self, on_progress: Callable[[int, int, str], None] | None = None):
         super().__init__()
-        self.setWindowTitle("File Manager Utils")
+        self.setWindowTitle("DataForge")
         self.resize(1100, 750)
         # Several views pack many controls into one row; below ~900px wide
         # the sidebar (230px) leaves too little content width and buttons/
@@ -713,7 +713,7 @@ class FileManagerApp(QMainWindow):
 
         # Navigation Header (Title only)
         self.nav_header = QHBoxLayout()
-        self.nav_title_lbl = QLabel("File Manager", self.nav_frame)
+        self.nav_title_lbl = QLabel("DataForge", self.nav_frame)
         self.nav_title_lbl.setStyleSheet("font-weight: bold; font-size: 16px; padding-left: 16px;")
         self.nav_header.addWidget(self.nav_title_lbl)
         self.nav_layout.addLayout(self.nav_header)
@@ -1010,7 +1010,7 @@ class FileManagerApp(QMainWindow):
             self.content_stack.setCurrentWidget(view)
             view.mount()
             self.current_view = view
-            self.setWindowTitle(f"File Manager - {title}")
+            self.setWindowTitle(f"DataForge - {title}")
             
             # Highlight active nav button
             for btn, btn_title in self.nav_buttons:

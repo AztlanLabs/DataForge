@@ -10,7 +10,7 @@ The GUI is launched through:
 python run_ui.py
 ```
 
-The shell is implemented by `filemanager.ui.app.FileManagerApp` (a `PyQt5.QtWidgets.QMainWindow`) and provides:
+The shell is implemented by `dataforge.ui.app.DataForgeApp` (a `PyQt5.QtWidgets.QMainWindow`) and provides:
 
 - a fixed-width (230px) left navigation rail with **collapsible groups** (the rail itself is not collapsible; each group header toggles its items via `toggle_sidebar_group`, and the collapsed set is persisted in `config["collapsed_groups"]`)
 - a theme toggle (light/dark stylesheets) exposed both as a sidebar checkbox and a Settings dropdown
@@ -31,7 +31,7 @@ The application registers these built-in screens on startup:
 | Advanced Analysis | Metadata Studio, Hardware Diagnostics, Forensics Lab | Expert |
 | Application | Settings, About & Help | Basic |
 
-After those are loaded, the app scans `filemanager/ui/plugins/` and registers plugin views that inherit from `BaseView` (they appear under a **Plugins** group).
+After those are loaded, the app scans `dataforge/ui/plugins/` and registers plugin views that inherit from `BaseView` (they appear under a **Plugins** group).
 
 > **Experience-level gating:** the `settings_ui_tier` setting (`Basic` / `Advanced` / `Expert`, chosen in Settings) hides groups whose minimum tier is higher than the current tier. A `Basic` user therefore does **not** see System Maintenance or Advanced Analysis at all. This trade-off (hidden navigation vs. progressive disclosure) is discussed in [`reviews/03_UIUX_REVIEW.md`](./reviews/03_UIUX_REVIEW.md).
 >
@@ -124,7 +124,7 @@ It is the GUI companion to the `fm dupes` command.
 
 ## Action Builder
 
-`ActionBuilderView` exposes the pipeline engine from `filemanager/core/actions/`.
+`ActionBuilderView` exposes the pipeline engine from `dataforge/core/actions/`.
 
 This view allows the user to compose multi-step workflows from filters and action steps instead of running only one predefined screen flow.
 
@@ -194,17 +194,17 @@ It allows the user to manage:
 - dashboard watch paths
 - cache clearing (Expert tier)
 
-These values persist through `ConfigManager` into `~/.filemanager/config.json`.
+These values persist through `ConfigManager` into `~/.dataforge/config.json`.
 
 > **Persistence is currently inconsistent:** theme, path display, and duplicate keep-strategy save immediately on change, whereas the Performance, Exclusions, and Dashboard tabs require an explicit *Save* button — unsaved edits in those tabs are lost on navigation. See [`reviews/03_UIUX_REVIEW.md`](./reviews/03_UIUX_REVIEW.md) §4.2.
 
 ## Plugin view: Metadata Cleaner
 
-`filemanager/ui/plugins/cleaner_plugin.py` ships with a standalone `MetadataCleanerPlugin`.
+`dataforge/ui/plugins/cleaner_plugin.py` ships with a standalone `MetadataCleanerPlugin`.
 
 The plugin system:
 
-- scans `filemanager/ui/plugins/*.py`
+- scans `dataforge/ui/plugins/*.py`
 - imports each module
 - registers any `BaseView` subclass it finds
 
@@ -212,7 +212,7 @@ Current plugin behavior mirrors the metadata cleaning capability that also exist
 
 ## UI infrastructure worth knowing
 
-Shared widget infrastructure lives in `filemanager/ui/widgets.py`.
+Shared widget infrastructure lives in `dataforge/ui/widgets.py`.
 
 Important reusable pieces include:
 

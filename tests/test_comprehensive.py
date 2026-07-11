@@ -21,13 +21,13 @@ try:
 except ImportError:
     PdfWriter = None
 
-from filemanager.core.common import FileEntry
-from filemanager.core.config import ConfigManager
-from filemanager.core.hasher import get_file_hash, get_hashes
-from filemanager.core.media_ops import merge_pdfs, split_pdf, convert_image
-from filemanager.core.scanner import scan_directory
-from filemanager.core.utils import format_size, parse_extensions, check_disk_space, safe_zip_write
-from filemanager.core.operations.files import (
+from dataforge.core.common import FileEntry
+from dataforge.core.config import ConfigManager
+from dataforge.core.hasher import get_file_hash, get_hashes
+from dataforge.core.media_ops import merge_pdfs, split_pdf, convert_image
+from dataforge.core.scanner import scan_directory
+from dataforge.core.utils import format_size, parse_extensions, check_disk_space, safe_zip_write
+from dataforge.core.operations.files import (
     OperationResult,
     resolve_collision_path,
     transfer_path,
@@ -38,21 +38,21 @@ from filemanager.core.operations.files import (
     apply_result_to_entry,
     format_operation_message,
 )
-from filemanager.core.actions.base import ActionContext, ActionStep
-from filemanager.core.actions.filters import SearchFilter, SizeFilter, DateFilter, ImagePropFilter
-from filemanager.core.actions.io import MoveStep, CopyStep, DeleteStep, ZipStep
-from filemanager.core.actions.modifications import RenameStep, MetaCleanStep
-from filemanager.core.services import FileActionService
-from filemanager.core.actions.media import ConvertImageStep
-from filemanager.modules.search import SearchQuery, search_files, build_search_query, export_result_rows, export_search_results, order_search_results, serialize_file_entry
-from filemanager.modules.duplicates import build_duplicate_export_rows, build_duplicate_records, choose_duplicate_keeper, find_duplicates, order_duplicate_records, select_duplicate_records, serialize_duplicate_group_summary, serialize_duplicate_record
-from filemanager.modules.cleaner import remove_empty_folders, MetadataCleaner
-from filemanager.modules.integrity import IntegrityMonitor
-from filemanager.modules.reporting import ReportGenerator
-from filemanager.modules.usage import analyze_size, generate_usage_report
-from filemanager.modules.renamer import bulk_rename
-from filemanager.modules.organizer import Organizer
-from filemanager.ui.views.duplicates import DuplicatesView
+from dataforge.core.actions.base import ActionContext, ActionStep
+from dataforge.core.actions.filters import SearchFilter, SizeFilter, DateFilter, ImagePropFilter
+from dataforge.core.actions.io import MoveStep, CopyStep, DeleteStep, ZipStep
+from dataforge.core.actions.modifications import RenameStep, MetaCleanStep
+from dataforge.core.services import FileActionService
+from dataforge.core.actions.media import ConvertImageStep
+from dataforge.modules.search import SearchQuery, search_files, build_search_query, export_result_rows, export_search_results, order_search_results, serialize_file_entry
+from dataforge.modules.duplicates import build_duplicate_export_rows, build_duplicate_records, choose_duplicate_keeper, find_duplicates, order_duplicate_records, select_duplicate_records, serialize_duplicate_group_summary, serialize_duplicate_record
+from dataforge.modules.cleaner import remove_empty_folders, MetadataCleaner
+from dataforge.modules.integrity import IntegrityMonitor
+from dataforge.modules.reporting import ReportGenerator
+from dataforge.modules.usage import analyze_size, generate_usage_report
+from dataforge.modules.renamer import bulk_rename
+from dataforge.modules.organizer import Organizer
+from dataforge.ui.views.duplicates import DuplicatesView
 
 
 def _make_entry(path="test.txt", size=100, ext=".txt", mtime=None):
@@ -113,36 +113,36 @@ class TestFormatSize(unittest.TestCase):
         self.assertEqual(format_size(None), "0 B")
 
     def test_zero_auto(self):
-        with patch("filemanager.core.utils.config") as mock_cfg:
+        with patch("dataforge.core.utils.config") as mock_cfg:
             mock_cfg.get.return_value = "Auto"
             self.assertEqual(format_size(0), "0 B")
 
     def test_bytes_mode(self):
-        with patch("filemanager.core.utils.config") as mock_cfg:
+        with patch("dataforge.core.utils.config") as mock_cfg:
             mock_cfg.get.return_value = "Bytes"
             result = format_size(1024)
             self.assertIn("1024", result)
 
     def test_kb_mode(self):
-        with patch("filemanager.core.utils.config") as mock_cfg:
+        with patch("dataforge.core.utils.config") as mock_cfg:
             mock_cfg.get.return_value = "KB"
             result = format_size(2048)
             self.assertIn("2.00", result)
 
     def test_mb_mode(self):
-        with patch("filemanager.core.utils.config") as mock_cfg:
+        with patch("dataforge.core.utils.config") as mock_cfg:
             mock_cfg.get.return_value = "MB"
             result = format_size(1048576)
             self.assertIn("1.00", result)
 
     def test_gb_mode(self):
-        with patch("filemanager.core.utils.config") as mock_cfg:
+        with patch("dataforge.core.utils.config") as mock_cfg:
             mock_cfg.get.return_value = "GB"
             result = format_size(1073741824)
             self.assertIn("1.00", result)
 
     def test_auto_large(self):
-        with patch("filemanager.core.utils.config") as mock_cfg:
+        with patch("dataforge.core.utils.config") as mock_cfg:
             mock_cfg.get.return_value = "Auto"
             result = format_size(5 * 1024 * 1024)
             self.assertIn("MB", result)
@@ -274,7 +274,7 @@ class TestScanner(unittest.TestCase):
     def test_scan_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             _make_files(Path(tmp), {"a.txt": "hello", "b.dat": "code"})
-            with patch("filemanager.core.scanner.config") as mock_cfg:
+            with patch("dataforge.core.scanner.config") as mock_cfg:
                 mock_cfg.get.side_effect = lambda key, default=None: {
                     "excluded_folders": [],
                     "excluded_extensions": [],
@@ -353,7 +353,7 @@ class TestScanner(unittest.TestCase):
 
 class TestCacheManager(unittest.TestCase):
     def test_set_and_get_hash(self):
-        from filemanager.core.cache import CacheManager
+        from dataforge.core.cache import CacheManager
         with tempfile.TemporaryDirectory() as tmp:
             db_path = os.path.join(tmp, "test_cache.db")
             cm = CacheManager(db_path)
@@ -363,7 +363,7 @@ class TestCacheManager(unittest.TestCase):
             cm.close()
 
     def test_get_hash_miss(self):
-        from filemanager.core.cache import CacheManager
+        from dataforge.core.cache import CacheManager
         with tempfile.TemporaryDirectory() as tmp:
             db_path = os.path.join(tmp, "test_cache.db")
             cm = CacheManager(db_path)
@@ -372,7 +372,7 @@ class TestCacheManager(unittest.TestCase):
             cm.close()
 
     def test_clear(self):
-        from filemanager.core.cache import CacheManager
+        from dataforge.core.cache import CacheManager
         with tempfile.TemporaryDirectory() as tmp:
             db_path = os.path.join(tmp, "test_cache.db")
             cm = CacheManager(db_path)
@@ -383,7 +383,7 @@ class TestCacheManager(unittest.TestCase):
             cm.close()
 
     def test_update_existing(self):
-        from filemanager.core.cache import CacheManager
+        from dataforge.core.cache import CacheManager
         with tempfile.TemporaryDirectory() as tmp:
             db_path = os.path.join(tmp, "test_cache.db")
             cm = CacheManager(db_path)
@@ -400,15 +400,15 @@ class TestCacheManager(unittest.TestCase):
 
 class TestConfig(unittest.TestCase):
     def test_config_get_default(self):
-        from filemanager.core.config import config
+        from dataforge.core.config import config
         self.assertIn(config.get("theme"), ["cosmo", "darkly"])
 
     def test_config_get_nonexistent_key(self):
-        from filemanager.core.config import config
+        from dataforge.core.config import config
         self.assertIsNone(config.get("nonexistent_key_xyz"))
 
     def test_config_get_with_default(self):
-        from filemanager.core.config import config
+        from dataforge.core.config import config
         result = config.get("nonexistent_key_xyz", "fallback")
         self.assertEqual(result, "fallback")
 
@@ -1341,7 +1341,7 @@ class TestOrganizer(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             _make_files(Path(tmp), {"a.txt": "data"})
             entries = list(scan_directory(tmp))
-            with patch("filemanager.core.operations.files.send2trash"):
+            with patch("dataforge.core.operations.files.send2trash"):
                 log = Organizer.delete_files(entries, dry_run=False)
             self.assertGreater(len(log), 0)
 
@@ -1528,16 +1528,16 @@ class TestConvertImageStep(unittest.TestCase):
 
 class TestPluginLoader(unittest.TestCase):
     def test_loader_returns_list(self):
-        from filemanager.ui.plugin_loader import PluginLoader
+        from dataforge.ui.plugin_loader import PluginLoader
         repo_root = Path(__file__).resolve().parents[1]
-        plugin_dir = str(repo_root / "filemanager" / "ui" / "plugins")
+        plugin_dir = str(repo_root / "dataforge" / "ui" / "plugins")
         loader = PluginLoader(plugin_dir)
         plugins = loader.load_plugins()
         self.assertIsInstance(plugins, list)
         self.assertGreater(len(plugins), 0)
 
     def test_loader_nonexistent_dir(self):
-        from filemanager.ui.plugin_loader import PluginLoader
+        from dataforge.ui.plugin_loader import PluginLoader
         loader = PluginLoader("/nonexistent/path")
         plugins = loader.load_plugins()
         self.assertEqual(len(plugins), 0)

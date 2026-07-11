@@ -1,4 +1,4 @@
-# Runtime dependencies for the FileManager application (CLI + GUI).
+# Runtime dependencies for the DataForge application (CLI + GUI).
 # For development/build tooling (pytest, pyinstaller, ...) see requirements-dev.txt.
 click
 rich

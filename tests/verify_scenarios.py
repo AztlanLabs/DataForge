@@ -3,16 +3,16 @@ import os
 sys.path.append(os.getcwd())
 import shutil
 import unittest
-from filemanager.modules.duplicates import find_duplicates
-from filemanager.modules.search import SearchQuery, search_files
-from filemanager.modules.renamer import bulk_rename
-from filemanager.modules.cleaner import remove_empty_folders
-from filemanager.modules.organizer import Organizer
-from filemanager.modules.integrity import IntegrityMonitor
+from dataforge.modules.duplicates import find_duplicates
+from dataforge.modules.search import SearchQuery, search_files
+from dataforge.modules.renamer import bulk_rename
+from dataforge.modules.cleaner import remove_empty_folders
+from dataforge.modules.organizer import Organizer
+from dataforge.modules.integrity import IntegrityMonitor
 
 TEST_DIR = "test_env"
 
-class TestFileManager(unittest.TestCase):
+class TestDataForge(unittest.TestCase):
     def setUp(self):
         # Setup clean environment
         if os.path.exists(TEST_DIR):

@@ -28,7 +28,7 @@ class PluginLoader:
             if module_name.startswith("__"):
                 continue
 
-            package_name = "filemanager.ui.plugins"
+            package_name = "dataforge.ui.plugins"
             full_module_name = f"{package_name}.{module_name}"
             try:
                 importlib.import_module(package_name)

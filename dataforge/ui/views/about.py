@@ -46,7 +46,7 @@ class AboutView(BaseView):
         banner_layout = QVBoxLayout(banner_frame)
         banner_layout.setContentsMargins(20, 20, 20, 20)
 
-        lbl_app_title = QLabel("Advanced File Manager & Forensics Lab", banner_frame)
+        lbl_app_title = QLabel("DataForge — File & System Intelligence", banner_frame)
         lbl_app_title.setStyleSheet("color: #e0e7ff; font-size: 20px; font-weight: bold; background: transparent;")
         banner_layout.addWidget(lbl_app_title)
 
@@ -88,7 +88,7 @@ class AboutView(BaseView):
             ("Installed RAM:", total_ram),
             ("Python Version:", sys.version.split(" ")[0]),
             ("PyQt5 Version:", "5.15.x (Qt 5.15.x)"),
-            ("Config Directory:", os.path.expanduser("~/.filemanager")),
+            ("Config Directory:", os.path.expanduser("~/.dataforge")),
         ]
 
         for i, (label, val) in enumerate(diagnostics):

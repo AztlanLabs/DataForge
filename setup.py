@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="filemanager-utils",
+    name="dataforge",
     version="0.1.0",
     packages=find_packages(),
     install_requires=[
@@ -17,7 +17,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "fm=filemanager.cli:main",
+            "fm=dataforge.cli:main",
         ],
     },
     # Note: PyQt5 and Pillow are intentionally excluded here since they only

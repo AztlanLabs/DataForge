@@ -563,7 +563,7 @@ def generate_forensic_report(results, output_path, fmt="json"):
     """
     report = {
         "report_generated": datetime.now().isoformat(),
-        "tool": "FileManager Forensics Module",
+        "tool": "DataForge Forensics Module",
         "data": results,
     }
 

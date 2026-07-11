@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['C:\\Users\\coron\\OneDrive\\Documents\\Python\\FileManager\\run_ui.py'],
+    ['C:\\Users\\coron\\OneDrive\\Documents\\Python\\DataForge\\run_ui.py'],
     pathex=[],
     binaries=[],
-    datas=[('C:\\Users\\coron\\OneDrive\\Documents\\Python\\FileManager\\filemanager\\ui\\plugins', 'filemanager/ui/plugins')],
+    datas=[('C:\\Users\\coron\\OneDrive\\Documents\\Python\\DataForge\\dataforge\\ui\\plugins', 'dataforge/ui/plugins')],
     hiddenimports=['ttkbootstrap', 'PIL', 'PIL.ImageTk', 'send2trash', 'pypdf'],
     hookspath=[],
     hooksconfig={},
@@ -21,7 +21,7 @@ exe = EXE(
     a.scripts,
     [('v', None, 'OPTION')],
     exclude_binaries=True,
-    name='FileManager-debug',
+    name='DataForge-debug',
     debug=True,
     bootloader_ignore_signals=False,
     strip=False,
@@ -40,5 +40,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='FileManager-debug',
+    name='DataForge-debug',
 )

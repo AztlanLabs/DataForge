@@ -156,7 +156,7 @@ class DashboardView(BaseView):
             ("Machine", platform.machine()),
             ("Home", home),
             ("Python", platform.python_version()),
-            ("Config Dir", os.path.join(home, ".filemanager")),
+            ("Config Dir", os.path.join(home, ".dataforge")),
         ]
         
         for idx, (lbl_txt, val_txt) in enumerate(sys_items):

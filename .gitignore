@@ -52,7 +52,7 @@ build/release/*
 *.sqlite3
 
 # Project-specific runtime data
-.filemanager/
+.dataforge/
 
 # Editor / OS junk
 .vscode/

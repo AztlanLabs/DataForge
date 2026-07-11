@@ -28,10 +28,6 @@ DataForge provides both a **terminal interface** (`fm` CLI) and **interactive de
 | **🚀 Automation at scale** | Parallel hashing, batch operations on thousands of files, configurable worker threads, progress tracking, cancellation — process like a pro |
 | **🔐 Enterprise features** | Role-based experience levels (Basic/Advanced/Expert), audit logging, integrity verification, forensic reports — audit-ready |
 
-## Rewrite track
-
- A new Tauri-based rewrite now exists at [`../FileManager_Tauri`](../FileManager_Tauri). The current Python application remains the functional source of truth while features are migrated into the new desktop stack in phases, and the Tauri app now includes Rust-backed search/discovery, dashboard snapshot metrics, organize preview, duplicate scanning with configurable hash/worker settings, integrity snapshot/verify, browse/save path dialogs, settings import/export with theme presets, image conversion with queued file picking, async background execution for long-running tasks, and a shared bottom status/progress bar modeled after the original desktop shell.
-
 ## What DataForge Does (The Arsenal)
 
 ### 🧹 Cleanup & Organization (On Steroids)
@@ -74,12 +70,12 @@ DataForge provides both a **terminal interface** (`fm` CLI) and **interactive de
 
 | Area | Details |
 | --- | --- |
-| **Product** | 🔨 **DataForge** — File system management with steroids and superpowers (code: `filemanager/` — package rename pending) |
-| **CLI** | `fm` command → `filemanager.cli:main` (17 commands, all powers available) |
-| **GUI** | `python run_ui.py` → `filemanager.ui.app.FileManagerApp` (PyQt5, 14 views, drag-reorder pipeline) |
-| **Config** | `~/.filemanager/config.json` (theme, performance, exclusions, dashboard paths, experience levels) |
-| **Cache** | `~/.filemanager/cache.db` (SQLite hash cache, thread-safe with WAL, parallel hashing) |
-| **Logging** | `~/.filemanager/app.log` (rotating, 5 MB / 3 backups, full audit trail) |
+| **Product** | 🔨 **DataForge** — File system management with steroids and superpowers (code: `dataforge/`) |
+| **CLI** | `fm` command → `dataforge.cli:main` (17 commands, all powers available) |
+| **GUI** | `python run_ui.py` → `dataforge.ui.app.DataForgeApp` (PyQt5, 14 views, drag-reorder pipeline) |
+| **Config** | `~/.dataforge/config.json` (theme, performance, exclusions, dashboard paths, experience levels) |
+| **Cache** | `~/.dataforge/cache.db` (SQLite hash cache, thread-safe with WAL, parallel hashing) |
+| **Logging** | `~/.dataforge/app.log` (rotating, 5 MB / 3 backups, full audit trail) |
 | **Architecture** | Layered: core primitives → operations → service layer → modules → GUI/CLI orchestration (shared logic, zero duplication) |
 | **Tests** | 224 passing (`pytest`, full coverage across all feature layers, production-grade quality) |
 | **Build** | `setup.py` (CLI/core), `build_exe.py` (PyInstaller → standalone desktop bundles, one-file release mode) |
@@ -91,7 +87,7 @@ DataForge provides both a **terminal interface** (`fm` CLI) and **interactive de
 ### Install
 
 ```bash
-cd FileManager
+cd DataForge
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -117,7 +113,7 @@ fm cleanup --category "User Cache" --dry-run
 
 No install? Use:
 ```bash
-PYTHONPATH=. python -m filemanager.cli --help
+PYTHONPATH=. python -m dataforge.cli --help
 ```
 
 ### Verify the Build
@@ -160,7 +156,7 @@ python build_exe.py debug
 **Deeper Dives:**
 - [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) - layered design, control flow, shared abstractions, extension points
 - [`docs/GUI_WORKFLOWS.md`](./docs/GUI_WORKFLOWS.md) - view-by-view desktop workflows, threading, background execution model
-- [`TECHNICAL_SOURCE_OF_TRUTH.md`](./TECHNICAL_SOURCE_OF_TRUTH.md) - authoritative file-by-file source map for maintainers
+- [`docs/TECHNICAL_SOURCE_OF_TRUTH.md`](./docs/TECHNICAL_SOURCE_OF_TRUTH.md) - authoritative file-by-file source map for maintainers
 
 ### Project Review & Audit (2026-07-10)
 
@@ -178,14 +174,14 @@ A comprehensive engineering, security, and UX audit lives under [`docs/reviews/`
 | --- | --- |
 | **`run_ui.py`** | Desktop GUI entry point (PyQt5 application launcher) |
 | **`build_exe.py`** | PyInstaller bundler for standalone executables (release/debug) |
-| **`filemanager/cli.py`** | 17 CLI commands via Click (scan, dupes, search, organize, rename, clean, usage, integrity, cleanup, performance, recover, metadata, hardware, forensics, hash-calc, devices) |
-| **`filemanager/core/`** | Shared foundation: file model, scanner, config, cache, hasher, logger, operations layer |
-| **`filemanager/core/services/`** | `FileActionService` — centralized batch file operations (move, copy, delete, rename, archive with progress/cancel/dry-run) |
-| **`filemanager/core/actions/`** | Action Builder pipeline engine: filters, IO steps, transformations, media operations |
-| **`filemanager/modules/`** | Feature implementations (search, duplicates, organizer, cleaner, integrity, usage, reporting, forensics, hardware, recovery, metadata, performance, system_cleanup, password_tools, device_manager, file_signatures) |
-| **`filemanager/ui/`** | PyQt5 desktop shell, 14 built-in views, widget library, plugin loader |
-| **`filemanager/ui/views/`** | Dashboard, Search, Duplicates, Action Builder, Tools, Media, System Cleanup, Performance, Recovery, Metadata, Hardware, Forensics, Settings, About |
-| **`filemanager/ui/plugins/`** | Plugin system; bundled example: Metadata Cleaner plugin |
+| **`dataforge/cli.py`** | 17 CLI commands via Click (scan, dupes, search, organize, rename, clean, usage, integrity, cleanup, performance, recover, metadata, hardware, forensics, hash-calc, devices) |
+| **`dataforge/core/`** | Shared foundation: file model, scanner, config, cache, hasher, logger, operations layer |
+| **`dataforge/core/services/`** | `FileActionService` — centralized batch file operations (move, copy, delete, rename, archive with progress/cancel/dry-run) |
+| **`dataforge/core/actions/`** | Action Builder pipeline engine: filters, IO steps, transformations, media operations |
+| **`dataforge/modules/`** | Feature implementations (search, duplicates, organizer, cleaner, integrity, usage, reporting, forensics, hardware, recovery, metadata, performance, system_cleanup, password_tools, device_manager, file_signatures) |
+| **`dataforge/ui/`** | PyQt5 desktop shell, 14 built-in views, widget library, plugin loader |
+| **`dataforge/ui/views/`** | Dashboard, Search, Duplicates, Action Builder, Tools, Media, System Cleanup, Performance, Recovery, Metadata, Hardware, Forensics, Settings, About |
+| **`dataforge/ui/plugins/`** | Plugin system; bundled example: Metadata Cleaner plugin |
 | **`tests/`** | 224 passing tests: comprehensive, integration, contract, new-modules suites |
 | **`docs/`** | Architecture, CLI reference, GUI workflows, development guide, audit reviews |
 | **`build/`, `dist/`** | Generated build artifacts (output only, not maintained source) |
@@ -238,8 +234,7 @@ The **two user interfaces are thin adapters** — all the real superpowers live 
 
 ### 🔄 Open / Future
 
-- **Version control** — No git/CI yet. Putting the tree under git and running tests in CI is the highest-leverage next step (Phase 0 in audit roadmap).
-- **Package namespace** — Internal code uses `filemanager/` package; product name is now DataForge. Package rename pending.
+- **CI** — The tree is under git, but tests don't run in CI yet. Wiring CI is the highest-leverage next step (Phase 0 in audit roadmap).
 - **Device Manager GUI** — CLI has `fm devices`; no dedicated GUI view yet (lower priority, works via CLI).
 - **Numbered release** — No public release number yet. `setup.py` has internal version `0.1.0` (development marker).
 - **Debug build artifacts** — `build/debug` and `dist/debug` predate the PyQt5 migration; `build/release` is current. Run `python build_exe.py debug` to refresh.
@@ -255,9 +250,9 @@ See [`docs/reviews/02_SECURITY_AND_FORENSIC_AUDIT.md`](./docs/reviews/02_SECURIT
 
 ## Developer & Deployment Notes
 
-- **Nested repo** — Application code lives under `./FileManager/` subdirectory. Commands run from there.
+- **Repo layout** — The Python package lives in `dataforge/` at the repository root. Run commands from the repo root.
 - **Dependency split** — `setup.py` = CLI + core only. `requirements.txt` = full stack (GUI/media). Install both for development.
-- **User data** — `~/.filemanager/config.json`, cache.db, app.log — all created on first run, no migration needed.
+- **User data** — `~/.dataforge/config.json`, cache.db, app.log — all created on first run, no migration needed.
 - **Build artifacts** — `build/` and `dist/` are generated; don't maintain them. `release` profile is current; refresh `debug` via `python build_exe.py debug`.
 - **Next milestone** — Put under version control + wire CI/CD (see [`docs/reviews/04_IMPROVEMENTS_AND_ROADMAP.md`](./docs/reviews/04_IMPROVEMENTS_AND_ROADMAP.md), Phase 0).
 

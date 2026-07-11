@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-10
 **Reviewer role:** Product / UX designer with front-end engineering background
-**Surface reviewed:** the PyQt5 desktop app (`filemanager/ui/`) — shell, navigation, views, settings, dialogs — plus the naming/labelling used across CLI and GUI.
+**Surface reviewed:** the PyQt5 desktop app (`dataforge/ui/`) — shell, navigation, views, settings, dialogs — plus the naming/labelling used across CLI and GUI.
 **Goal:** make the app easier to understand and safer to use for a *non-expert end user*, without dumbing it down for power users.
 
 > **One-line assessment:** the app is *feature-rich and visually competent* (clean light/dark theme, grouped sidebar, consistent preview→confirm pattern), but it is organised around **the developer's module boundaries, not the user's tasks**, and several core interactions (choosing a path, saving settings, "Experience Level" gating) fight the user's mental model. The biggest wins are in **information architecture, naming, and interaction consistency** — not visual polish.

@@ -1,7 +1,7 @@
-# FileManager — Full Project Review (Executive Summary)
+# DataForge — Full Project Review (Executive Summary)
 
 **Date:** 2026-07-10
-**Reviewed by:** engineering + security + UX pass over the whole repository (`filemanager/`, `tests/`, docs, packaging).
+**Reviewed by:** engineering + security + UX pass over the whole repository (`dataforge/`, `tests/`, docs, packaging).
 **What this is:** a top-level summary and index for a four-part review. Each part is a standalone file in this folder.
 
 > **Remediation update (2026-07-10):** all correctness findings in report 01 (H1, M1–M6, L1–L9) have since been **fixed** in the source tree. The test suite now runs green — **224 tests pass**. The security items in report 02 that overlap those fixes are also addressed (symlink-following scan, MD5-by-default integrity/dedup, `sha512` crash, unguarded `json.load`, thread-unsafe cache). The forensic-report XSS (S2), trash-restore path trust (S4), and System Cleanup over-classification (S7) are documented risks tracked in report 02; the plaintext below describes the *original* pre-fix state for context.

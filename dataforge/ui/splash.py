@@ -1,7 +1,7 @@
 """
-Startup splash screen shown while FileManagerApp constructs its views.
+Startup splash screen shown while DataForgeApp constructs its views.
 
-Progress is real, not simulated: FileManagerApp.__init__ accepts an
+Progress is real, not simulated: DataForgeApp.__init__ accepts an
 on_progress(current, total, message) callback and invokes it once per view
 as it's constructed, so the bar and "what's loading" text track actual work.
 """
@@ -65,7 +65,7 @@ class SplashScreen(QWidget):
         layout.setSpacing(10)
         layout.addStretch()
 
-        title = QLabel("File Manager", self)
+        title = QLabel("DataForge", self)
         title.setObjectName("splashTitle")
         layout.addWidget(title)
 

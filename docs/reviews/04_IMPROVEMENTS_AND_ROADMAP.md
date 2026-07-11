@@ -12,7 +12,7 @@ This file is about *where the project should go next*, not individual bugs (thos
 
 ### 1.1 Repository & process
 - **Put the code under version control.** The working tree is **not a git repository** (confirmed) — there is history nowhere, no diffs, no blame, no CI. This is the single highest-leverage change. `git init`, commit, push, protect the main branch. *(Effort S, impact 🔴 huge.)*
-- **Add a `.gitignore`** covering `build/`, `dist/`, `__pycache__/`, `.venv/`, `.pytest_cache/`, `~/.filemanager/`, and stray files (there's an empty `26.1.2` at root — delete it). *(S)*
+- **Add a `.gitignore`** covering `build/`, `dist/`, `__pycache__/`, `.venv/`, `.pytest_cache/`, `~/.dataforge/`, and stray files (there's an empty `26.1.2` at root — delete it). *(S)*
 - **Stand up CI** (GitHub Actions) that runs `pytest`, a linter, and a type check on every push. The `.github/` folder is full of agent/workflow markdown but there is **no actual test/lint CI workflow**. *(M)*
 - **Unbreak the test suite first** — see doc 01 / H1. CI on a red suite is pointless. *(S)*
 
@@ -95,7 +95,7 @@ Ordered by value-to-effort. See doc 03 for the UX framing.
 
 ## 5. Observability & support
 
-- **Structured logging** with rotation under `~/.filemanager/` (there's a logger; add rotation + a "copy diagnostics" button in About).
+- **Structured logging** with rotation under `~/.dataforge/` (there's a logger; add rotation + a "copy diagnostics" button in About).
 - **Opt-in crash reporting** (local file the user can attach), never automatic upload.
 - **A `fm doctor` command** that checks optional external tools (exiftool, hashcat, john, photorec, magic) and prints install hints — the app already probes these ad hoc.
 

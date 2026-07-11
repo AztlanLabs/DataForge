@@ -12,7 +12,7 @@
 
 ## Purpose
 
-This file is the authoritative technical map of the FileManager codebase as it exists today.
+This file is the authoritative technical map of the DataForge codebase as it exists today.
 
 It is intended to answer four questions for a new maintainer:
 
@@ -28,7 +28,7 @@ This document is based on the current source files in the repository, not on int
 
 > [!IMPORTANT]
 > **Correctness & security caveats (2026-07-10 review + remediation).** A full engineering/security/UX pass is recorded under [`docs/reviews/`](./docs/reviews/). The correctness backlog (report 01) has since been **fixed**; the most load-bearing corrections to statements elsewhere in this document:
-> - The **test suite runs green — 224 tests pass.** `rename_with_regex` was restored in `filemanager/core/operations/files.py` (as documented below), and stale tests were updated. (See `docs/reviews/01`, H1.)
+> - The **test suite runs green — 224 tests pass.** `rename_with_regex` was restored in `dataforge/core/operations/files.py` (as documented below), and stale tests were updated. (See `docs/reviews/01`, H1.)
 > - **Integrity and duplicate detection no longer default to MD5.** The config default `hash_algorithm` is now `sha256`; `IntegrityMonitor` honours it and writes self-describing snapshots (`{"algorithm", "created_at", "files"}`), with legacy flat MD5 snapshots still readable. Duplicate deletion byte-verifies each group. (`docs/reviews/01`, M4/M6.)
 > - **`core/scanner.py` no longer follows symlinks** — it skips symlinks and passes `follow_symlinks=False` to every `is_dir()`/`is_file()` check, closing the scope-escape/recursion window. (`docs/reviews/01`, M3.)
 > - Also fixed: `sha512` CLI crash (added to the hasher allow-list), unguarded `json.load` in `verify_snapshot` (now catches `JSONDecodeError`), and non-thread-safe cache access (now lock + WAL).
@@ -39,7 +39,7 @@ This document is based on the current source files in the repository, not on int
 Documented as maintained source:
 
 - Root packaging and launch files
-- `filemanager/` package
+- `dataforge/` package
 - `tests/` directory
 
 Not treated as maintained source:
@@ -54,17 +54,17 @@ Those folders are generated artifacts or cache output.
 
 The project is a local desktop and CLI file-management utility with two separate user-facing entrypoints:
 
-- CLI entrypoint: `fm` -> `filemanager.cli:main`
-- GUI entrypoint: `run_ui.py` -> `filemanager.ui.app.FileManagerApp`
+- CLI entrypoint: `fm` -> `dataforge.cli:main`
+- GUI entrypoint: `run_ui.py` -> `dataforge.ui.app.DataForgeApp`
 
 The codebase has six architectural layers:
 
-1. **Infrastructure and shared primitives** in `filemanager/core/` — data models, scanning, config, caching, hashing, logging, utilities.
-2. **Shared file-mutation operations** in `filemanager/core/operations/` — neutral filesystem mutation functions (move, copy, delete, rename, collision resolution).
-3. **Service layer** in `filemanager/core/services/` — `FileActionService` provides batched file operations with progress, cancellation, and dry-run support. This is the primary dispatch layer used by modules, views, widgets, and action steps.
-4. **Task-oriented business logic** in `filemanager/modules/` — higher-level features (search, duplicates, organizer, renamer, cleaner, integrity, usage, reporting).
-5. **Composable action pipeline** in `filemanager/core/actions/` — step-based workflow engine used by the GUI Action Builder.
-6. **GUI orchestration and widgets** in `filemanager/ui/` — desktop application shell, views, widgets, plugin loader.
+1. **Infrastructure and shared primitives** in `dataforge/core/` — data models, scanning, config, caching, hashing, logging, utilities.
+2. **Shared file-mutation operations** in `dataforge/core/operations/` — neutral filesystem mutation functions (move, copy, delete, rename, collision resolution).
+3. **Service layer** in `dataforge/core/services/` — `FileActionService` provides batched file operations with progress, cancellation, and dry-run support. This is the primary dispatch layer used by modules, views, widgets, and action steps.
+4. **Task-oriented business logic** in `dataforge/modules/` — higher-level features (search, duplicates, organizer, renamer, cleaner, integrity, usage, reporting).
+5. **Composable action pipeline** in `dataforge/core/actions/` — step-based workflow engine used by the GUI Action Builder.
+6. **GUI orchestration and widgets** in `dataforge/ui/` — desktop application shell, views, widgets, plugin loader.
 
 There is also a dual workflow pattern: modules provide direct function-call workflows (used by the CLI and parts of the GUI), while the action pipeline provides a step-chain model (used by the Action Builder view). Both now route filesystem mutations through `FileActionService` → `core/operations/files.py`, which means the mutation rules are centralized even though the orchestration models differ.
 
@@ -72,30 +72,30 @@ There is also a dual workflow pattern: modules provide direct function-call work
 
 ### CLI flow
 
-`setup.py` registers `fm=filemanager.cli:main`.
+`setup.py` registers `fm=dataforge.cli:main`.
 
 Runtime flow:
 
 1. User runs a Click command.
-2. `filemanager/cli.py` parses arguments.
-3. The command calls one of the `filemanager.modules.*` functions or classes.
-4. Those modules depend on `filemanager.core.scanner.scan_directory`, `core.services.FileActionService`, and related helpers.
+2. `dataforge/cli.py` parses arguments.
+3. The command calls one of the `dataforge.modules.*` functions or classes.
+4. Those modules depend on `dataforge.core.scanner.scan_directory`, `core.services.FileActionService`, and related helpers.
 5. Output is rendered back to stdout using Click.
 
 CLI commands: `scan`, `dupes`, `search`, `organize`, `rename`, `clean`, `usage`, `integrity create`, `integrity check`.
 
 ### GUI flow
 
-`run_ui.py` enables High-DPI scaling, creates a `PyQt5.QtWidgets.QApplication`, and instantiates `FileManagerApp` as its main window.
+`run_ui.py` enables High-DPI scaling, creates a `PyQt5.QtWidgets.QApplication`, and instantiates `DataForgeApp` as its main window.
 
 Runtime flow:
 
-1. `FileManagerApp` builds a fixed-width (230px), non-collapsible sidebar (`QFrame` with grouped nav buttons) plus a `QStackedWidget` content area, a status bar, progress controls, and a cancellation event.
+1. `DataForgeApp` builds a fixed-width (230px), non-collapsible sidebar (`QFrame` with grouped nav buttons) plus a `QStackedWidget` content area, a status bar, progress controls, and a cancellation event.
 2. Fourteen base views are instantiated eagerly at startup (Dashboard, Search & Organize, Duplicate Finder, Action Builder, Tools & Workflows, Media Tools, System Cleanup, Performance, File Recovery, Metadata Studio, Hardware Diagnostics, Forensics Lab, Settings, About & Help), plus any discovered plugins.
-3. Long-running work is pushed to a `BackgroundWorker(QThread)` through `FileManagerApp.run_workflow` or `run_background`.
+3. Long-running work is pushed to a `BackgroundWorker(QThread)` through `DataForgeApp.run_workflow` or `run_background`.
 4. Worker results and progress updates are sent back via Qt signals (`progress_signal`, `status_signal`, `result_signal`, `error_signal`) connected directly to UI update slots — there is no `queue.Queue` or polling loop.
 5. `run_workflow` auto-inspects worker function signatures for `progress_callback` and `cancel_token` parameters and injects them automatically.
-6. Individual views either call `filemanager.modules.*` directly or build an `ActionContext` plus `ActionStep` chain, routing filesystem mutations through `FileActionService`.
+6. Individual views either call `dataforge.modules.*` directly or build an `ActionContext` plus `ActionStep` chain, routing filesystem mutations through `FileActionService`.
 
 ### Dual orchestration models
 
@@ -110,7 +110,7 @@ Both models now delegate filesystem mutations to `FileActionService` → `core/o
 
 ### 1. `FileEntry` is the main metadata carrier
 
-`filemanager/core/common.py` defines `FileEntry`, a dataclass that stores:
+`dataforge/core/common.py` defines `FileEntry`, a dataclass that stores:
 
 - `path: str` — absolute path
 - `filename: str`
@@ -126,19 +126,19 @@ Most of the system passes `FileEntry` objects around once a scan begins.
 
 ### 2. Scanning is centralized
 
-`filemanager/core/scanner.py` is the shared directory traversal generator. It yields `FileEntry` objects and supports both directory and single-file paths. `build_file_entry(path)` constructs a single `FileEntry` from OS stat data.
+`dataforge/core/scanner.py` is the shared directory traversal generator. It yields `FileEntry` objects and supports both directory and single-file paths. `build_file_entry(path)` constructs a single `FileEntry` from OS stat data.
 
 ### 3. Config is global and persistent
 
-`filemanager/core/config.py` creates a singleton `ConfigManager` and persists settings to `~/.filemanager/config.json`. Keys: `theme`, `safe_mode`, `excluded_extensions`, `excluded_folders`, `max_thread_workers`, `hash_algorithm`, `log_level`, `size_unit`, `dashboard_paths`.
+`dataforge/core/config.py` creates a singleton `ConfigManager` and persists settings to `~/.dataforge/config.json`. Keys: `theme`, `safe_mode`, `excluded_extensions`, `excluded_folders`, `max_thread_workers`, `hash_algorithm`, `log_level`, `size_unit`, `dashboard_paths`.
 
 ### 4. Hash caching is persistent
 
-`filemanager/core/cache.py` stores hashes in SQLite at `~/.filemanager/cache.db`. Cache key includes `path`, `size`, `mtime`, and `algo`.
+`dataforge/core/cache.py` stores hashes in SQLite at `~/.dataforge/cache.db`. Cache key includes `path`, `size`, `mtime`, and `algo`.
 
 ### 5. `FileActionService` is the central batch operations layer
 
-`filemanager/core/services/file_actions.py` provides `FileActionService`, a class of class methods that wrap `core/operations/files.py` with batch execution, progress reporting, cancellation, and dry-run support. It is used by:
+`dataforge/core/services/file_actions.py` provides `FileActionService`, a class of class methods that wrap `core/operations/files.py` with batch execution, progress reporting, cancellation, and dry-run support. It is used by:
 
 - `modules/organizer.py` and `modules/renamer.py` for CLI-facing operations
 - `ui/views/search.py`, `ui/views/duplicates.py`, `ui/views/tools.py` for GUI batch actions
@@ -149,7 +149,7 @@ This is the most important architectural evolution in the codebase: filesystem m
 
 ### 6. GUI threading is centralized
 
-`filemanager/ui/app.py` owns:
+`dataforge/ui/app.py` owns:
 
 - `BackgroundWorker(QThread)` instances and their Qt signals (`progress_signal`, `status_signal`, `result_signal`, `error_signal`) for cross-thread communication — no `queue.Queue` is used
 - `run_workflow` which auto-injects `progress_callback`/`cancel_token` into worker functions
@@ -162,7 +162,7 @@ This is the most important architectural evolution in the codebase: filesystem m
 
 ### 8. Plugin support is aligned to the GUI plugin directory
 
-The GUI app loads plugins from `filemanager/ui/plugins`, the build scripts bundle that directory, and `PluginLoader` imports plugin modules with the package name `filemanager.ui.plugins.*` so relative imports inside plugins resolve correctly.
+The GUI app loads plugins from `dataforge/ui/plugins`, the build scripts bundle that directory, and `PluginLoader` imports plugin modules with the package name `dataforge.ui.plugins.*` so relative imports inside plugins resolve correctly.
 
 ### 9. Hover tooltips are shared across all views
 
@@ -175,7 +175,7 @@ The GUI app loads plugins from `filemanager/ui/plugins`, the build scripts bundl
 #### `setup.py`
 
 - Package definition using `setuptools.setup` with `find_packages()`.
-- Declares console script `fm=filemanager.cli:main`.
+- Declares console script `fm=dataforge.cli:main`.
 - Install requires: `click`, `rich`, `tqdm`.
 - Does not include GUI dependencies; `requirements.txt` is broader.
 
@@ -185,23 +185,23 @@ Full dependency list: `click`, `rich`, `tqdm`, `pandas`, `PyQt5`, `send2trash`, 
 
 #### `run_ui.py`
 
-Desktop GUI bootstrapper. Creates a `PyQt5.QtWidgets.QApplication` with high-DPI scaling enabled, instantiates `FileManagerApp`, calls `.show()`, and runs `app.exec_()`.
+Desktop GUI bootstrapper. Creates a `PyQt5.QtWidgets.QApplication` with high-DPI scaling enabled, instantiates `DataForgeApp`, calls `.show()`, and runs `app.exec_()`.
 
 #### `build_exe.py`
 
-Programmatic PyInstaller build script. Builds from `run_ui.py`, produces a windowed one-file executable named `FileManager`. Injects data for `filemanager/ui/plugins` and hidden imports for `PyQt5` (`QtCore`, `QtWidgets`, `QtGui`), `PIL`, and `send2trash`.
+Programmatic PyInstaller build script. Builds from `run_ui.py`, produces a windowed one-file executable named `DataForge`. Injects data for `dataforge/ui/plugins` and hidden imports for `PyQt5` (`QtCore`, `QtWidgets`, `QtGui`), `PIL`, and `send2trash`.
 
-#### `FileManager.spec`
+#### `DataForge.spec`
 
-PyInstaller spec file. Entry script is `run_ui.py`. Includes `filemanager/ui/plugins` as bundled data. `console=False`.
+PyInstaller spec file. Entry script is `run_ui.py`. Includes `dataforge/ui/plugins` as bundled data. `console=False`.
 
 ### Package Root
 
-#### `filemanager/__init__.py`
+#### `dataforge/__init__.py`
 
 Package marker only. Empty file.
 
-#### `filemanager/cli.py`
+#### `dataforge/cli.py`
 
 Main CLI command surface built with Click.
 
@@ -230,13 +230,13 @@ How it works:
 - `usage` calls `analyze_size` and `generate_usage_report`.
 - `integrity` is a nested Click group for snapshot creation and verification.
 
-### `filemanager/core/`
+### `dataforge/core/`
 
-#### `filemanager/core/__init__.py`
+#### `dataforge/core/__init__.py`
 
 Convenience re-export module. Exports: `FileEntry`, `get_file_hash`, `get_hashes`, `scan_directory`, `logger`, `config`.
 
-#### `filemanager/core/common.py`
+#### `dataforge/core/common.py`
 
 Shared data model definitions.
 
@@ -245,7 +245,7 @@ Shared data model definitions.
 
 This is the shared metadata contract used across scanner, search, duplicates, organizer, services, and the action pipeline.
 
-#### `filemanager/core/scanner.py`
+#### `dataforge/core/scanner.py`
 
 Recursive filesystem traversal.
 
@@ -254,25 +254,25 @@ Functions:
 - `build_file_entry(path: str) -> FileEntry | None` — constructs a single `FileEntry` from OS stat data. Returns `None` on `OSError`.
 - `scan_directory(root_path, recursive=True, max_depth=-1, cancel_token=None)` — generator yielding `FileEntry` objects. Supports single file paths (yields one entry). Honors `excluded_folders` and `excluded_extensions` from config. Depth control: -1 = infinite, 0 = current dir only, N = N levels. Swallows `OSError` on inaccessible directories.
 
-#### `filemanager/core/config.py`
+#### `dataforge/core/config.py`
 
 Singleton configuration service.
 
 - `ConfigManager` — singleton via `__new__`. Methods: `load`, `save`, `get(key, default)`, `set(key, value)`.
 - `DEFAULT_CONFIG` keys: `theme` ("cosmo"), `safe_mode` (True), `excluded_extensions` ([".tmp", ".log"]), `excluded_folders` ([".git", "node_modules", "__pycache__"]), `max_thread_workers` (4), `hash_algorithm` ("sha256"), `log_level` ("INFO"), `size_unit` ("Auto"), `dashboard_paths` ([~/Documents]).
-- Persists to `~/.filemanager/config.json`.
+- Persists to `~/.dataforge/config.json`.
 - Global instance: `config`.
 
-#### `filemanager/core/cache.py`
+#### `dataforge/core/cache.py`
 
-Persistent file-hash cache using SQLite at `~/.filemanager/cache.db`.
+Persistent file-hash cache using SQLite at `~/.dataforge/cache.db`.
 
 - `CacheManager` — methods: `_init_db`, `get_hash(path, size, mtime, algo)`, `set_hash(path, size, mtime, hash_val, algo)`, `clear`, `close`. All methods are serialized through a `threading.Lock`, and `_init_db` sets `PRAGMA journal_mode=WAL`, so the shared connection is safe under concurrent `BackgroundWorker(QThread)` access.
 - Schema: `file_hashes` table with columns `path` (PRIMARY KEY), `size`, `mtime`, `hash`, `algo`.
 - `clear` deletes all rows and runs `VACUUM`.
 - Global instance: `file_cache`.
 
-#### `filemanager/core/hasher.py`
+#### `dataforge/core/hasher.py`
 
 File hashing utilities.
 
@@ -281,14 +281,14 @@ File hashing utilities.
 - `get_file_hash(filepath, algo='md5', cancel_token=None) -> str` — validates `algo` against `SUPPORTED_ALGORITHMS` (raises `ValueError` otherwise). Returns empty string on read failure.
 - `get_hashes(filepath, algos: list) -> dict` — single file pass for multiple algorithms.
 
-#### `filemanager/core/logger.py`
+#### `dataforge/core/logger.py`
 
 Central logging setup.
 
-- `setup_logger(name='filemanager', log_file=None, level=INFO) -> Logger` — adds console handler (stdout) and optional rotating file handler (5 MB / 3 backups). Format: `%(asctime)s - %(name)s - %(levelname)s - %(message)s`. Guards against duplicate handlers.
-- Default: `logger = setup_logger("filemanager", "~/.filemanager/app.log")`.
+- `setup_logger(name='dataforge', log_file=None, level=INFO) -> Logger` — adds console handler (stdout) and optional rotating file handler (5 MB / 3 backups). Format: `%(asctime)s - %(name)s - %(levelname)s - %(message)s`. Guards against duplicate handlers.
+- Default: `logger = setup_logger("dataforge", "~/.dataforge/app.log")`.
 
-#### `filemanager/core/provider.py`
+#### `dataforge/core/provider.py`
 
 File-provider abstraction for future alternate backends.
 
@@ -297,7 +297,7 @@ File-provider abstraction for future alternate backends.
 
 Reality: this abstraction is not the primary path through the system. Most code uses `os`, `shutil`, and `scan_directory` directly.
 
-#### `filemanager/core/media_ops.py`
+#### `dataforge/core/media_ops.py`
 
 Shared media conversion helpers.
 
@@ -308,7 +308,7 @@ Functions:
 - `convert_image(path, target_format, resize_pct=100, dry_run=False) -> dict` — converts images using Pillow. Handles RGBA→RGB for JPEG (white background). Resizes with Lanczos resampling. JPEG quality: 90. Returns report dict.
 - Internal report builders: `_merge_report`, `_split_report`, `_convert_report`.
 
-#### `filemanager/core/utils.py`
+#### `dataforge/core/utils.py`
 
 General helper functions.
 
@@ -317,13 +317,13 @@ General helper functions.
 - `check_disk_space(dest_folder, required_bytes) -> tuple[bool, str]` — uses `shutil.disk_usage`.
 - `safe_zip_write(zf, source_path, arcname, existing_names) -> str` — appends `_N` suffix on collision, mutates `existing_names` set.
 
-### `filemanager/core/operations/`
+### `dataforge/core/operations/`
 
-#### `filemanager/core/operations/__init__.py`
+#### `dataforge/core/operations/__init__.py`
 
 Re-exports: `apply_result_to_entry`, `delete_path`, `format_operation_message`, `rename_path`, `rename_with_regex`, `resolve_collision_path`, `render_template_name`, `transfer_path`.
 
-#### `filemanager/core/operations/files.py`
+#### `dataforge/core/operations/files.py`
 
 Shared neutral file-mutation layer. This is the single authoritative location for filesystem mutation rules.
 
@@ -342,13 +342,13 @@ Functions:
 - `apply_result_to_entry(entry, result)` — updates a `FileEntry` to reflect operation outcome (re-stats file).
 - `format_operation_message(result) -> str` — returns `result.message`.
 
-### `filemanager/core/services/`
+### `dataforge/core/services/`
 
-#### `filemanager/core/services/__init__.py`
+#### `dataforge/core/services/__init__.py`
 
 Re-exports: `BatchActionOutcome`, `BatchActionRecord`, `FileActionService`.
 
-#### `filemanager/core/services/file_actions.py`
+#### `dataforge/core/services/file_actions.py`
 
 Central batch operations layer above `core/operations/files.py`. This is the primary dispatch layer used by modules, views, widgets, and action steps.
 
@@ -378,22 +378,22 @@ Static utilities:
 - `messages(outcome, include_skipped=True)` — extracts message strings.
 - `log_outcome(outcome, action_label, log_func, include_skipped=True)` — calls log function per record.
 
-### `filemanager/core/actions/`
+### `dataforge/core/actions/`
 
 This package implements a composable workflow engine used by the GUI Action Builder.
 
-#### `filemanager/core/actions/__init__.py`
+#### `dataforge/core/actions/__init__.py`
 
 Package marker only (comment: `# Actions Package`).
 
-#### `filemanager/core/actions/base.py`
+#### `dataforge/core/actions/base.py`
 
 Base execution context and step abstraction.
 
 - `ActionContext` — holds the current file list, result log (tuples of path/action/status/original_path), dry-run flag, logger callback, progress callback, cancel token, and shared `variables` dict. Methods: `log`, `progress`, `should_cancel`.
 - `ActionStep` (ABC) — base class with `id` (unique), `params` dict, `name` property, `description` property. Abstract: `execute(context)`. Optional: `render_ui(parent)`, `get_summary()`.
 
-#### `filemanager/core/actions/filters.py`
+#### `dataforge/core/actions/filters.py`
 
 Filter steps that reduce `context.files`.
 
@@ -405,7 +405,7 @@ Filter steps that reduce `context.files`.
 
 Each filter logs excluded files to `context.results`.
 
-#### `filemanager/core/actions/io.py`
+#### `dataforge/core/actions/io.py`
 
 Pipeline steps for filesystem side effects. All delegate to `FileActionService`.
 
@@ -416,28 +416,28 @@ Pipeline steps for filesystem side effects. All delegate to `FileActionService`.
 - `DeleteStep` — calls `FileActionService.delete_items`, clears `context.files`.
 - `ZipStep` — calls `FileActionService.archive_items` with mode (`single`/`individual`) and compression.
 
-#### `filemanager/core/actions/media.py`
+#### `dataforge/core/actions/media.py`
 
 Pipeline image-conversion step.
 
 - `ConvertImageStep` — converts supported image files to target format (PNG/JPEG/WEBP/BMP/ICO) with optional resize. Calls `core.media_ops.convert_image`. Updates `FileEntry` path/filename/extension after conversion.
 
-#### `filemanager/core/actions/modifications.py`
+#### `dataforge/core/actions/modifications.py`
 
 Pipeline rename and metadata-cleaning steps. Delegate to `FileActionService` and `MetadataCleaner`.
 
 - `RenameStep` — calls `FileActionService.rename_items_with_template` with pattern and counter_start. Supports `{name}`, `{ext}`, `{date}`, `{size}`, `{counter}` placeholders.
 - `MetaCleanStep` — iterates files and calls `MetadataCleaner.remove_metadata` for each (skipped in dry-run).
 
-### `filemanager/modules/`
+### `dataforge/modules/`
 
 This package contains higher-level features that power the CLI and parts of the GUI.
 
-#### `filemanager/modules/__init__.py`
+#### `dataforge/modules/__init__.py`
 
 Package marker only. Empty file.
 
-#### `filemanager/modules/duplicates.py`
+#### `dataforge/modules/duplicates.py`
 
 Duplicate-file detection engine with helpers for grouping, sorting, keep-strategy selection, and export serialization.
 
@@ -460,7 +460,7 @@ Helper functions:
 - `build_duplicate_export_rows(records, include_group_summary=True) -> list[dict]` — groups records by hash, returns list with optional group summaries + serialized entries.
 - `_hash_worker(path, size, mtime, algo, cancel_token)` — parallel worker returning `(path, hash_result)`.
 
-#### `filemanager/modules/search.py`
+#### `dataforge/modules/search.py`
 
 Search query object, search engine, and shared serialization/export/ordering utilities used by CLI, SearchView, and DuplicatesView.
 
@@ -495,20 +495,20 @@ Internal:
 
 - `_glob_to_regex(pattern) -> str` — converts fnmatch patterns to regex.
 
-#### `filemanager/modules/organizer.py`
+#### `dataforge/modules/organizer.py`
 
 Search-driven move/copy/delete operations. Static utility class.
 
 - `Organizer.organize_files(root_path, query, action, dest_folder, dry_run=True) -> List[str]` — searches files, calls `FileActionService.transfer_items`. Returns messages.
 - `Organizer.delete_files(files, dry_run=True) -> List[str]` — calls `FileActionService.delete_items`. Returns messages.
 
-#### `filemanager/modules/renamer.py`
+#### `dataforge/modules/renamer.py`
 
 Regex-based batch renamer.
 
 - `bulk_rename(path, pattern, replacement, recursive=False, dry_run=True) -> List[str]` — scans directory, calls `FileActionService.rename_items_with_regex`. Returns messages.
 
-#### `filemanager/modules/cleaner.py`
+#### `dataforge/modules/cleaner.py`
 
 Metadata inspection/removal and empty-folder cleanup.
 
@@ -522,7 +522,7 @@ Classes:
   - `get_metadata_info(path) -> tuple[bool, int, str]` — analyzes images (JPG/JPEG/PNG/WEBP/BMP/TIFF) for EXIF via Pillow, PDFs via `pypdf`. Returns `(has_metadata, size_or_count, description)`.
   - `remove_metadata(path, dry_run=False) -> bool` — strips metadata. For images: saves to new Image with empty EXIF. For PDFs: copies pages to new PdfWriter, clears metadata. Uses temp file + `os.replace` for atomicity.
 
-#### `filemanager/modules/integrity.py`
+#### `dataforge/modules/integrity.py`
 
 Snapshot-based file integrity tracking.
 
@@ -532,14 +532,14 @@ Snapshot-based file integrity tracking.
 
 Internal helpers: `_snapshot_key`, `_empty_verification_stats`, `_build_verification_report`, `_resolve_algorithm`, `_unwrap_snapshot`.
 
-#### `filemanager/modules/usage.py`
+#### `dataforge/modules/usage.py`
 
 Disk-usage summarization.
 
 - `analyze_size(path) -> dict` — scans directory, aggregates file sizes by immediate containing folder. Returns dict: folder → total_bytes.
 - `generate_usage_report(data, limit=20) -> list[str]` — ASCII bar chart of top N folders by size.
 
-#### `filemanager/modules/reporting.py`
+#### `dataforge/modules/reporting.py`
 
 Export formats for duplicate scan results.
 
@@ -548,11 +548,11 @@ Export formats for duplicate scan results.
   - `duplicates_to_json(duplicates, output_file)` — nested dict: hash → [{path, size, filename}].
   - `duplicates_to_txt(duplicates, output_file)` — text format with hash headers and bulleted file paths.
 
-### `filemanager/ui/`
+### `dataforge/ui/`
 
 This package contains the desktop application shell, views, widgets, and plugin loader.
 
-#### `filemanager/ui/app.py`
+#### `dataforge/ui/app.py`
 
 Main GUI controller and shell.
 
@@ -566,7 +566,7 @@ Types:
 - `BackgroundWorker(QThread)` — runs a target callable off the UI thread; emits `progress_signal`, `status_signal`, `result_signal`, `error_signal` (Qt signals, not a `queue.Queue`).
 - Protocol type hints: `ProgressCallback`, `SuccessCallback`, `ErrorCallback`, `BackgroundTarget`.
 
-Class `FileManagerApp(QMainWindow)`:
+Class `DataForgeApp(QMainWindow)`:
 
 Layout:
 
@@ -595,16 +595,16 @@ Key methods:
 
 Plugin loading:
 
-- `PluginLoader` scans `filemanager/ui/plugins` for `.py` files.
-- Imports as `filemanager.ui.plugins.<module>` so relative imports resolve correctly.
+- `PluginLoader` scans `dataforge/ui/plugins` for `.py` files.
+- Imports as `dataforge.ui.plugins.<module>` so relative imports resolve correctly.
 
-#### `filemanager/ui/plugin_loader.py`
+#### `dataforge/ui/plugin_loader.py`
 
 Dynamic loader for GUI view plugins.
 
 - `PluginLoader(plugin_dir)` — `load_plugins() -> List[Type[BaseView]]`. Scans for `.py` files, imports dynamically, collects `BaseView` subclasses. Skips `__init__.py`. Handles import errors gracefully.
 
-#### `filemanager/ui/widgets.py`
+#### `dataforge/ui/widgets.py`
 
 Shared custom GUI widgets.
 
@@ -627,7 +627,7 @@ Classes:
   - Text files: `tk.Text` widget with scrollbars, 4 KB limit.
   - Other files: "No Preview Available".
 
-#### `filemanager/ui/views/base.py`
+#### `dataforge/ui/views/base.py`
 
 Abstract base class for all GUI views.
 
@@ -652,7 +652,7 @@ Shared static/instance helpers:
 - `restore_tree_selection(tree, item_ids, on_select)` — set selection, focus, see.
 - `choose_file_or_directory(file_title, directory_title, filetypes)` — Yes=file, No=folder chooser.
 
-#### `filemanager/ui/views/dashboard.py`
+#### `dataforge/ui/views/dashboard.py`
 
 Overview screen with comprehensive system, disk, file, and configuration information.
 
@@ -673,7 +673,7 @@ Key internals:
 - `_scan_comprehensive(paths)` — runs off the UI thread via `self.app.run_background`; counts extensions, tracks category sizes, finds largest files.
 - `mount()` triggers `refresh_stats()`, so data refreshes every time the view is selected.
 
-#### `filemanager/ui/views/search.py`
+#### `dataforge/ui/views/search.py`
 
 Search and bulk-action view. Title: "Search & Organize".
 
@@ -703,7 +703,7 @@ Workflow methods:
 
 Uses `handle_preview_outcome` and `present_batch_outcome` from `BaseView` for consistent UX.
 
-#### `filemanager/ui/views/duplicates.py`
+#### `dataforge/ui/views/duplicates.py`
 
 Duplicate finder with grouped display, keep-strategy actions, and export. Title: "Duplicate Finder".
 
@@ -735,7 +735,7 @@ Attributes: `current_results`, `visible_records`, `item_records`, `group_items`,
 
 Internal methods: `_refresh_visible_results`, `_rebuild_tree`, `_capture_expanded_group_state`, `_set_tree_selection`, `_drop_processed_entries`, `select_extras`, `run_keep_action`.
 
-#### `filemanager/ui/views/action_builder.py`
+#### `dataforge/ui/views/action_builder.py`
 
 GUI workflow designer for chained action steps. Title: "Action Builder".
 
@@ -758,7 +758,7 @@ Pipeline execution:
 - `run_pipeline(dry_run)` → `_execute_pipeline_thread` — scans source, creates `ActionContext`, executes each step in sequence.
 - Results logged as tuples in the pipeline log tree.
 
-#### `filemanager/ui/views/tools.py`
+#### `dataforge/ui/views/tools.py`
 
 Multi-tool notebook with four tabs. Title: "Tools & Workflows".
 
@@ -788,7 +788,7 @@ Multi-tool notebook with four tabs. Title: "Tools & Workflows".
 
 Tooltip initialization: `_init_integrity_tooltips()`, `_init_metadata_cleaner_tooltips()`, `_init_batch_renamer_tooltips()`, `_init_folder_sync_tooltips()`.
 
-#### `filemanager/ui/views/settings.py`
+#### `dataforge/ui/views/settings.py`
 
 GUI editor for persisted configuration. Title: "Settings".
 
@@ -802,7 +802,7 @@ GUI editor for persisted configuration. Title: "Settings".
 
 **Tab 4: Dashboard** — listbox of dashboard scan paths with Add Folder / Remove Selected / Save Dashboard controls.
 
-#### `filemanager/ui/views/media.py`
+#### `dataforge/ui/views/media.py`
 
 Media batch tools for PDF and image operations. Title: "Media Tools".
 
@@ -821,17 +821,17 @@ Media batch tools for PDF and image operations. Title: "Media Tools".
 
 ### GUI Plugin Files
 
-#### `filemanager/ui/plugins/__init__.py`
+#### `dataforge/ui/plugins/__init__.py`
 
 Package marker only (comment: `# GUI plugins package.`).
 
-#### `filemanager/ui/plugins/cleaner_plugin.py`
+#### `dataforge/ui/plugins/cleaner_plugin.py`
 
 Standalone metadata-cleaner view as a plugin. Title: "Metadata Cleaner".
 
 - `MetadataCleanerPlugin(BaseView)` — searches files by extension, analyzes metadata via `MetadataCleaner.get_metadata_info`, allows cleaning selected or all listed files via `MetadataCleaner.remove_metadata`.
 - Two-step UI: Step 1 = path/depth/extensions/scan, Step 2 = results tree + clean buttons.
-- Loadable through `PluginLoader` when GUI scans `filemanager/ui/plugins`.
+- Loadable through `PluginLoader` when GUI scans `dataforge/ui/plugins`.
 
 ### Tests
 
@@ -939,8 +939,8 @@ All GUI bulk operations follow: dry-run preview → user confirmation → execut
 
 ### Plugin discovery is aligned
 
-- `FileManagerApp` loads from `filemanager/ui/plugins`
-- `PluginLoader` imports as `filemanager.ui.plugins.<module>`
+- `DataForgeApp` loads from `dataforge/ui/plugins`
+- `PluginLoader` imports as `dataforge.ui.plugins.<module>`
 - Build scripts bundle the correct path
 - Covered by regression tests
 
@@ -952,16 +952,16 @@ All GUI bulk operations follow: dry-run preview → user confirmation → execut
 
 If you need to understand the system quickly, use this reading order:
 
-1. `filemanager/core/common.py` → `FileEntry` data model
-2. `filemanager/core/scanner.py` → how files are discovered
-3. `filemanager/core/operations/files.py` → how files are mutated
-4. `filemanager/core/services/file_actions.py` → how mutations are batched (the central dispatch)
-5. `filemanager/cli.py` → CLI surface
-6. `filemanager/ui/app.py` → GUI shell, threading model, event queue
-7. `filemanager/ui/views/base.py` → shared GUI helpers
-8. `filemanager/modules/search.py` → search engine + shared serialization/export utilities
-9. `filemanager/modules/duplicates.py` → duplicate engine + keep-strategy utilities
-10. `filemanager/core/actions/base.py` + `filemanager/ui/views/action_builder.py` → pipeline model
+1. `dataforge/core/common.py` → `FileEntry` data model
+2. `dataforge/core/scanner.py` → how files are discovered
+3. `dataforge/core/operations/files.py` → how files are mutated
+4. `dataforge/core/services/file_actions.py` → how mutations are batched (the central dispatch)
+5. `dataforge/cli.py` → CLI surface
+6. `dataforge/ui/app.py` → GUI shell, threading model, event queue
+7. `dataforge/ui/views/base.py` → shared GUI helpers
+8. `dataforge/modules/search.py` → search engine + shared serialization/export utilities
+9. `dataforge/modules/duplicates.py` → duplicate engine + keep-strategy utilities
+10. `dataforge/core/actions/base.py` + `dataforge/ui/views/action_builder.py` → pipeline model
 
 ## Change Guidance
 
@@ -971,7 +971,7 @@ When modifying this repository, assume these rules unless you verify otherwise:
 2. **Operations go through core/operations/files.py** — `FileActionService` delegates here. New mutation types should be added at this level.
 3. **Rename exists in three orchestration patterns** — modules (regex), actions (template), tools (parts). All delegate to `FileActionService`.
 4. **Search/filter logic has two implementations** — `modules/search.py` (used by CLI/GUI) and `core/actions/filters.py` (independent, used by Action Builder).
-5. **Config and cache are persistent** on the user's machine under `~/.filemanager/`.
+5. **Config and cache are persistent** on the user's machine under `~/.dataforge/`.
 6. **GUI views use preview → confirm → execute** — new views should follow the same pattern using `BaseView` helpers.
 7. **GUI threading uses run_workflow** — new background work should use `app.run_workflow(target, on_success)`, not raw threading.
 8. **Tooltips use attach_tooltips** — new views with help text should use `ui.widgets.attach_tooltips`.
@@ -983,6 +983,6 @@ The current repository is best understood as:
 - A usable file-management application with both CLI and desktop interfaces.
 - Built on a shared `FileEntry` → `scanner` → `operations` → `FileActionService` foundation.
 - With centralized filesystem mutation rules but multiple orchestration patterns (module-direct, pipeline-step, GUI-direct).
-- GUI threading, preview/confirm workflows, and batch outcome reporting are standardized through `FileManagerApp` and `BaseView` helpers.
+- GUI threading, preview/confirm workflows, and batch outcome reporting are standardized through `DataForgeApp` and `BaseView` helpers.
 - The pipeline filters are the main remaining structural overlap with `modules/search.py`.
 - `LocalProvider` is the main dead abstraction.

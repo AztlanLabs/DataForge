@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['/mnt/pharos/Data/Documents/Python/FileManager_Repo/DataForge/run_ui.py'],
+    ['/mnt/pharos/Data/Documents/Python/DataForge/run_ui.py'],
     pathex=[],
     binaries=[],
-    datas=[('/mnt/pharos/Data/Documents/Python/FileManager_Repo/DataForge/filemanager/ui/plugins', 'filemanager/ui/plugins')],
+    datas=[('/mnt/pharos/Data/Documents/Python/DataForge/dataforge/ui/plugins', 'dataforge/ui/plugins')],
     hiddenimports=['PyQt5', 'PyQt5.QtCore', 'PyQt5.QtWidgets', 'PyQt5.QtGui', 'PIL', 'send2trash', 'pypdf'],
     hookspath=[],
     hooksconfig={},
@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='FileManager',
+    name='DataForge',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -55,7 +55,7 @@ def _write_duplicate_text_report(records, output_path):
 
 @click.group()
 def main():
-    """File Manager Utilities CLI"""
+    """DataForge CLI — file & system intelligence toolkit"""
     pass
 
 @main.command()

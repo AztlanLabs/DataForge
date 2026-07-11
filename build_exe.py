@@ -7,8 +7,8 @@ import PyInstaller.__main__
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 ENTRY_SCRIPT = PROJECT_ROOT / 'run_ui.py'
-PLUGIN_SOURCE = PROJECT_ROOT / 'filemanager' / 'ui' / 'plugins'
-PLUGIN_TARGET = 'filemanager/ui/plugins'
+PLUGIN_SOURCE = PROJECT_ROOT / 'dataforge' / 'ui' / 'plugins'
+PLUGIN_TARGET = 'dataforge/ui/plugins'
 DATA_SEPARATOR = os.pathsep
 COMMON_HIDDEN_IMPORTS = (
     'PyQt5',
@@ -44,14 +44,14 @@ def build_common_args(profile_name: str, executable_name: str) -> list[str]:
 
 
 def release_args() -> list[str]:
-    return build_common_args('release', 'FileManager') + [
+    return build_common_args('release', 'DataForge') + [
         '--windowed',
         '--onefile',
     ]
 
 
 def debug_args() -> list[str]:
-    return build_common_args('debug', 'FileManager-debug') + [
+    return build_common_args('debug', 'DataForge-debug') + [
         '--console',
         '--onedir',
         '--debug=all',
@@ -60,7 +60,7 @@ def debug_args() -> list[str]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description='Build FileManager PyInstaller bundles.',
+        description='Build DataForge PyInstaller bundles.',
     )
     parser.add_argument(
         'profile',

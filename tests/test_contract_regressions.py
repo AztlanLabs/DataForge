@@ -8,21 +8,21 @@ from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
 
-from filemanager.cli import main
-from filemanager.modules.cleaner import remove_empty_folders
-from filemanager.modules.organizer import Organizer
-from filemanager.modules.renamer import bulk_rename
-from filemanager.modules.search import build_search_query, search_files
-from filemanager.ui.widgets import HoverTooltip, attach_tooltips
-from filemanager.ui.views.search import SearchView
-from filemanager.ui.views.action_builder import ActionBuilderView
-from filemanager.ui.views.tools import ToolsView
-from filemanager.ui.views.media import MediaView
-from filemanager.ui.views.duplicates import DuplicatesView
-from filemanager.ui.views.settings import SettingsView
-from filemanager.ui.plugin_loader import PluginLoader
-from filemanager.ui.plugins.cleaner_plugin import MetadataCleanerPlugin
-from filemanager.ui.views.base import BaseView
+from dataforge.cli import main
+from dataforge.modules.cleaner import remove_empty_folders
+from dataforge.modules.organizer import Organizer
+from dataforge.modules.renamer import bulk_rename
+from dataforge.modules.search import build_search_query, search_files
+from dataforge.ui.widgets import HoverTooltip, attach_tooltips
+from dataforge.ui.views.search import SearchView
+from dataforge.ui.views.action_builder import ActionBuilderView
+from dataforge.ui.views.tools import ToolsView
+from dataforge.ui.views.media import MediaView
+from dataforge.ui.views.duplicates import DuplicatesView
+from dataforge.ui.views.settings import SettingsView
+from dataforge.ui.plugin_loader import PluginLoader
+from dataforge.ui.plugins.cleaner_plugin import MetadataCleanerPlugin
+from dataforge.ui.views.base import BaseView
 
 
 class ContractRegressionTests(unittest.TestCase):
@@ -30,9 +30,9 @@ class ContractRegressionTests(unittest.TestCase):
         self.assertIsNotNone(main)
 
     def test_browse_helper_supports_file_and_folder_selection(self):
-        with patch("filemanager.ui.views.base.QMessageBox") as MockQMessageBox, \
-             patch("filemanager.ui.views.base.dialogs.get_open_file_name", return_value=("C:/tmp/file.txt", "")) as open_file, \
-             patch("filemanager.ui.views.base.dialogs.get_existing_directory", return_value="C:/tmp/folder") as open_dir:
+        with patch("dataforge.ui.views.base.QMessageBox") as MockQMessageBox, \
+             patch("dataforge.ui.views.base.dialogs.get_open_file_name", return_value=("C:/tmp/file.txt", "")) as open_file, \
+             patch("dataforge.ui.views.base.dialogs.get_existing_directory", return_value="C:/tmp/folder") as open_dir:
             
             mock_box = MockQMessageBox.return_value
             yes_btn = object()
@@ -925,7 +925,7 @@ class ContractRegressionTests(unittest.TestCase):
 
     def test_plugin_loader_discovers_internal_cleaner_plugin(self):
         repo_root = Path(__file__).resolve().parents[1]
-        plugin_dir = repo_root / "filemanager" / "ui" / "plugins"
+        plugin_dir = repo_root / "dataforge" / "ui" / "plugins"
 
         loader = PluginLoader(str(plugin_dir))
         plugin_names = {plugin_cls.__name__ for plugin_cls in loader.load_plugins()}

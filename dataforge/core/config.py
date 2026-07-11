@@ -38,7 +38,7 @@ class ConfigManager:
         if hasattr(self, 'initialized'):
             return
             
-        self.config_dir = os.path.join(os.path.expanduser("~"), ".filemanager")
+        self.config_dir = os.path.join(os.path.expanduser("~"), ".dataforge")
         self.config_file = os.path.join(self.config_dir, "config.json")
         self.data: Dict[str, Any] = self.DEFAULT_CONFIG.copy()
         
