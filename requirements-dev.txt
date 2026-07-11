@@ -1,0 +1,5 @@
+# Development & build tooling. Install alongside the runtime deps:
+#   pip install -r requirements.txt -r requirements-dev.txt
+-r requirements.txt
+pytest
+pyinstaller
