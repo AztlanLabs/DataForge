@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar, QApplica
 from PyQt5.QtCore import Qt
 
 from ..core.config import config
+from .theme_tokens import TOKENS, TYPE_SCALE
 
 
 class SplashScreen(QWidget):
@@ -22,10 +23,13 @@ class SplashScreen(QWidget):
         self._center_on_screen()
 
         is_dark = config.get("theme", "cosmo") == "darkly"
-        bg, fg, muted, accent, border = (
-            ("#121214", "#e2e8f0", "#a1a1aa", "#6366f1", "#27272a") if is_dark
-            else ("#ffffff", "#1f2937", "#6b7280", "#3b82f6", "#e5e7eb")
-        )
+        tk = TOKENS["dark" if is_dark else "light"]
+        bg = "#1c1c20" if is_dark else "#ffffff"
+        fg = tk["text"]
+        muted = tk["text_muted"]
+        accent = tk["accent_focus"]
+        border = tk["border"]
+        progress_bg = "#1f1f23" if is_dark else "#f3f4f6"
         self.setStyleSheet(f"""
             QWidget#splashRoot {{
                 background-color: {bg};
@@ -34,20 +38,20 @@ class SplashScreen(QWidget):
             }}
             QLabel#splashTitle {{
                 color: {fg};
-                font-size: 20px;
+                font-size: {TYPE_SCALE['display']}px;
                 font-weight: bold;
             }}
             QLabel#splashStatus {{
                 color: {muted};
-                font-size: 12px;
+                font-size: {TYPE_SCALE['body']}px;
             }}
             QLabel#splashPct {{
                 color: {accent};
-                font-size: 12px;
+                font-size: {TYPE_SCALE['body']}px;
                 font-weight: bold;
             }}
             QProgressBar {{
-                background-color: {"#1f1f23" if is_dark else "#f3f4f6"};
+                background-color: {progress_bg};
                 border: none;
                 border-radius: 5px;
                 height: 10px;

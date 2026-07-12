@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from .base import BaseView
 from .. import dialogs
+from ..theme_tokens import TOKENS
 from ...core.config import config
 from ...core.logger import logger
 from ...core.cache import file_cache
@@ -207,7 +208,7 @@ class SettingsView(BaseView):
         row_cache_layout.setContentsMargins(0, 0, 0, 0)
         self.btn_clear_cache = QPushButton("Clear Cache DB", row_cache)
         self.btn_clear_cache.clicked.connect(self.clear_cache_db)
-        self.btn_clear_cache.setStyleSheet("background-color: #d9534f; color: white;")
+        self.btn_clear_cache.setProperty("variant", "danger")
         row_cache_layout.addWidget(self.btn_clear_cache)
         row_cache_layout.addStretch()
         perf_layout.addWidget(row_cache)
@@ -235,7 +236,7 @@ class SettingsView(BaseView):
         excl_layout.addWidget(self.excl_ext_entry)
         
         self.save_exclusions_button = QPushButton("Save Exclusions", self.tab_excl)
-        self.save_exclusions_button.setStyleSheet("background-color: #5cb85c; color: white;")
+        self.save_exclusions_button.setProperty("variant", "success")
         self.save_exclusions_button.clicked.connect(self.save_exclusions)
         excl_layout.addWidget(self.save_exclusions_button)
         
@@ -269,7 +270,7 @@ class SettingsView(BaseView):
         
         self.dash_save_button = QPushButton("Save Dashboard", d_btns)
         self.dash_save_button.clicked.connect(self.save_dashboard)
-        self.dash_save_button.setStyleSheet("background-color: #5bc0de; color: white;")
+        self.dash_save_button.setProperty("variant", "info")
         d_btns_layout.addWidget(self.dash_save_button)
         
         dash_layout.addWidget(d_btns)

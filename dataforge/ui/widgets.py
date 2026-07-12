@@ -13,6 +13,7 @@ from PyQt5.QtGui import QPixmap, QImage, QPainter, QFont, QColor
 
 from . import dialogs
 from ..core.config import config
+from .theme_tokens import TOKENS, TYPE_SCALE
 from ..core.services import FileActionService
 from ..core.logger import logger
 from ..core.utils import categorize_extension, CATEGORY_COLORS
@@ -149,7 +150,7 @@ class CollapsibleCard(QWidget):
         # Toggle Button
         self.btn_toggle = QPushButton("▼" if expanded else "▶", self.header)
         self.btn_toggle.setFixedWidth(30)
-        self.btn_toggle.setStyleSheet("border: none; background: transparent; font-size: 14px; font-weight: bold;")
+        self.btn_toggle.setStyleSheet(f"border: none; background: transparent; font-size: {TYPE_SCALE['subheading']}px; font-weight: bold;")
         self.btn_toggle.clicked.connect(self.toggle)
         self.header_layout.addWidget(self.btn_toggle)
         
@@ -1125,7 +1126,7 @@ class FilePreviewPanel(QWidget):
         info_layout = QVBoxLayout(self.f_info)
 
         self.lbl_name = QLabel("No Selection", self.f_info)
-        self.lbl_name.setStyleSheet("font-weight: bold; font-size: 14px;")
+        self.lbl_name.setStyleSheet(f"font-weight: bold; font-size: {TYPE_SCALE['subheading']}px;")
         info_layout.addWidget(self.lbl_name)
 
         self.lbl_detail = QLabel("", self.f_info)
@@ -1150,7 +1151,7 @@ class FilePreviewPanel(QWidget):
 
         self.content_lbl = QLabel("", self.f_content)
         self.content_lbl.setAlignment(Qt.AlignCenter)
-        self.content_lbl.setStyleSheet("color: #6c757d;")
+        self.content_lbl.setProperty("class", "muted")
         self.content_lbl.setWordWrap(True)
         self.content_layout.addWidget(self.content_lbl)
 
@@ -1158,7 +1159,7 @@ class FilePreviewPanel(QWidget):
         self.text_edit.setReadOnly(True)
         self.text_edit.setVisible(False)
         self.text_edit.setStyleSheet(
-            "font-family: 'Courier New', Consolas, monospace; font-size: 12px;"
+            f"font-family: 'Courier New', Consolas, monospace; font-size: {TYPE_SCALE['body']}px;"
         )
         self.content_layout.addWidget(self.text_edit)
 
@@ -1508,9 +1509,9 @@ class FilePreviewPanel(QWidget):
 
     def _show_binary_summary(self, path, ext, kind):
         if "Database" in kind or "SQLite" in kind:
-            self._set_thumbnail(self._category_icon("Other", glyph="DB", color="#0ea5e9"))
+            self._set_thumbnail(self._category_icon("Other", glyph="DB", color=TOKENS["light"]["info"]))
         else:
-            self._set_thumbnail(self._category_icon("Other", glyph="EXE", color="#ef4444"))
+            self._set_thumbnail(self._category_icon("Other", glyph="EXE", color=TOKENS["light"]["danger"]))
         try:
             size = os.path.getsize(path)
             if size > self.LARGE_FILE_BYTES:

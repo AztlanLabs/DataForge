@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 
 from .base import BaseView
+from ..theme_tokens import TOKENS, TYPE_SCALE
 from .. import dialogs
 from ..widgets import EnhancedTreeview, CollapsibleCard, attach_tooltips, FilePreviewPanel
 from ...core.utils import format_size
@@ -72,14 +73,15 @@ class RecoveryView(BaseView):
             "Files can be restored to their original locations.",
             t_body,
         )
-        self.lbl_trash_summary.setStyleSheet("color: #6c757d;")
+        self.lbl_trash_summary.setProperty("class", "muted")
         self.lbl_trash_summary.setWordWrap(True)
         t_body_layout.addWidget(self.lbl_trash_summary)
 
         self.btn_scan_trash = self.card_trash.add_widget_to_header(
             QPushButton, text="SCAN TRASH",
         )
-        self.btn_scan_trash.setStyleSheet("background-color: #10b981; color: white; font-weight: bold;")
+        self.btn_scan_trash.setProperty("variant", "success")
+        self.btn_scan_trash.setStyleSheet("font-weight: bold;")
         self.btn_scan_trash.clicked.connect(self._start_trash_scan)
 
         # Summary bar
@@ -88,10 +90,11 @@ class RecoveryView(BaseView):
         sf_layout = QHBoxLayout(summary_frame)
         sf_layout.setContentsMargins(10, 8, 10, 8)
         self.lbl_trash_count = QLabel("Files in trash: —")
-        self.lbl_trash_count.setStyleSheet("font-size: 15px; font-weight: bold; color: #3b82f6;")
+        self.lbl_trash_count.setStyleSheet(f"font-size: {TYPE_SCALE['subheading']}px; font-weight: bold; color: {TOKENS['light']['accent_focus']};")
         sf_layout.addWidget(self.lbl_trash_count)
         self.lbl_trash_size = QLabel("Total size: —")
-        self.lbl_trash_size.setStyleSheet("font-size: 14px; color: #6b7280;")
+        self.lbl_trash_size.setProperty("class", "muted")
+        self.lbl_trash_size.setStyleSheet(f"font-size: {TYPE_SCALE['subheading']}px;")
         sf_layout.addWidget(self.lbl_trash_size)
         sf_layout.addStretch()
         trash_layout.addWidget(summary_frame)
@@ -129,7 +132,8 @@ class RecoveryView(BaseView):
         ta_layout.setContentsMargins(0, 5, 0, 0)
 
         self.btn_restore_selected = QPushButton("♻️ Restore Selected", trash_actions)
-        self.btn_restore_selected.setStyleSheet("background-color: #10b981; color: white; font-weight: bold;")
+        self.btn_restore_selected.setProperty("variant", "success")
+        self.btn_restore_selected.setStyleSheet("font-weight: bold;")
         self.btn_restore_selected.clicked.connect(self._restore_selected)
         ta_layout.addWidget(self.btn_restore_selected)
 
@@ -139,7 +143,7 @@ class RecoveryView(BaseView):
 
         ta_layout.addStretch()
         self.lbl_restore_status = QLabel("", trash_actions)
-        self.lbl_restore_status.setStyleSheet("color: #6c757d;")
+        self.lbl_restore_status.setProperty("class", "muted")
         ta_layout.addWidget(self.lbl_restore_status)
         trash_layout.addWidget(trash_actions)
 
@@ -217,14 +221,16 @@ class RecoveryView(BaseView):
         btn_layout.setContentsMargins(0, 0, 0, 0)
 
         self.btn_carve = QPushButton("🔍 Carve Files (Built-in)", btn_frame)
-        self.btn_carve.setStyleSheet("background-color: #f59e0b; color: black; font-weight: bold;")
+        self.btn_carve.setProperty("variant", "warning")
+        self.btn_carve.setStyleSheet("font-weight: bold;")
         self.btn_carve.clicked.connect(self._start_carve)
         btn_layout.addWidget(self.btn_carve)
 
         self.btn_photorec = QPushButton("⚡ PhotoRec Recovery", btn_frame)
         photorec_available = check_photorec_available()
         if photorec_available:
-            self.btn_photorec.setStyleSheet("background-color: #8b5cf6; color: white; font-weight: bold;")
+            self.btn_photorec.setProperty("variant", "primary")
+            self.btn_photorec.setStyleSheet("font-weight: bold;")
         else:
             self.btn_photorec.setEnabled(False)
             self.btn_photorec.setToolTip("photorec not installed. Install testdisk: sudo apt install testdisk")
@@ -236,7 +242,7 @@ class RecoveryView(BaseView):
 
         # Deep recovery summary
         self.lbl_deep_summary = QLabel("Configure image path and file types, then start recovery.", d_body)
-        self.lbl_deep_summary.setStyleSheet("color: #6c757d;")
+        self.lbl_deep_summary.setProperty("class", "muted")
         self.lbl_deep_summary.setWordWrap(True)
         d_body_layout.addWidget(self.lbl_deep_summary)
 

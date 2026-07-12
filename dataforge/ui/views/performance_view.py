@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTimer
 
 from .base import BaseView
+from ..theme_tokens import TYPE_SCALE
 from ..widgets import EnhancedTreeview, CollapsibleCard, attach_tooltips
 from ...core.utils import format_size
 from ...modules.performance import (
@@ -57,7 +58,8 @@ class PerformanceView(BaseView):
                 "Performance monitoring features are unavailable.",
                 self,
             )
-            no_psutil.setStyleSheet("color: #ef4444; font-size: 16px; padding: 40px;")
+            no_psutil.setProperty("variant", "danger")
+            no_psutil.setStyleSheet(f"font-size: {TYPE_SCALE['heading']}px; padding: 40px;")
             no_psutil.setAlignment(Qt.AlignCenter)
             no_psutil.setWordWrap(True)
             layout.addWidget(no_psutil)
@@ -87,7 +89,7 @@ class PerformanceView(BaseView):
         header_layout.addStretch()
 
         self.lbl_uptime = QLabel("Uptime: —", header)
-        self.lbl_uptime.setStyleSheet("color: #6b7280;")
+        self.lbl_uptime.setProperty("class", "muted")
         header_layout.addWidget(self.lbl_uptime)
         overview_layout.addWidget(header)
 
@@ -98,7 +100,7 @@ class PerformanceView(BaseView):
 
         # CPU Meter
         self.lbl_cpu_title = QLabel("CPU")
-        self.lbl_cpu_title.setStyleSheet("font-weight: bold; font-size: 14px;")
+        self.lbl_cpu_title.setStyleSheet(f"font-weight: bold; font-size: {TYPE_SCALE['subheading']}px;")
         meters_grid.addWidget(self.lbl_cpu_title, 0, 0)
         self.cpu_bar = QProgressBar(meters_group)
         self.cpu_bar.setMaximum(100)
@@ -106,13 +108,14 @@ class PerformanceView(BaseView):
         self.cpu_bar.setMinimumHeight(25)
         meters_grid.addWidget(self.cpu_bar, 1, 0)
         self.lbl_cpu_detail = QLabel("—")
-        self.lbl_cpu_detail.setStyleSheet("color: #6b7280; font-size: 11px;")
+        self.lbl_cpu_detail.setProperty("class", "muted")
+        self.lbl_cpu_detail.setStyleSheet(f"font-size: {TYPE_SCALE['caption']}px;")
         self.lbl_cpu_detail.setWordWrap(True)
         meters_grid.addWidget(self.lbl_cpu_detail, 2, 0)
 
         # RAM Meter
         self.lbl_ram_title = QLabel("RAM")
-        self.lbl_ram_title.setStyleSheet("font-weight: bold; font-size: 14px;")
+        self.lbl_ram_title.setStyleSheet(f"font-weight: bold; font-size: {TYPE_SCALE['subheading']}px;")
         meters_grid.addWidget(self.lbl_ram_title, 0, 1)
         self.ram_bar = QProgressBar(meters_group)
         self.ram_bar.setMaximum(100)
@@ -120,13 +123,14 @@ class PerformanceView(BaseView):
         self.ram_bar.setMinimumHeight(25)
         meters_grid.addWidget(self.ram_bar, 1, 1)
         self.lbl_ram_detail = QLabel("—")
-        self.lbl_ram_detail.setStyleSheet("color: #6b7280; font-size: 11px;")
+        self.lbl_ram_detail.setProperty("class", "muted")
+        self.lbl_ram_detail.setStyleSheet(f"font-size: {TYPE_SCALE['caption']}px;")
         self.lbl_ram_detail.setWordWrap(True)
         meters_grid.addWidget(self.lbl_ram_detail, 2, 1)
 
         # Swap Meter
         self.lbl_swap_title = QLabel("Swap")
-        self.lbl_swap_title.setStyleSheet("font-weight: bold; font-size: 14px;")
+        self.lbl_swap_title.setStyleSheet(f"font-weight: bold; font-size: {TYPE_SCALE['subheading']}px;")
         meters_grid.addWidget(self.lbl_swap_title, 0, 2)
         self.swap_bar = QProgressBar(meters_group)
         self.swap_bar.setMaximum(100)
@@ -134,7 +138,8 @@ class PerformanceView(BaseView):
         self.swap_bar.setMinimumHeight(25)
         meters_grid.addWidget(self.swap_bar, 1, 2)
         self.lbl_swap_detail = QLabel("—")
-        self.lbl_swap_detail.setStyleSheet("color: #6b7280; font-size: 11px;")
+        self.lbl_swap_detail.setProperty("class", "muted")
+        self.lbl_swap_detail.setStyleSheet(f"font-size: {TYPE_SCALE['caption']}px;")
         self.lbl_swap_detail.setWordWrap(True)
         meters_grid.addWidget(self.lbl_swap_detail, 2, 2)
 
@@ -155,7 +160,8 @@ class PerformanceView(BaseView):
         ]
         for label_text, row, col in info_fields:
             lbl_name = QLabel(f"{label_text}:", self.sys_info_group)
-            lbl_name.setStyleSheet("font-weight: bold; color: #4b5563;")
+            lbl_name.setProperty("class", "muted")
+            lbl_name.setStyleSheet("font-weight: bold;")
             lbl_value = QLabel("—", self.sys_info_group)
             lbl_value.setWordWrap(True)
             self.sys_info_layout.addWidget(lbl_name, row, col)
@@ -209,13 +215,13 @@ class PerformanceView(BaseView):
         proc_header_layout.addWidget(self.btn_heavy)
 
         self.btn_kill = QPushButton("⛔ Kill Process", proc_header)
-        self.btn_kill.setStyleSheet("background-color: #ef4444; color: white;")
+        self.btn_kill.setProperty("variant", "danger")
         self.btn_kill.clicked.connect(self._kill_selected_process)
         proc_header_layout.addWidget(self.btn_kill)
         proc_header_layout.addStretch()
 
         self.lbl_proc_count = QLabel("Processes: —", proc_header)
-        self.lbl_proc_count.setStyleSheet("color: #6b7280;")
+        self.lbl_proc_count.setProperty("class", "muted")
         proc_header_layout.addWidget(self.lbl_proc_count)
         proc_layout.addWidget(proc_header)
 
@@ -256,7 +262,7 @@ class PerformanceView(BaseView):
         sh_layout.addWidget(self.btn_refresh_startup)
         sh_layout.addStretch()
         self.lbl_startup_count = QLabel("Startup items: —", startup_header)
-        self.lbl_startup_count.setStyleSheet("color: #6b7280;")
+        self.lbl_startup_count.setProperty("class", "muted")
         sh_layout.addWidget(self.lbl_startup_count)
         startup_layout.addWidget(startup_header)
 
@@ -291,7 +297,7 @@ class PerformanceView(BaseView):
         hh_layout.addWidget(self.btn_refresh_health)
         hh_layout.addStretch()
         self.lbl_health_status = QLabel("Click to check S.M.A.R.T. health data.", health_header)
-        self.lbl_health_status.setStyleSheet("color: #6b7280;")
+        self.lbl_health_status.setProperty("class", "muted")
         hh_layout.addWidget(self.lbl_health_status)
         health_layout.addWidget(health_header)
 

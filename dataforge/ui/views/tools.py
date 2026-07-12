@@ -8,6 +8,7 @@ import os
 
 from .base import BaseView
 from .. import dialogs
+from ..theme_tokens import TOKENS
 from ...core.scanner import scan_directory
 from ...core.services import FileActionService
 from ...modules import integrity
@@ -103,7 +104,7 @@ class ToolsView(BaseView):
         f1_layout.addWidget(self.snap_save_button, 1, 2)
         
         self.snap_create_button = QPushButton("Create", f1)
-        self.snap_create_button.setStyleSheet("background-color: #0275d8; color: white;")
+        self.snap_create_button.setProperty("variant", "primary")
         self.snap_create_button.clicked.connect(self.create_snapshot)
         f1_layout.addWidget(self.snap_create_button, 2, 0, 1, 3)
         
@@ -137,7 +138,7 @@ class ToolsView(BaseView):
         f2_layout.addWidget(self.verify_file_button, 1, 2)
         
         self.verify_button = QPushButton("Verify Integrity", f2)
-        self.verify_button.setStyleSheet("background-color: #f0ad4e; color: white;")
+        self.verify_button.setProperty("variant", "warning")
         self.verify_button.clicked.connect(self.verify_snapshot)
         f2_layout.addWidget(self.verify_button, 2, 0, 1, 3)
         
@@ -288,17 +289,17 @@ class ToolsView(BaseView):
         cleaner_btn_layout.setContentsMargins(0, 5, 0, 0)
         
         self.cleaner_scan_button = QPushButton("SCAN FOR METADATA", cleaner_btn_row)
-        self.cleaner_scan_button.setStyleSheet("background-color: #5bc0de; color: white;")
+        self.cleaner_scan_button.setProperty("variant", "info")
         self.cleaner_scan_button.clicked.connect(self.cleaner_start_scan)
         cleaner_btn_layout.addWidget(self.cleaner_scan_button)
         
         self.cleaner_selected_button = QPushButton("Clean Selected", cleaner_btn_row)
-        self.cleaner_selected_button.setStyleSheet("background-color: #f0ad4e; color: white;")
+        self.cleaner_selected_button.setProperty("variant", "warning")
         self.cleaner_selected_button.clicked.connect(self.cleaner_execute)
         cleaner_btn_layout.addWidget(self.cleaner_selected_button)
         
         self.cleaner_all_button = QPushButton("Clean All", cleaner_btn_row)
-        self.cleaner_all_button.setStyleSheet("background-color: #d9534f; color: white;")
+        self.cleaner_all_button.setProperty("variant", "danger")
         self.cleaner_all_button.clicked.connect(self.cleaner_execute_all)
         cleaner_btn_layout.addWidget(self.cleaner_all_button)
         
@@ -443,7 +444,7 @@ class ToolsView(BaseView):
         renamer_btn_layout.addWidget(self.renamer_preview_button)
 
         self.renamer_apply_button = QPushButton("APPLY", renamer_btn_row)
-        self.renamer_apply_button.setStyleSheet("background-color: #5cb85c; color: white;")
+        self.renamer_apply_button.setProperty("variant", "success")
         self.renamer_apply_button.clicked.connect(self.renamer_execute)
         renamer_btn_layout.addWidget(self.renamer_apply_button)
         renamer_btn_layout.addStretch()
@@ -495,12 +496,12 @@ class ToolsView(BaseView):
         sync_btn_layout.setContentsMargins(0, 5, 0, 0)
         
         self.sync_analyze_button = QPushButton("ANALYZE", sync_btn_row)
-        self.sync_analyze_button.setStyleSheet("background-color: #5bc0de; color: white;")
+        self.sync_analyze_button.setProperty("variant", "info")
         self.sync_analyze_button.clicked.connect(self.sync_analyze)
         sync_btn_layout.addWidget(self.sync_analyze_button)
         
         self.sync_execute_button = QPushButton("SYNC NOW", sync_btn_row)
-        self.sync_execute_button.setStyleSheet("background-color: #d9534f; color: white;")
+        self.sync_execute_button.setProperty("variant", "danger")
         self.sync_execute_button.clicked.connect(self.sync_execute)
         sync_btn_layout.addWidget(self.sync_execute_button)
         

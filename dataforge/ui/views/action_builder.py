@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 
 from .base import BaseView
+from ..theme_tokens import TOKENS
 from ..widgets import EnhancedTreeview, FlowLayout, FlowContainer, ElidingLabel, attach_tooltips
 from ...core.scanner import scan_directory
 from ...core.actions.base import ActionContext
@@ -121,7 +122,7 @@ Operations to perform on the filtered files.
 
         # Row 1: Filters
         self._add_step_button_group(
-            lib_layout, lib_frame, "Filter:", "#17a2b8",
+            lib_layout, lib_frame, "Filter:", "info",
             [
                 ("Name", SearchFilter), ("Size", SizeFilter), ("Date", DateFilter),
                 ("Img Prop", ImagePropFilter), ("Extension", ExtensionFilter),
@@ -132,7 +133,7 @@ Operations to perform on the filtered files.
 
         # Row 2: Actions
         self._add_step_button_group(
-            lib_layout, lib_frame, "Act:", "#ffc107",
+            lib_layout, lib_frame, "Act:", "warning",
             [
                 ("Rename", RenameStep), ("Move", MoveStep), ("Copy", CopyStep),
                 ("Zip", ZipStep), ("Normalize", NormalizeNameStep), ("Organize", OrganizeStep),
@@ -141,7 +142,7 @@ Operations to perform on the filtered files.
 
         # Row 3: Misc/Media
         self._add_step_button_group(
-            lib_layout, lib_frame, "Misc:", "#28a745",
+            lib_layout, lib_frame, "Misc:", "success",
             [
                 ("Convert", ConvertImageStep), ("Clean", MetaCleanStep),
                 ("Delete", DeleteStep), ("Hash Log", HashLogStep),
@@ -203,7 +204,7 @@ Operations to perform on the filtered files.
         run_layout.addWidget(self.btn_preview)
         
         self.btn_execute = QPushButton("EXECUTE PIPELINE", run_frame)
-        self.btn_execute.setStyleSheet("background-color: #28a745; color: white; font-weight: bold;")
+        self.btn_execute.setProperty("variant", "success")
         self.btn_execute.clicked.connect(lambda: self.run_pipeline(dry_run=False))
         run_layout.addWidget(self.btn_execute)
         
@@ -211,7 +212,7 @@ Operations to perform on the filtered files.
         
         self._init_tooltips()
 
-    def _add_step_button_group(self, parent_layout, parent_widget, label_text, label_color, entries):
+    def _add_step_button_group(self, parent_layout, parent_widget, label_text, label_variant, entries):
         """
         Renders a category label followed by a FlowLayout of "+ <name>"
         buttons that wrap onto additional lines as needed, instead of a
@@ -219,7 +220,7 @@ Operations to perform on the filtered files.
         category has more entries than fit on one line.
         """
         lbl = QLabel(label_text, parent_widget)
-        lbl.setStyleSheet(f"color: {label_color}; font-weight: bold;")
+        lbl.setProperty("variant", label_variant)
         parent_layout.addWidget(lbl)
 
         flow_widget = FlowContainer(parent_widget)
@@ -304,7 +305,7 @@ Operations to perform on the filtered files.
         
         btn_close = QPushButton("✕", header)
         btn_close.setFixedWidth(25)
-        btn_close.setStyleSheet("background-color: #dc3545; color: white;")
+        btn_close.setProperty("variant", "danger")
         btn_close.clicked.connect(lambda checked, idx=index: self.remove_step(idx))
         header_layout.addWidget(btn_close)
         
@@ -322,7 +323,8 @@ Operations to perform on the filtered files.
         # through this many levels of nested layouts (QLabel -> card_layout
         # -> card -> chain_layout -> chain_widget -> QScrollArea).
         summary_lbl = ElidingLabel(step.get_summary(), card)
-        summary_lbl.setStyleSheet("color: #6c757d; font-style: italic;")
+        summary_lbl.setProperty("class", "muted")
+        summary_lbl.setStyleSheet("font-style: italic;")
         card_layout.addWidget(summary_lbl)
 
         # Body content

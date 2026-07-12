@@ -13,6 +13,7 @@ from PyQt5.QtCore import Qt
 from .base import BaseView
 from .. import dialogs
 from ...core.services import FileActionService
+from ..theme_tokens import TOKENS
 from ..widgets import EnhancedTreeview, FilePreviewPanel, FlowLayout, FlowContainer, attach_tooltips
 from ...modules.search import build_search_query, export_search_results, order_search_results, search_files
 from ...core.utils import format_size, format_display_path
@@ -155,7 +156,7 @@ Once files are found, use the 'Bulk Actions' card to:
         grep_layout.addWidget(self.entry_content)
         
         self.lbl_results_slice = QLabel("Slice: natural order | full set", frame_grep)
-        self.lbl_results_slice.setStyleSheet("color: #6c757d;")
+        self.lbl_results_slice.setProperty("class", "muted")
         self.lbl_results_slice.setWordWrap(True)
         grep_layout.addWidget(self.lbl_results_slice)
         
@@ -213,7 +214,7 @@ Once files are found, use the 'Bulk Actions' card to:
         export_layout.addWidget(self.btn_export)
         
         self.lbl_export_summary = QLabel("Export not run yet.", f_export)
-        self.lbl_export_summary.setStyleSheet("color: #6c757d;")
+        self.lbl_export_summary.setProperty("class", "muted")
         self.lbl_export_summary.setWordWrap(True)
         export_layout.addWidget(self.lbl_export_summary)
         export_layout.addStretch()
@@ -225,22 +226,22 @@ Once files are found, use the 'Bulk Actions' card to:
         ops_layout.setContentsMargins(0, 0, 0, 0)
         
         self.btn_move = QPushButton("Move Selected", f_ops)
-        self.btn_move.setStyleSheet("background-color: #ffc107; color: black;")
+        self.btn_move.setProperty("variant", "warning")
         self.btn_move.clicked.connect(lambda: self.organize('move'))
         ops_layout.addWidget(self.btn_move)
         
         self.btn_copy = QPushButton("Copy Selected", f_ops)
-        self.btn_copy.setStyleSheet("background-color: #17a2b8; color: white;")
+        self.btn_copy.setProperty("variant", "info")
         self.btn_copy.clicked.connect(lambda: self.organize('copy'))
         ops_layout.addWidget(self.btn_copy)
         
         self.btn_delete = QPushButton("Delete Selected", f_ops)
-        self.btn_delete.setStyleSheet("background-color: #dc3545; color: white;")
+        self.btn_delete.setProperty("variant", "danger")
         self.btn_delete.clicked.connect(lambda: self.organize('delete'))
         ops_layout.addWidget(self.btn_delete)
         
         self.lbl_organize_summary = QLabel("Move/copy/delete preview not run yet.", f_ops)
-        self.lbl_organize_summary.setStyleSheet("color: #6c757d;")
+        self.lbl_organize_summary.setProperty("class", "muted")
         self.lbl_organize_summary.setWordWrap(True)
         ops_layout.addWidget(self.lbl_organize_summary)
         ops_layout.addStretch()
@@ -264,7 +265,7 @@ Once files are found, use the 'Bulk Actions' card to:
         ren_layout.addWidget(self.btn_rename)
         
         self.lbl_rename_summary = QLabel("Rename preview not run yet.", f_ren)
-        self.lbl_rename_summary.setStyleSheet("color: #6c757d;")
+        self.lbl_rename_summary.setProperty("class", "muted")
         self.lbl_rename_summary.setWordWrap(True)
         ren_layout.addWidget(self.lbl_rename_summary)
         ren_layout.addStretch()
@@ -292,7 +293,7 @@ Once files are found, use the 'Bulk Actions' card to:
         zip_layout.addWidget(self.btn_zip_all)
         
         self.lbl_archive_summary = QLabel("Archive preview not run yet.", f_zip)
-        self.lbl_archive_summary.setStyleSheet("color: #6c757d;")
+        self.lbl_archive_summary.setProperty("class", "muted")
         self.lbl_archive_summary.setWordWrap(True)
         zip_layout.addWidget(self.lbl_archive_summary)
         zip_layout.addStretch()

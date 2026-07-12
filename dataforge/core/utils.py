@@ -19,13 +19,13 @@ CATEGORY_EXTENSIONS = {
 }
 
 CATEGORY_COLORS = {
-    "Documents": "#0d6efd",
-    "Images": "#28a745",
-    "Videos": "#ffc107",
-    "Audio": "#17a2b8",
-    "Archives": "#dc3545",
-    "Code": "#6c757d",
-    "Other": "#343a40",
+    "Documents": "#2563eb",
+    "Images": "#047857",
+    "Videos": "#b45309",
+    "Audio": "#0369a1",
+    "Archives": "#dc2626",
+    "Code": "#6b7280",
+    "Other": "#374151",
 }
 
 

@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 
 from .base import BaseView
+from ..theme_tokens import TOKENS, TYPE_SCALE
 from .. import dialogs
 from ..widgets import EnhancedTreeview, CollapsibleCard, attach_tooltips
 from ...core.utils import format_size
@@ -82,7 +83,7 @@ class ForensicsView(BaseView):
         )
         warning.setStyleSheet(
             "background-color: #fef3c7; color: #92400e; padding: 8px; "
-            "border: 1px solid #f59e0b; border-radius: 4px; font-weight: bold;"
+            f"border: 1px solid {TOKENS['light']['warning']}; border-radius: 4px; font-weight: bold;"
         )
         warning.setWordWrap(True)
         layout.addWidget(warning)
@@ -187,11 +188,12 @@ class ForensicsView(BaseView):
 
         # Run button
         self.btn_ingest = card.add_widget_to_header(QPushButton, text="RUN INGESTION")
-        self.btn_ingest.setStyleSheet("background-color: #dc2626; color: white; font-weight: bold;")
+        self.btn_ingest.setProperty("variant", "danger")
+        self.btn_ingest.setStyleSheet("font-weight: bold;")
         self.btn_ingest.clicked.connect(self._start_ingestion)
 
         self.lbl_ingest_status = QLabel("Configure target and options, then run ingestion.", body)
-        self.lbl_ingest_status.setStyleSheet("color: #6c757d;")
+        self.lbl_ingest_status.setProperty("class", "muted")
         self.lbl_ingest_status.setWordWrap(True)
         body_layout.addWidget(self.lbl_ingest_status)
 
@@ -256,7 +258,8 @@ class ForensicsView(BaseView):
         h_layout.addWidget(self.chk_sha512)
 
         self.btn_calc_hash = QPushButton("🔐 Calculate", header)
-        self.btn_calc_hash.setStyleSheet("background-color: #10b981; color: white; font-weight: bold;")
+        self.btn_calc_hash.setProperty("variant", "success")
+        self.btn_calc_hash.setStyleSheet("font-weight: bold;")
         self.btn_calc_hash.clicked.connect(self._calculate_hashes)
         h_layout.addWidget(self.btn_calc_hash)
 
@@ -321,7 +324,8 @@ class ForensicsView(BaseView):
         btn_browse.clicked.connect(lambda: self._browse_to(self.artifact_path))
         h_layout.addWidget(btn_browse)
         self.btn_parse = QPushButton("🔍 Parse Artifacts", header)
-        self.btn_parse.setStyleSheet("background-color: #f59e0b; color: black; font-weight: bold;")
+        self.btn_parse.setProperty("variant", "warning")
+        self.btn_parse.setStyleSheet("font-weight: bold;")
         self.btn_parse.clicked.connect(self._parse_artifacts)
         h_layout.addWidget(self.btn_parse)
         tab_layout.addWidget(header)
@@ -339,7 +343,7 @@ class ForensicsView(BaseView):
         tab_layout.addWidget(self.artifact_tree, 1)
 
         self.lbl_artifact_status = QLabel("", tab)
-        self.lbl_artifact_status.setStyleSheet("color: #6b7280;")
+        self.lbl_artifact_status.setProperty("class", "muted")
         tab_layout.addWidget(self.lbl_artifact_status)
 
         self.tabs.addTab(tab, "🔎 OS Artifacts")
@@ -368,7 +372,8 @@ class ForensicsView(BaseView):
         btn_browse_pwd.clicked.connect(lambda: self._browse_file_to(self.pwd_source))
         ef_layout.addWidget(btn_browse_pwd)
         self.btn_extract = QPushButton("🔓 Extract Hashes", ef_frame)
-        self.btn_extract.setStyleSheet("background-color: #8b5cf6; color: white; font-weight: bold;")
+        self.btn_extract.setProperty("variant", "primary")
+        self.btn_extract.setStyleSheet("font-weight: bold;")
         self.btn_extract.clicked.connect(self._extract_hashes)
         ef_layout.addWidget(self.btn_extract)
         eg_layout.addWidget(ef_frame)
@@ -409,7 +414,7 @@ class ForensicsView(BaseView):
 
         self.strength_result = QLabel("", strength_group)
         self.strength_result.setWordWrap(True)
-        self.strength_result.setStyleSheet("font-size: 13px; padding: 10px;")
+        self.strength_result.setStyleSheet(f"font-size: {TYPE_SCALE['body']}px; padding: 10px;")
         sg_layout.addWidget(self.strength_result)
 
         tab_layout.addWidget(strength_group)
@@ -452,7 +457,8 @@ class ForensicsView(BaseView):
         ag_layout.addWidget(self.attack_hash_type, 2, 3, 1, 2)
 
         self.btn_run_attack = QPushButton("⚔️ Run Dictionary Attack", attack_group)
-        self.btn_run_attack.setStyleSheet("background-color: #dc2626; color: white; font-weight: bold;")
+        self.btn_run_attack.setProperty("variant", "danger")
+        self.btn_run_attack.setStyleSheet("font-weight: bold;")
         self.btn_run_attack.clicked.connect(self._run_dict_attack)
         ag_layout.addWidget(self.btn_run_attack, 3, 0, 1, 5)
 
@@ -477,7 +483,8 @@ class ForensicsView(BaseView):
             tools_info.append(f"{'✅' if available else '❌'} {label}")
 
         lbl_tools = QLabel(f"Available tools: {' | '.join(tools_info)}", tab)
-        lbl_tools.setStyleSheet("color: #9ca3af; font-size: 11px;")
+        lbl_tools.setProperty("class", "muted")
+        lbl_tools.setStyleSheet(f"font-size: {TYPE_SCALE['caption']}px;")
         tab_layout.addWidget(lbl_tools)
 
         self.tabs.addTab(tab, "🔑 Password Tools")
@@ -516,14 +523,15 @@ class ForensicsView(BaseView):
         btn_browse.clicked.connect(lambda: self._browse_to(self.ftype_path))
         h_layout.addWidget(btn_browse)
         self.btn_ftype = QPushButton("🔍 Profile Types", header)
-        self.btn_ftype.setStyleSheet("background-color: #0ea5e9; color: white; font-weight: bold;")
+        self.btn_ftype.setProperty("variant", "info")
+        self.btn_ftype.setStyleSheet("font-weight: bold;")
         self.btn_ftype.clicked.connect(self._profile_filetypes)
         h_layout.addWidget(self.btn_ftype)
         tab_layout.addWidget(header)
 
         # Summary label
         self.lbl_ftype_summary = QLabel("Classify every file by magic bytes — ignores extensions.", tab)
-        self.lbl_ftype_summary.setStyleSheet("color: #6b7280;")
+        self.lbl_ftype_summary.setProperty("class", "muted")
         self.lbl_ftype_summary.setWordWrap(True)
         tab_layout.addWidget(self.lbl_ftype_summary)
 
@@ -630,7 +638,8 @@ class ForensicsView(BaseView):
         self.spin_ent_bytes.setSingleStep(1024)
         h_layout.addWidget(self.spin_ent_bytes)
         self.btn_ent_calc = QPushButton("📊 Compute Entropy", header)
-        self.btn_ent_calc.setStyleSheet("background-color: #6366f1; color: white; font-weight: bold;")
+        self.btn_ent_calc.setProperty("variant", "primary")
+        self.btn_ent_calc.setStyleSheet("font-weight: bold;")
         self.btn_ent_calc.clicked.connect(self._compute_entropy)
         h_layout.addWidget(self.btn_ent_calc)
         h_layout.addStretch()
@@ -640,7 +649,7 @@ class ForensicsView(BaseView):
             "High entropy (>7.5) hints at encryption, packing, or compression.",
             tab,
         )
-        self.lbl_entropy_status.setStyleSheet("color: #6b7280;")
+        self.lbl_entropy_status.setProperty("class", "muted")
         self.lbl_entropy_status.setWordWrap(True)
         tab_layout.addWidget(self.lbl_entropy_status)
 
@@ -751,7 +760,7 @@ class ForensicsView(BaseView):
         if "error" in result:
             self.ent_single_result.setText(f"Error: {result['error']}")
             return
-        color = "#dc2626" if result["entropy"] >= 7.5 else ("#f59e0b" if result["entropy"] >= 4.5 else "#059669")
+        color = TOKENS["light"]["danger"] if (result["entropy"] >= 7.5) else (TOKENS["light"]["warning"] if (result["entropy"] >= 4.5) else TOKENS["light"]["success"])
         self.ent_single_result.setText(
             f"<b style='color:{color}'>Entropy: {result['entropy']:.4f} bits/byte</b> "
             f"(sample {result['sample_size']} bytes)\nVerdict: {result['verdict']}"
@@ -782,13 +791,14 @@ class ForensicsView(BaseView):
         self.timeline_sort.addItems(["mtime", "atime", "ctime"])
         h_layout.addWidget(self.timeline_sort)
         self.btn_timeline = QPushButton("🕰 Build Timeline", header)
-        self.btn_timeline.setStyleSheet("background-color: #f59e0b; color: black; font-weight: bold;")
+        self.btn_timeline.setProperty("variant", "warning")
+        self.btn_timeline.setStyleSheet("font-weight: bold;")
         self.btn_timeline.clicked.connect(self._build_timeline)
         h_layout.addWidget(self.btn_timeline)
         tab_layout.addWidget(header)
 
         self.lbl_timeline_status = QLabel("Builds a UTC timestamped event list for every file.", tab)
-        self.lbl_timeline_status.setStyleSheet("color: #6b7280;")
+        self.lbl_timeline_status.setProperty("class", "muted")
         self.lbl_timeline_status.setWordWrap(True)
         tab_layout.addWidget(self.lbl_timeline_status)
 
@@ -887,7 +897,8 @@ class ForensicsView(BaseView):
         self.spin_hex_offset.setSingleStep(4096)
         h_layout.addWidget(self.spin_hex_offset)
         self.btn_hex_view = QPushButton("👁 View Hex", header)
-        self.btn_hex_view.setStyleSheet("background-color: #10b981; color: white; font-weight: bold;")
+        self.btn_hex_view.setProperty("variant", "success")
+        self.btn_hex_view.setStyleSheet("font-weight: bold;")
         self.btn_hex_view.clicked.connect(self._view_hex)
         h_layout.addWidget(self.btn_hex_view)
         tab_layout.addWidget(header)
@@ -895,12 +906,12 @@ class ForensicsView(BaseView):
         self.hex_view = QTextEdit(tab)
         self.hex_view.setReadOnly(True)
         self.hex_view.setStyleSheet(
-            "font-family: 'Courier New', Consolas, monospace; font-size: 12px;"
+            f"font-family: 'Courier New', Consolas, monospace; font-size: {TYPE_SCALE['body']}px;"
         )
         tab_layout.addWidget(self.hex_view, 1)
 
         self.lbl_hex_info = QLabel("", tab)
-        self.lbl_hex_info.setStyleSheet("color: #6b7280;")
+        self.lbl_hex_info.setProperty("class", "muted")
         self.lbl_hex_info.setWordWrap(True)
         tab_layout.addWidget(self.lbl_hex_info)
 
@@ -956,7 +967,8 @@ class ForensicsView(BaseView):
         btn_browse.clicked.connect(lambda: self._browse_file_to(self.stego_path))
         h_layout.addWidget(btn_browse)
         self.btn_stego = QPushButton("🕵 Analyze", header)
-        self.btn_stego.setStyleSheet("background-color: #8b5cf6; color: white; font-weight: bold;")
+        self.btn_stego.setProperty("variant", "primary")
+        self.btn_stego.setStyleSheet("font-weight: bold;")
         self.btn_stego.clicked.connect(self._analyze_stego)
         h_layout.addWidget(self.btn_stego)
         tab_layout.addWidget(header)
@@ -964,7 +976,7 @@ class ForensicsView(BaseView):
         self.stego_result = QTextEdit(tab)
         self.stego_result.setReadOnly(True)
         self.stego_result.setStyleSheet(
-            "font-family: 'Courier New', Consolas, monospace; font-size: 12px;"
+            f"font-family: 'Courier New', Consolas, monospace; font-size: {TYPE_SCALE['body']}px;"
         )
         tab_layout.addWidget(self.stego_result, 1)
 
@@ -1027,7 +1039,8 @@ class ForensicsView(BaseView):
         self.spin_secure_passes.setValue(3)
         h_layout.addWidget(self.spin_secure_passes)
         self.btn_secure_delete = QPushButton("🗑 Secure Delete", header)
-        self.btn_secure_delete.setStyleSheet("background-color: #dc2626; color: white; font-weight: bold;")
+        self.btn_secure_delete.setProperty("variant", "danger")
+        self.btn_secure_delete.setStyleSheet("font-weight: bold;")
         self.btn_secure_delete.clicked.connect(self._do_secure_delete)
         h_layout.addWidget(self.btn_secure_delete)
         tab_layout.addWidget(header)
@@ -1035,7 +1048,7 @@ class ForensicsView(BaseView):
         self.secure_result = QTextEdit(tab)
         self.secure_result.setReadOnly(True)
         self.secure_result.setStyleSheet(
-            "font-family: 'Courier New', Consolas, monospace; font-size: 12px;"
+            f"font-family: 'Courier New', Consolas, monospace; font-size: {TYPE_SCALE['body']}px;"
         )
         tab_layout.addWidget(self.secure_result, 1)
 
@@ -1100,7 +1113,8 @@ class ForensicsView(BaseView):
         btn_browse_file.clicked.connect(lambda: self._browse_file_to(self.integrity_path))
         m_layout.addWidget(btn_browse_file)
         self.btn_integrity_run = QPushButton("Run", mode_row)
-        self.btn_integrity_run.setStyleSheet("background-color: #10b981; color: white; font-weight: bold;")
+        self.btn_integrity_run.setProperty("variant", "success")
+        self.btn_integrity_run.setStyleSheet("font-weight: bold;")
         self.btn_integrity_run.clicked.connect(self._run_integrity)
         m_layout.addWidget(self.btn_integrity_run)
         tab_layout.addWidget(mode_row)
@@ -1119,7 +1133,7 @@ class ForensicsView(BaseView):
             "Create a cryptographic baseline, then later re-verify to detect tampering.",
             tab,
         )
-        self.lbl_integrity_status.setStyleSheet("color: #6b7280;")
+        self.lbl_integrity_status.setProperty("class", "muted")
         self.lbl_integrity_status.setWordWrap(True)
         tab_layout.addWidget(self.lbl_integrity_status)
 
@@ -1547,10 +1561,13 @@ class ForensicsView(BaseView):
         if results:
             r = results[0]
             color = {
-                "Very Weak": "#dc2626", "Weak": "#ef4444",
-                "Fair": "#f59e0b", "Good": "#10b981",
-                "Strong": "#059669", "Very Strong": "#047857",
-            }.get(r["strength"], "#6b7280")
+                "Very Weak": TOKENS["light"]["danger"],
+                "Weak": TOKENS["light"]["danger_bg"],
+                "Fair": TOKENS["light"]["warning"],
+                "Good": TOKENS["light"]["success"],
+                "Strong": TOKENS["light"]["success"],
+                "Very Strong": TOKENS["light"]["success"],
+            }.get(r["strength"], TOKENS["light"]["text_muted"])
 
             issues = "\n".join(f"  ⚠️ {issue}" for issue in r.get("issues", []))
             self.strength_result.setText(

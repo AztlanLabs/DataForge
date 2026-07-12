@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 
 from .base import BaseView
+from ..theme_tokens import TOKENS, TYPE_SCALE
 from ...modules.usage import analyze_size
 from ...core.config import config
 from ...core.utils import format_size, categorize_extension, CATEGORY_COLORS
@@ -32,7 +33,7 @@ class DashboardView(BaseView):
         hdr_layout.setContentsMargins(0, 0, 0, 10)
         
         self.lbl_title = QLabel("\u2302 System Dashboard", hdr)
-        self.lbl_title.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.lbl_title.setStyleSheet(f"font-size: {TYPE_SCALE['heading']}px; font-weight: bold;")
         hdr_layout.addWidget(self.lbl_title)
         
         hdr_layout.addStretch()
@@ -131,13 +132,13 @@ class DashboardView(BaseView):
             pct = int((used / total) * 100)
             self.disk_progress.setValue(pct)
             
-            # Color-coded progress based on usage
+            # Color-coded progress based on usage (uses token-validated AA colors)
             if pct > 90:
-                style = "QProgressBar::chunk { background-color: #dc3545; }"
+                style = f"QProgressBar::chunk {{ background-color: {TOKENS['light']['danger']}; }}"
             elif pct > 70:
-                style = "QProgressBar::chunk { background-color: #ffc107; }"
+                style = f"QProgressBar::chunk {{ background-color: {TOKENS['light']['warning']}; }}"
             else:
-                style = "QProgressBar::chunk { background-color: #28a745; }"
+                style = f"QProgressBar::chunk {{ background-color: {TOKENS['light']['success']}; }}"
             self.disk_progress.setStyleSheet(style)
             
             self.lbl_disk_info.setText(
@@ -355,7 +356,7 @@ class DashboardView(BaseView):
                 p.setTextVisible(False)
                 p.setFixedHeight(12)
                 
-                color = CATEGORY_COLORS.get(cat, "#17a2b8")
+                color = CATEGORY_COLORS.get(cat, TOKENS["light"]["info"])
                 p.setStyleSheet(f"QProgressBar::chunk {{ background-color: {color}; }}")
                 row_layout.addWidget(p)
                 

@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 
 from .base import BaseView
+from ..theme_tokens import TOKENS, TYPE_SCALE
 from ..widgets import CollapsibleCard
 
 class AboutView(BaseView):
@@ -47,18 +48,18 @@ class AboutView(BaseView):
         banner_layout.setContentsMargins(20, 20, 20, 20)
 
         lbl_app_title = QLabel("DataForge — File & System Intelligence", banner_frame)
-        lbl_app_title.setStyleSheet("color: #e0e7ff; font-size: 20px; font-weight: bold; background: transparent;")
+        lbl_app_title.setStyleSheet(f"color: #e0e7ff; font-size: {TYPE_SCALE['display']}px; font-weight: bold; background: transparent;")
         banner_layout.addWidget(lbl_app_title)
 
         lbl_app_version = QLabel("Development build (release 1.0, 64-bit)", banner_frame)
-        lbl_app_version.setStyleSheet("color: #818cf8; font-size: 13px; background: transparent;")
+        lbl_app_version.setStyleSheet(f"color: #818cf8; font-size: {TYPE_SCALE['body']}px; background: transparent;")
         banner_layout.addWidget(lbl_app_version)
 
         lbl_app_desc = QLabel(
             "An all-in-one system diagnostics, file organizer, storage structures analyzer, "
             "metadata studio, and digital forensics application.", banner_frame
         )
-        lbl_app_desc.setStyleSheet("color: #c7d2fe; font-size: 13px; background: transparent;")
+        lbl_app_desc.setStyleSheet(f"color: #c7d2fe; font-size: {TYPE_SCALE['body']}px; background: transparent;")
         lbl_app_desc.setWordWrap(True)
         banner_layout.addWidget(lbl_app_desc)
 
@@ -93,7 +94,8 @@ class AboutView(BaseView):
 
         for i, (label, val) in enumerate(diagnostics):
             lbl_name = QLabel(label, sys_group)
-            lbl_name.setStyleSheet("font-weight: bold; color: #6b7280;")
+            lbl_name.setStyleSheet("font-weight: bold;")
+            lbl_name.setProperty("class", "muted")
             lbl_val = QLabel(val, sys_group)
             lbl_val.setStyleSheet("font-family: Consolas, monospace;")
             lbl_val.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -166,7 +168,8 @@ class AboutView(BaseView):
             
             lbl_desc = QLabel(desc, card.get_body())
             lbl_desc.setWordWrap(True)
-            lbl_desc.setStyleSheet("color: #4b5563; font-size: 13px; line-height: 1.4;")
+            lbl_desc.setProperty("class", "muted")
+            lbl_desc.setStyleSheet(f"font-size: {TYPE_SCALE['body']}px; line-height: 1.4;")
             card_layout.addWidget(lbl_desc)
             
             help_layout.addWidget(card)

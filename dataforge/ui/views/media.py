@@ -7,6 +7,7 @@ from PyQt5.QtCore import Qt
 import os
 
 from .base import BaseView
+from ..theme_tokens import TYPE_SCALE
 from .. import dialogs
 from ..widgets import EnhancedTreeview, FilePreviewPanel, attach_tooltips
 
@@ -44,7 +45,7 @@ class MediaView(BaseView):
         
         # Merge Section
         lbl_merge = QLabel("Merge PDFs", tab)
-        lbl_merge.setStyleSheet("font-weight: bold; font-size: 14px;")
+        lbl_merge.setStyleSheet(f"font-weight: bold; font-size: {TYPE_SCALE['subheading']}px;")
         layout.addWidget(lbl_merge)
         
         # Tools row
@@ -71,7 +72,7 @@ class MediaView(BaseView):
         bar_layout.addStretch()
         
         self.pdf_merge_button = QPushButton("Merge Into One", bar)
-        self.pdf_merge_button.setStyleSheet("background-color: #f0ad4e; color: white;")
+        self.pdf_merge_button.setProperty("variant", "warning")
         self.pdf_merge_button.clicked.connect(self.pdf_merge)
         bar_layout.addWidget(self.pdf_merge_button)
         
@@ -90,7 +91,7 @@ class MediaView(BaseView):
         
         # Split Section
         lbl_split = QLabel("Split PDF", tab)
-        lbl_split.setStyleSheet("font-weight: bold; font-size: 14px;")
+        lbl_split.setStyleSheet(f"font-weight: bold; font-size: {TYPE_SCALE['subheading']}px;")
         layout.addWidget(lbl_split)
         
         row = QWidget(tab)
@@ -106,7 +107,7 @@ class MediaView(BaseView):
         row_layout.addWidget(self.pdf_split_browse_button)
         
         self.pdf_split_button = QPushButton("Split Into Pages", row)
-        self.pdf_split_button.setStyleSheet("background-color: #f0ad4e; color: white;")
+        self.pdf_split_button.setProperty("variant", "warning")
         self.pdf_split_button.clicked.connect(self.pdf_split)
         row_layout.addWidget(self.pdf_split_button)
         
@@ -160,7 +161,7 @@ class MediaView(BaseView):
         opts_layout.addStretch()
         
         self.img_convert_button = QPushButton("Convert All", opts)
-        self.img_convert_button.setStyleSheet("background-color: #5cb85c; color: white;")
+        self.img_convert_button.setProperty("variant", "success")
         self.img_convert_button.clicked.connect(self.img_convert)
         opts_layout.addWidget(self.img_convert_button)
         

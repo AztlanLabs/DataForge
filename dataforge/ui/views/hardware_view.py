@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 
 from .base import BaseView
+from ..theme_tokens import TYPE_SCALE
 from .. import dialogs
 from ..widgets import EnhancedTreeview, CollapsibleCard, attach_tooltips
 from ...core.utils import format_size
@@ -48,7 +49,8 @@ class HardwareView(BaseView):
         h_layout.setContentsMargins(0, 0, 0, 5)
 
         self.btn_scan = QPushButton("🔍 Run Hardware Scan", header)
-        self.btn_scan.setStyleSheet("background-color: #3b82f6; color: white; font-weight: bold; padding: 8px 16px;")
+        self.btn_scan.setProperty("variant", "primary")
+        self.btn_scan.setStyleSheet("font-weight: bold; padding: 8px 16px;")
         self.btn_scan.clicked.connect(self._run_scan)
         h_layout.addWidget(self.btn_scan)
 
@@ -62,7 +64,7 @@ class HardwareView(BaseView):
 
         h_layout.addStretch()
         self.lbl_status = QLabel("Click 'Run Hardware Scan' to begin.", header)
-        self.lbl_status.setStyleSheet("color: #6b7280;")
+        self.lbl_status.setProperty("class", "muted")
         h_layout.addWidget(self.lbl_status)
         layout.addWidget(header)
 
@@ -87,7 +89,8 @@ class HardwareView(BaseView):
         self.overview_placeholder = QLabel(
             "Run a hardware scan to see system details.", ov_inner
         )
-        self.overview_placeholder.setStyleSheet("color: #9ca3af; font-size: 16px; padding: 40px;")
+        self.overview_placeholder.setProperty("class", "muted")
+        self.overview_placeholder.setStyleSheet(f"font-size: {TYPE_SCALE['heading']}px; padding: 40px;")
         self.overview_placeholder.setAlignment(Qt.AlignCenter)
         self.overview_layout.addWidget(self.overview_placeholder)
 
@@ -117,7 +120,7 @@ class HardwareView(BaseView):
 
         self.rec_text = QTextEdit(rec_tab)
         self.rec_text.setReadOnly(True)
-        self.rec_text.setStyleSheet("font-size: 14px; padding: 10px;")
+        self.rec_text.setStyleSheet(f"font-size: {TYPE_SCALE['subheading']}px; padding: 10px;")
         self.rec_text.setPlainText("Run a hardware scan to see upgrade recommendations.")
         rec_layout.addWidget(self.rec_text)
 
@@ -230,7 +233,8 @@ class HardwareView(BaseView):
             card_layout = QGridLayout(card)
             for i, (key, value) in enumerate(rows):
                 lbl_key = QLabel(f"{key}:")
-                lbl_key.setStyleSheet("font-weight: bold; color: #4b5563;")
+                lbl_key.setProperty("class", "muted")
+                lbl_key.setStyleSheet("font-weight: bold;")
                 lbl_val = QLabel(str(value))
                 lbl_val.setWordWrap(True)
                 card_layout.addWidget(lbl_key, i, 0)

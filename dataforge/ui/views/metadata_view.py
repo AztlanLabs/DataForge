@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 
 from .base import BaseView
+from ..theme_tokens import TYPE_SCALE
 from .. import dialogs
 from ..widgets import EnhancedTreeview, FilePreviewPanel, CollapsibleCard, attach_tooltips
 from ...core.utils import format_size
@@ -92,11 +93,12 @@ class MetadataView(BaseView):
         self.btn_scan = self.card_config.add_widget_to_header(
             QPushButton, text="SCAN METADATA",
         )
-        self.btn_scan.setStyleSheet("background-color: #6366f1; color: white; font-weight: bold;")
+        self.btn_scan.setProperty("variant", "primary")
+        self.btn_scan.setStyleSheet("font-weight: bold;")
         self.btn_scan.clicked.connect(self._start_scan)
 
         self.lbl_scan_summary = QLabel("No metadata scan run yet.", c_body)
-        self.lbl_scan_summary.setStyleSheet("color: #6c757d;")
+        self.lbl_scan_summary.setProperty("class", "muted")
         self.lbl_scan_summary.setWordWrap(True)
         c_layout.addWidget(self.lbl_scan_summary)
 
@@ -113,7 +115,8 @@ class MetadataView(BaseView):
         exiftool_str = "✅ ExifTool (180+ formats)" if has_exiftool else "❌ ExifTool not installed"
         support_text = f"Format support: {' | '.join(support_parts)} | {exiftool_str}"
         lbl_support = QLabel(support_text, c_body)
-        lbl_support.setStyleSheet("color: #9ca3af; font-size: 11px;")
+        lbl_support.setProperty("class", "muted")
+        lbl_support.setStyleSheet(f"font-size: {TYPE_SCALE['caption']}px;")
         lbl_support.setWordWrap(True)
         c_layout.addWidget(lbl_support)
 
@@ -181,7 +184,7 @@ class MetadataView(BaseView):
         raw_layout = QVBoxLayout(raw_tab)
         self.raw_text = QTextEdit(raw_tab)
         self.raw_text.setReadOnly(True)
-        self.raw_text.setStyleSheet("font-family: 'Courier New', Consolas, monospace; font-size: 12px;")
+        self.raw_text.setStyleSheet(f"font-family: 'Courier New', Consolas, monospace; font-size: {TYPE_SCALE['body']}px;")
         raw_layout.addWidget(self.raw_text)
         self.detail_tabs.addTab(raw_tab, "{ } Raw Data")
 
@@ -189,7 +192,7 @@ class MetadataView(BaseView):
         gps_tab = QWidget()
         gps_layout = QVBoxLayout(gps_tab)
         self.lbl_gps = QLabel("Select a file with GPS data to view coordinates.", gps_tab)
-        self.lbl_gps.setStyleSheet("font-size: 14px; padding: 20px;")
+        self.lbl_gps.setStyleSheet(f"font-size: {TYPE_SCALE['subheading']}px; padding: 20px;")
         self.lbl_gps.setAlignment(Qt.AlignCenter)
         self.lbl_gps.setWordWrap(True)
         gps_layout.addWidget(self.lbl_gps)
@@ -215,7 +218,7 @@ class MetadataView(BaseView):
         action_layout = QHBoxLayout(action_frame)
 
         self.btn_strip_all = QPushButton("🗑 Strip All Metadata", action_frame)
-        self.btn_strip_all.setStyleSheet("background-color: #ef4444; color: white;")
+        self.btn_strip_all.setProperty("variant", "danger")
         self.btn_strip_all.clicked.connect(self._strip_selected)
         action_layout.addWidget(self.btn_strip_all)
 
@@ -244,7 +247,7 @@ class MetadataView(BaseView):
 
         action_layout.addStretch()
         self.lbl_action_status = QLabel("", action_frame)
-        self.lbl_action_status.setStyleSheet("color: #6c757d;")
+        self.lbl_action_status.setProperty("class", "muted")
         action_layout.addWidget(self.lbl_action_status)
 
         layout.addWidget(action_frame)

@@ -10,6 +10,7 @@ from PyQt5.QtCore import Qt
 
 from .base import BaseView
 from .. import dialogs
+from ..theme_tokens import TOKENS
 from ..widgets import EnhancedTreeview, FilePreviewPanel, CollapsibleCard, attach_tooltips
 from ...core.config import config
 from ...core.services import FileActionService
@@ -137,17 +138,17 @@ class DuplicatesView(BaseView):
             QPushButton,
             text="RUN SCAN",
         )
-        self.btn_run.setStyleSheet("background-color: #ffc107; color: black; font-weight: bold;")
+        self.btn_run.setProperty("variant", "warning")
         self.btn_run.clicked.connect(self.start_scan)
 
         # Scan summaries
         self.lbl_scan_summary = QLabel("No duplicate scan run yet.", c_body)
-        self.lbl_scan_summary.setStyleSheet("color: #6c757d;")
+        self.lbl_scan_summary.setProperty("class", "muted")
         self.lbl_scan_summary.setWordWrap(True)
         c_body_layout.addWidget(self.lbl_scan_summary)
 
         self.lbl_results_slice = QLabel("Slice: natural order | full set", c_body)
-        self.lbl_results_slice.setStyleSheet("color: #6c757d;")
+        self.lbl_results_slice.setProperty("class", "muted")
         self.lbl_results_slice.setWordWrap(True)
         c_body_layout.addWidget(self.lbl_results_slice)
 
@@ -226,12 +227,12 @@ class DuplicatesView(BaseView):
         row2_layout = QHBoxLayout(row2_widget)
         row2_layout.setContentsMargins(0, 0, 0, 0)
         self.btn_keep_newest_del = QPushButton("Keep Newest + Delete Rest", row2_widget)
-        self.btn_keep_newest_del.setStyleSheet("background-color: #dc3545; color: white;")
+        self.btn_keep_newest_del.setProperty("variant", "danger")
         self.btn_keep_newest_del.clicked.connect(lambda: self.run_keep_action("newest", "delete"))
         row2_layout.addWidget(self.btn_keep_newest_del)
 
         self.btn_keep_oldest_del = QPushButton("Keep Oldest + Delete Rest", row2_widget)
-        self.btn_keep_oldest_del.setStyleSheet("background-color: #dc3545; color: white;")
+        self.btn_keep_oldest_del.setProperty("variant", "danger")
         self.btn_keep_oldest_del.clicked.connect(lambda: self.run_keep_action("oldest", "delete"))
         row2_layout.addWidget(self.btn_keep_oldest_del)
         row2_layout.addStretch()
@@ -242,12 +243,12 @@ class DuplicatesView(BaseView):
         row3_layout = QHBoxLayout(row3_widget)
         row3_layout.setContentsMargins(0, 0, 0, 0)
         self.btn_keep_largest_mov = QPushButton("Keep Largest + Move Rest", row3_widget)
-        self.btn_keep_largest_mov.setStyleSheet("background-color: #ffc107; color: black;")
+        self.btn_keep_largest_mov.setProperty("variant", "warning")
         self.btn_keep_largest_mov.clicked.connect(lambda: self.run_keep_action("largest", "move"))
         row3_layout.addWidget(self.btn_keep_largest_mov)
 
         self.btn_keep_smallest_mov = QPushButton("Keep Smallest + Move Rest", row3_widget)
-        self.btn_keep_smallest_mov.setStyleSheet("background-color: #ffc107; color: black;")
+        self.btn_keep_smallest_mov.setProperty("variant", "warning")
         self.btn_keep_smallest_mov.clicked.connect(lambda: self.run_keep_action("smallest", "move"))
         row3_layout.addWidget(self.btn_keep_smallest_mov)
         row3_layout.addStretch()
@@ -294,7 +295,7 @@ class DuplicatesView(BaseView):
 
         # Action status label
         self.lbl_action_summary = QLabel("Choose a keep strategy, then select extras or export current duplicate groups.", self.action_frame)
-        self.lbl_action_summary.setStyleSheet("color: #6c757d;")
+        self.lbl_action_summary.setProperty("class", "muted")
         self.lbl_action_summary.setWordWrap(True)
         action_layout.addWidget(self.lbl_action_summary)
 

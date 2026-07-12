@@ -6,6 +6,7 @@ from PyQt5.QtCore import Qt
 import os
 
 from ..views.base import BaseView
+from ..theme_tokens import TOKENS
 from ..widgets import EnhancedTreeview
 from ...modules.search import build_search_query, search_files
 from ...modules.cleaner import MetadataCleaner
@@ -44,7 +45,7 @@ class MetadataCleanerPlugin(BaseView):
         ctrl_layout.addWidget(self.ext_entry, 1, 1, 1, 3)
         
         self.btn_scan = QPushButton("Scan for Metadata", ctrl_frame)
-        self.btn_scan.setStyleSheet("background-color: #0275d8; color: white;")
+        self.btn_scan.setProperty("variant", "primary")
         self.btn_scan.clicked.connect(self.start_scan)
         ctrl_layout.addWidget(self.btn_scan, 1, 4)
         
@@ -78,12 +79,12 @@ class MetadataCleanerPlugin(BaseView):
         act_layout.addStretch()
         
         self.btn_clean_sel = QPushButton("Clean Selected", act_frame)
-        self.btn_clean_sel.setStyleSheet("background-color: #f0ad4e; color: white;")
+        self.btn_clean_sel.setProperty("variant", "warning")
         self.btn_clean_sel.clicked.connect(self.clean_selected)
         act_layout.addWidget(self.btn_clean_sel)
         
         self.btn_clean_all = QPushButton("Clean ALL Found", act_frame)
-        self.btn_clean_all.setStyleSheet("background-color: #d9534f; color: white;")
+        self.btn_clean_all.setProperty("variant", "danger")
         self.btn_clean_all.clicked.connect(self.clean_all)
         act_layout.addWidget(self.btn_clean_all)
         

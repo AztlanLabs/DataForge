@@ -14,6 +14,8 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 
+from ..theme_tokens import TOKENS, TYPE_SCALE
+
 from .base import BaseView
 from .. import dialogs
 from ..widgets import EnhancedTreeview, CollapsibleCard, attach_tooltips, FilePreviewPanel
@@ -110,12 +112,13 @@ class SystemCleanupView(BaseView):
         self.btn_scan = self.card_scan.add_widget_to_header(
             QPushButton, text="SCAN JUNK",
         )
-        self.btn_scan.setStyleSheet("background-color: #f59e0b; color: black; font-weight: bold;")
+        self.btn_scan.setProperty("variant", "warning")
+        self.btn_scan.setStyleSheet("font-weight: bold;")
         self.btn_scan.clicked.connect(self._start_junk_scan)
 
         # Summary label
         self.lbl_junk_summary = QLabel("No junk scan run yet.", c_body)
-        self.lbl_junk_summary.setStyleSheet("color: #6c757d;")
+        self.lbl_junk_summary.setProperty("class", "muted")
         self.lbl_junk_summary.setWordWrap(True)
         c_body_layout.addWidget(self.lbl_junk_summary)
 
@@ -126,11 +129,12 @@ class SystemCleanupView(BaseView):
         savings_layout.setContentsMargins(10, 8, 10, 8)
 
         self.lbl_total_savings = QLabel("Reclaimable: —")
-        self.lbl_total_savings.setStyleSheet("font-size: 16px; font-weight: bold; color: #10b981;")
+        self.lbl_total_savings.setStyleSheet(f"font-size: {TYPE_SCALE['heading']}px; font-weight: bold; color: {TOKENS['light']['success']};")
         savings_layout.addWidget(self.lbl_total_savings)
 
         self.lbl_file_count = QLabel("Files: —")
-        self.lbl_file_count.setStyleSheet("font-size: 14px; color: #6b7280;")
+        self.lbl_file_count.setProperty("class", "muted")
+        self.lbl_file_count.setStyleSheet(f"font-size: {TYPE_SCALE['subheading']}px;")
         savings_layout.addWidget(self.lbl_file_count)
         savings_layout.addStretch()
         junk_layout.addWidget(self.savings_frame)
@@ -170,14 +174,15 @@ class SystemCleanupView(BaseView):
         action_layout.addWidget(self.btn_deselect)
 
         self.btn_clean = QPushButton("🗑 Clean Selected", action_frame)
-        self.btn_clean.setStyleSheet("background-color: #ef4444; color: white; font-weight: bold;")
+        self.btn_clean.setProperty("variant", "danger")
+        self.btn_clean.setStyleSheet("font-weight: bold;")
         self.btn_clean.clicked.connect(self._clean_selected)
         action_layout.addWidget(self.btn_clean)
 
         action_layout.addStretch()
 
         self.lbl_action_status = QLabel("Scan for junk files to begin cleanup.", action_frame)
-        self.lbl_action_status.setStyleSheet("color: #6c757d;")
+        self.lbl_action_status.setProperty("class", "muted")
         action_layout.addWidget(self.lbl_action_status)
         junk_layout.addWidget(action_frame)
 
@@ -197,14 +202,15 @@ class SystemCleanupView(BaseView):
         b_body_layout.setContentsMargins(0, 5, 0, 0)
 
         self.lbl_browser_summary = QLabel("Scan to detect browser tracking artifacts.", b_body)
-        self.lbl_browser_summary.setStyleSheet("color: #6c757d;")
+        self.lbl_browser_summary.setProperty("class", "muted")
         self.lbl_browser_summary.setWordWrap(True)
         b_body_layout.addWidget(self.lbl_browser_summary)
 
         self.btn_browser_scan = self.card_browser.add_widget_to_header(
             QPushButton, text="SCAN BROWSERS",
         )
-        self.btn_browser_scan.setStyleSheet("background-color: #8b5cf6; color: white; font-weight: bold;")
+        self.btn_browser_scan.setProperty("variant", "primary")
+        self.btn_browser_scan.setStyleSheet("font-weight: bold;")
         self.btn_browser_scan.clicked.connect(self._start_browser_scan)
 
         # Browser savings
@@ -213,7 +219,7 @@ class SystemCleanupView(BaseView):
         bsav_layout = QHBoxLayout(self.browser_savings_frame)
         bsav_layout.setContentsMargins(10, 8, 10, 8)
         self.lbl_browser_savings = QLabel("Browser artifacts: —")
-        self.lbl_browser_savings.setStyleSheet("font-size: 16px; font-weight: bold; color: #8b5cf6;")
+        self.lbl_browser_savings.setStyleSheet(f"font-size: {TYPE_SCALE['heading']}px; font-weight: bold; color: {TOKENS['light']['primary']};")
         bsav_layout.addWidget(self.lbl_browser_savings)
         bsav_layout.addStretch()
         browser_layout.addWidget(self.browser_savings_frame)
