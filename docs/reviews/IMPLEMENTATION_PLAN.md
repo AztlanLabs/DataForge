@@ -400,14 +400,17 @@ clean, pip-audit clean; ready for the `v0.2.0-alpha.2` tag on `develop`).
 ```
 fix(ui): replace file-or-folder message box with explicit pickers
 fix(ui): autosave settings with a transient saved indicator
-fix(ui): make one dark-mode control writable and mirror the other
-feat(ui): show all sidebar groups behind progressive disclosure
-feat(ui): render destructive preview as a scrollable checklist
-fix(ui): name the running task and counts in the busy status bar
-feat(ui): render help as markdown with inline whats-this affordance
+fix(ui): mirror dark mode from sidebar in settings as a label
+fix(ui): show all sidebar groups regardless of experience tier
+feat(ui): per-row opt-out destructive preview with running total
+fix(ui): name the running task in the status bar
+feat(ui): render view help as markdown with inline whats-this helper
 test(ui): round-trip settings persistence
 ```
-**Version impact:** MINOR (2c.4/2c.5/2c.7 are `feat`).
+**Version impact:** MINOR (2c.4/2c.5/2c.7 are `feat`). **Gate:** ✅ satisfied
+(270 passed — 260 → 270 over seven incremental commits; ruff clean; the
+`choose_file_or_directory` riddle is gone and the sidebar no longer filters
+groups by tier; ready for the `v0.2.0-alpha.3` tag on `develop`).
 
 ### WS-D — IA, Naming & Parity (Phase 2d) → `v0.2.0-alpha.4`
 
@@ -677,7 +680,7 @@ Update the `WS` streams here as they close; the detailed per-item status stays i
 | --- | --- | --- | --- |
 | WS-A | Stabilize & Doc Truth (CI, tooling, S2, doc audit) | `v0.2.0-alpha.1` | ✅ Done — tagged locally |
 | WS-B | Trust & Safety (S4–S13) | `v0.2.0-alpha.2` | ✅ Done — closed |
-| WS-C | Interaction Correctness (2c) | `v0.2.0-alpha.3` | ⏳ Not started |
+| WS-C | Interaction Correctness (2c) | `v0.2.0-alpha.3` | ✅ Done — closed |
 | WS-D | IA, Naming & Parity (2d) | `v0.2.0-alpha.4` | ⏳ Not started |
 | WS-E | Motion, Empty/Error, A11y (2e) | `v0.2.0-alpha.5` | ⏳ Not started |
 | WS-F | Architecture Consolidation | `v0.2.0-alpha.6` | ⏳ Not started |

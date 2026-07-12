@@ -15,17 +15,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.github/dependabot.yml`: weekly pip + GitHub Actions update PRs
 - ruff, black, mypy, and coverage configuration in `pyproject.toml`
 - Regression test guarding the forensic HTML report against `<script>`-tag filenames
+- `BaseView.choose_file()` and `BaseView.choose_directory()` — explicit file/folder pickers
+- `BaseView.confirm_destructive_preview()` — scrollable, per-row opt-out preview with running total
+- `BaseView.whats_this_for()` — inline "What's this?" affordance helper
+- Status-bar busy message now names the running task (e.g. "Running: search files…")
+- `BaseView._humanize_callable_name()` — helper for the status bar
 
 ### Changed
 - Updated all documentation cross-references after review restructure
 - Migrated package metadata (name, version, dependencies, `fm` entry point) from `setup.py` into `pyproject.toml` (PEP 621); `setup.py` is now a thin `setup()` shim
 - Pinned lower-bound versions for previously-unconstrained runtime dependencies (click, rich, tqdm, pandas, send2trash, pypdf, pymupdf, opencv-python-headless)
+- **WS-C Interaction Correctness**: settings now autosave on every change with a transient "Saved ✓" indicator instead of an interrupting dialog or hidden Save buttons; the Settings theme dropdown is now a read-only label that mirrors the sidebar Dark Mode checkbox (sidebar is the single source of truth); the sidebar shows every group regardless of Experience Level, and the tier now controls only in-view complexity; view help renders Markdown; destructive previews are scrollable checkable tables with running size totals and a danger-tinted Proceed button
 
 ### Fixed
 - Broken links in ARCHITECTURE.md and TECHNICAL_SOURCE_OF_TRUTH.md
 - Stale path prefixes (missing `dataforge/` prefix)
 - Removed unused imports, dead variable assignments, and ambiguous single-letter loop variables flagged by ruff across `dataforge/` and `tests/`
 - `fm devices` used a backslash escape sequence inside f-string braces, which is a `SyntaxError` on Python <3.12 despite the documented Python 3.10+ minimum
+- **2c.1**: Killed the file-vs-folder Yes/No/Cancel `QMessageBox` riddle — every affected view (Search, Action Builder, Metadata, Tools, Cleaner Plugin) now exposes separate "Browse File…" and "Browse Folder…" buttons that call `BaseView.choose_file()` / `choose_directory()` directly
+- **2c.2**: Settings persistence was inconsistent (some fields autosaved, others needed hidden Save buttons followed by a modal "Success" dialog); every setting now autosaves the moment it changes
+- **2c.3**: The Settings theme `QComboBox` and the sidebar Dark Mode `QCheckBox` both wrote to the same key and could fall out of sync; the dropdown is now a read-only label that mirrors the checkbox
+- **2c.4**: The Experience Level setting hid entire sidebar groups (System Maintenance, Advanced Analysis) from Basic users, creating a discoverability cliff where users could not see that Forensics Lab existed; every group is now always visible
+- **2c.6**: The status bar showed a generic "Busy: please wait…" message that did not name the running task
 
 ### Security
 - **S2 (Fixed)**: Forensic HTML report was vulnerable to stored HTML/JS injection — every interpolated value is now passed through `html.escape()`
