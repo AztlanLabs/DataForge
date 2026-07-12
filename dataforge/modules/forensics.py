@@ -1044,7 +1044,7 @@ def collect_recent_documents(platform_system=None):
     ~/Library/Application Support/ are heaviest; on Linux this looks at
     ~/.local/share/recently-used.xbel. Returns a list of dicts with the
     target URI/path and last-modified timestamp."""
-    import xml.etree.ElementTree as ET
+    import defusedxml.ElementTree as ET
 
     platform_system = platform_system or platform.system()
     candidates = []
