@@ -22,6 +22,7 @@ The **architecture is genuinely good**: filesystem mutation is centralised throu
 | **[`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md)** | Code bugs + security | 15 correctness bugs (all fixed) + 13 security findings (2 fixed, 11 open). |
 | **[`IMPROVEMENT_PLAN.md`](./IMPROVEMENT_PLAN.md)** | UX + engineering + roadmap | IA redesign, 7 interaction fixes, design-token system, phased plan with per-item status. |
 | **[`EXECUTIVE_SUMMARY.md`](./EXECUTIVE_SUMMARY.md)** | Overview + brand | This document — assessment, quick wins, brand identity. |
+| **[`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md)** | Execution + release | Sequenced work-streams for the whole open backlog, mapped to commits and the `v0.2.0` release. |
 
 ---
 

@@ -6,6 +6,10 @@
 **Result:** All admonition blocks have been removed from the source files
 and consolidated here as the single source of truth for these review notes.
 
+> **Execution status:** D1–D3 are already resolved in the source docs. The
+> remaining open items (TSOT path audit, datestamps, close-out) are sequenced as
+> **WS-A** in [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md).
+
 ---
 
 ## 1. Block Inventory
