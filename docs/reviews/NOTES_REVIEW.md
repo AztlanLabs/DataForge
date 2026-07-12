@@ -1,14 +1,23 @@
 # Notes Review — Consolidated Admonition-Block Audit
 
-**Date:** 2026-07-11  
+**Date:** 2026-07-11 · **Last verified:** 2026-07-11
 **Scope:** Every `[!NOTE]`, `[!WARNING]`, and `[!IMPORTANT]` block across
 `README.md` and `docs/` — verified against the current codebase state.  
 **Result:** All admonition blocks have been removed from the source files
 and consolidated here as the single source of truth for these review notes.
 
-> **Execution status:** D1–D3 are already resolved in the source docs. The
-> remaining open items (TSOT path audit, datestamps, close-out) are sequenced as
-> **WS-A** in [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md).
+> **Execution status: CLOSED.** All Priority 1/3 documentation items are
+> done: D1–D7 are resolved in the source docs (D1 broken anchor, D2 wrong
+> "224" test count, D3 dead `docs/reviews/01` links, D4–D7 unprefixed
+> `core/`/`modules/` paths); the 3.1 path audit, 3.2 datestamps, and 3.3
+> staleness-caveat review (§4, Priority 3) are all done, tracked in
+> [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) WS-A. Priority 2's
+> S2 (§4) is also fixed — see [`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md).
+> Remaining Priority 2 items (S4–S10) are security fixes, not doc defects;
+> they carry forward to WS-B. The tables below (§1–§3) are kept as-is as
+> the frozen record of what the audit found and verified at the time -
+> including the original "224"/`docs/reviews/01` quotes in §2, which are
+> evidence of the defect, not a live claim.
 
 ---
 
@@ -219,18 +228,18 @@ three dead references to `docs/reviews/01`, and the `core/scanner.py` path.
 
 | ID | Severity | Issue | Affected blocks |
 |----|----------|-------|-----------------|
-| D1 | 🔴 | **Broken anchor link** — `#known-incomplete--in-progress-changes` doesn't exist in README.md | A1 |
-| D2 | 🔴 | **Wrong test count** — "224" should be "254" | A6 |
-| D3 | 🔴 | **Dead cross-references** — 3 links to `docs/reviews/01` (consolidated files no longer exist at those paths) | A6 |
-| D4 | 🟠 | **Inconsistent path prefixes** — `core/` and `modules/` used without `dataforge/` prefix in ARCHITECTURE.md (lines 89, 207-209, 212-213) and TECHNICAL_SOURCE_OF_TRUTH.md (line 33, 865) | A3, A4, A6, A7 |
+| D1 | 🔴 | **Broken anchor link** — `#known-incomplete--in-progress-changes` doesn't exist in README.md — ✅ **Fixed** (resolved in source before this session) | A1 |
+| D2 | 🔴 | **Wrong test count** — "224" should be "254" — ✅ **Fixed** (now 255, current suite size) | A6 |
+| D3 | 🔴 | **Dead cross-references** — 3 links to `docs/reviews/01` (consolidated files no longer exist at those paths) — ✅ **Fixed** (resolved in source before this session) | A6 |
+| D4 | 🟠 | **Inconsistent path prefixes** — `core/` and `modules/` used without `dataforge/` prefix in ARCHITECTURE.md (lines 89, 207-209, 212-213) and TECHNICAL_SOURCE_OF_TRUTH.md (line 33, 865) — ✅ **Fixed** (WS-A path audit) | A3, A4, A6, A7 |
 
 ### In the surrounding context (lines adjacent to admonition blocks)
 
 | ID | Issue | File:Line |
 |----|-------|-----------|
-| D5 | `core/scanner.py` path stale | TECHNICAL_SOURCE_OF_TRUTH.md:33 |
-| D6 | `modules/cleaner.py`, `core/actions/filters.py`, `core/provider.py`, `modules/search.py` all missing `dataforge/` prefix | ARCHITECTURE.md:207-209 |
-| D7 | "adapter around `modules/`" → should be `dataforge/modules/` | ARCHITECTURE.md:89 |
+| D5 | `core/scanner.py` path stale — ✅ **Fixed** | TECHNICAL_SOURCE_OF_TRUTH.md:33 |
+| D6 | `modules/cleaner.py`, `core/actions/filters.py`, `core/provider.py`, `modules/search.py` all missing `dataforge/` prefix — ✅ **Fixed** (already resolved in ARCHITECTURE.md before this session, re-verified) | ARCHITECTURE.md:207-209 |
+| D7 | "adapter around `modules/`" → should be `dataforge/modules/` — ✅ **Fixed** (already resolved before this session, re-verified) | ARCHITECTURE.md:89 |
 
 ### Open security issues (confirmed still present in code)
 
@@ -241,7 +250,7 @@ the full verified status of all 13 security findings from
 | ID | Severity | Issue | Verified location | Status |
 |----|----------|-------|-------------------|--------|
 | S1 | 🔴 | MD5 used for integrity/dedup | — | ✅ **Fixed** (SHA-256 default) |
-| S2 | 🔴 | Forensic HTML report XSS — no `html.escape()` | `dataforge/modules/forensics.py:581-625` | ⏳ **Open** |
+| S2 | 🔴 | Forensic HTML report XSS — no `html.escape()` | `dataforge/modules/forensics.py:581-625` | ✅ **Fixed** (this session, WS-A - was open when this table was written) |
 | S3 | 🟠 | Symlink-following scan | — | ✅ **Fixed** (`follow_symlinks=False`) |
 | S4 | 🟠 | Trash-restore trusts `.trashinfo` path | `dataforge/modules/recovery.py:225-250` | ⏳ **Open** |
 | S5 | 🟠 | Plugin loader executes arbitrary `.py` with full privileges | `dataforge/ui/plugin_loader.py:38-51` — `exec_module()` with no signing or sandbox | ⏳ **Open** |
@@ -260,33 +269,33 @@ the full verified status of all 13 security findings from
 
 ### Priority 1 — Fix broken/stale documentation (quick wins)
 
-| # | Action | Affected blocks | Effort |
-|---|--------|-----------------|--------|
-| 1.1 | Update test count 224 → 254 | A6 | 1 min |
-| 1.2 | Replace stale `docs/reviews/01` references (×3) → `docs/reviews/AUDIT_FINDINGS.md` | A6 | 5 min |
-| 1.3 | Fix or remove broken anchor `#known-incomplete--in-progress-changes` in README.md — point to `#-open--future` or create the section | A1 | 5 min |
-| 1.4 | Prefix `core/` and `modules/` paths with `dataforge/` in ARCHITECTURE.md lines 89, 207-209, 213, and TECHNICAL_SOURCE_OF_TRUTH.md lines 33, 865 | A3, A4, A6, A7 | 10 min |
+| # | Action | Affected blocks | Effort | Status |
+|---|--------|-----------------|--------|--------|
+| 1.1 | Update test count 224 → 254 | A6 | 1 min | ✅ Done (now 255) |
+| 1.2 | Replace stale `docs/reviews/01` references (×3) → `docs/reviews/AUDIT_FINDINGS.md` | A6 | 5 min | ✅ Done |
+| 1.3 | Fix or remove broken anchor `#known-incomplete--in-progress-changes` in README.md — point to `#-open--future` or create the section | A1 | 5 min | ✅ Done |
+| 1.4 | Prefix `core/` and `modules/` paths with `dataforge/` in ARCHITECTURE.md lines 89, 207-209, 213, and TECHNICAL_SOURCE_OF_TRUTH.md lines 33, 865 | A3, A4, A6, A7 | 10 min | ✅ Done |
 
 ### Priority 2 — Security fixes (per AUDIT_FINDINGS.md remediation order)
 
-| # | Action | Effort |
-|---|--------|--------|
-| 2.1 | Fix S2 — add `html.escape()` to forensic HTML report | 30 min |
-| 2.2 | Fix S4 — confine trash-restore paths, block `..` traversal | 30 min |
-| 2.3 | Fix S7 — add minimum-age filter for /tmp, skip sockets/FIFOs | 30 min |
-| 2.4 | Fix S5 — plugin trust model (opt-in flag, load logging) | 15 min |
-| 2.5 | Fix S6 — rename to "best-effort overwrite", remove trash fallback | 15 min |
-| 2.6 | Fix S8 — write hash files with `0o600` | 10 min |
-| 2.7 | Fix S9 — switch to `defusedxml` | 10 min |
-| 2.8 | Fix S10 — validate config types/ranges/enums on load | 30 min |
+| # | Action | Effort | Status |
+|---|--------|--------|--------|
+| 2.1 | Fix S2 — add `html.escape()` to forensic HTML report | 30 min | ✅ Done |
+| 2.2 | Fix S4 — confine trash-restore paths, block `..` traversal | 30 min | ⏳ Open (WS-B) |
+| 2.3 | Fix S7 — add minimum-age filter for /tmp, skip sockets/FIFOs | 30 min | ⏳ Open (WS-B) |
+| 2.4 | Fix S5 — plugin trust model (opt-in flag, load logging) | 15 min | ⏳ Open (WS-B) |
+| 2.5 | Fix S6 — rename to "best-effort overwrite", remove trash fallback | 15 min | ⏳ Open (WS-B) |
+| 2.6 | Fix S8 — write hash files with `0o600` | 10 min | ⏳ Open (WS-B) |
+| 2.7 | Fix S9 — switch to `defusedxml` | 10 min | ⏳ Open (WS-B) |
+| 2.8 | Fix S10 — validate config types/ranges/enums on load | 30 min | ⏳ Open (WS-B) |
 
 ### Priority 3 — Structural improvements
 
-| # | Action |
-|---|--------|
-| 3.1 | Run a full path-audit across `ARCHITECTURE.md` and `TECHNICAL_SOURCE_OF_TRUTH.md` — many paths still use the repo-root `core/`/`modules/` convention instead of `dataforge/core/`/`dataforge/modules/` |
-| 3.2 | Add "Last verified: YYYY-MM-DD" datestamps to all remaining review/source-of-truth sections |
-| 3.3 | Consider removing the TECHNICAL_SOURCE_OF_TRUTH `[!WARNING]` staleness caveat (A5) — after the path audit in 3.1, the doc should be accurate enough that the blanket caveat is no longer needed |
+| # | Action | Status |
+|---|--------|--------|
+| 3.1 | Run a full path-audit across `ARCHITECTURE.md` and `TECHNICAL_SOURCE_OF_TRUTH.md` — many paths still use the repo-root `core/`/`modules/` convention instead of `dataforge/core/`/`dataforge/modules/` | ✅ Done (ARCHITECTURE.md was already clean; TSOT had ~17 references fixed) |
+| 3.2 | Add "Last verified: YYYY-MM-DD" datestamps to all remaining review/source-of-truth sections | ✅ Done |
+| 3.3 | Consider removing the TECHNICAL_SOURCE_OF_TRUTH `[!WARNING]` staleness caveat (A5) — after the path audit in 3.1, the doc should be accurate enough that the blanket caveat is no longer needed | ✅ Done — narrowed rather than removed: the path/dead-link portion is resolved and cited, but the honest "GUI content not fully re-audited" hedge stays (this doc's own A5 evidence table validated that hedge as accurate) |
 
 ---
 
