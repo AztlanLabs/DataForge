@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import (
     QWidget, QMessageBox, QTextEdit, QVBoxLayout, QHBoxLayout, QPushButton, QDialog,
-    QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QLabel, QDialogButtonBox
+    QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QLabel, QDialogButtonBox,
+    QFrame
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
@@ -12,6 +13,134 @@ from ...core.utils import format_size
 
 class QWidgetABCMeta(type(QWidget), ABCMeta):
     pass
+
+
+class EmptyState(QFrame):
+    """2e.5 — Purposeful empty state for views that have no results yet.
+
+    Replaces the previous behaviour of leaving a blank panel with a
+    bare "No results" label, which gave the user no idea *what to do
+    next*. The widget shows an icon, a short title, a body sentence
+    describing why the view is empty, and an optional action button
+    that fires ``action_callback`` when clicked.
+
+    The icon can be either a single Unicode glyph (e.g. ``"\u2316"``
+    for a magnifying glass) or a longer text token — kept as text so
+    the empty state has no external asset dependencies."""
+
+    def __init__(self, icon="", title="", body="", action_label="",
+                 action_callback=None, parent=None):
+        super().__init__(parent)
+        self.setObjectName("emptyState")
+        self.action_callback = action_callback
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(8)
+        layout.setAlignment(Qt.AlignCenter)
+
+        if icon:
+            self.icon_lbl = QLabel(icon, self)
+            icon_font = QFont()
+            icon_font.setPointSize(28)
+            self.icon_lbl.setFont(icon_font)
+            self.icon_lbl.setAlignment(Qt.AlignCenter)
+            self.icon_lbl.setProperty("variant", "muted")
+            layout.addWidget(self.icon_lbl)
+
+        if title:
+            self.title_lbl = QLabel(title, self)
+            title_font = QFont()
+            title_font.setBold(True)
+            title_font.setPointSize(13)
+            self.title_lbl.setFont(title_font)
+            self.title_lbl.setAlignment(Qt.AlignCenter)
+            self.title_lbl.setWordWrap(True)
+            layout.addWidget(self.title_lbl)
+
+        if body:
+            self.body_lbl = QLabel(body, self)
+            self.body_lbl.setAlignment(Qt.AlignCenter)
+            self.body_lbl.setWordWrap(True)
+            self.body_lbl.setProperty("variant", "muted")
+            layout.addWidget(self.body_lbl)
+
+        if action_label and action_callback is not None:
+            self.action_btn = QPushButton(action_label, self)
+            self.action_btn.setProperty("variant", "primary")
+            self.action_btn.clicked.connect(self.action_callback)
+            layout.addWidget(self.action_btn, 0, Qt.AlignCenter)
+        else:
+            self.action_btn = None
+
+
+def friendly_error_message(error):
+    """2e.5 — Turn a Python exception into a short, user-readable
+    sentence that ends with a hint about the most likely cause.
+
+    The previous ``show_workflow_error`` surfaced the raw ``str(error)``
+    which dumped stack-trace-style messages like
+    ``PermissionError: [Errno 13] Permission denied: '/root/.ssh'`` —
+    technically accurate but leaving the user to guess whether the
+    problem was the path, the permissions, or something else. The
+    helper below maps the common cases to a one-line summary the
+    user can act on, and falls back to ``str(error)`` for everything
+    else."""
+    if isinstance(error, PermissionError):
+        return (
+            f"Permission denied: {error.filename or 'a file or folder'}\n\n"
+            "DataForge cannot read or write to this location. "
+            "Check the file's permissions, or pick a different path."
+        )
+    if isinstance(error, FileNotFoundError):
+        return (
+            f"File not found: {error.filename or 'the requested path'}\n\n"
+            "The path may have been moved or deleted while the scan was running. "
+            "Try again with an existing folder."
+        )
+    if isinstance(error, IsADirectoryError):
+        return (
+            f"Expected a file but found a folder: {error.filename}\n\n"
+            "Pick a single file, not a directory."
+        )
+    if isinstance(error, NotADirectoryError):
+        return (
+            f"Expected a folder but found a file: {error.filename}\n\n"
+            "Pick a directory, not a single file."
+        )
+    if isinstance(error, OSError):
+        return (
+            f"Could not access the path: {error}\n\n"
+            "The filesystem may be busy, the disk may be full, or the "
+            "path may be on a disconnected network share."
+        )
+    if isinstance(error, ValueError):
+        return (
+            f"Invalid input: {error}\n\n"
+            "Double-check the values you entered and try again."
+        )
+    if isinstance(error, TimeoutError):
+        return (
+            f"The operation timed out: {error}\n\n"
+            "The target may be unreachable or under heavy load. "
+            "Try again, or pick a smaller scope."
+        )
+    if isinstance(error, KeyboardInterrupt):
+        return "The operation was cancelled."
+    if isinstance(error, MemoryError):
+        return (
+            "The system ran out of memory while processing this operation.\n\n"
+            "Close other applications, lower the thread count in Settings, "
+            "or work on a smaller scope."
+        )
+    if isinstance(error, RecursionError):
+        return (
+            "DataForge hit a recursion limit while processing this operation.\n\n"
+            "This usually means a deeply-nested folder structure or a symlink loop. "
+            "Report this as a bug if the path is not unusual."
+        )
+    return str(error)
+
 
 class BaseView(QWidget, metaclass=QWidgetABCMeta):
     def __init__(self, master=None, app=None):
@@ -34,6 +163,17 @@ class BaseView(QWidget, metaclass=QWidgetABCMeta):
     def unmount(self):
         """Called when view is hidden."""
         pass
+
+    def make_empty_state(self, icon="", title="", body="", action_label="",
+                          action_callback=None):
+        """Convenience for ``EmptyState`` so views do not need to
+        import the class directly. Returns a freshly-built widget
+        ready to be added to the view's layout."""
+        return EmptyState(
+            icon=icon, title=title, body=body,
+            action_label=action_label, action_callback=action_callback,
+            parent=self,
+        )
         
     def get_help_text(self) -> str:
         """Return Markdown help for this view. The default is a small

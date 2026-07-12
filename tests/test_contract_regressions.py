@@ -1703,6 +1703,157 @@ class ContractRegressionTests(unittest.TestCase):
             "QPushButton base border must be 2px so focus does not shift",
         )
 
+    def test_empty_state_widget_renders_icon_title_body_and_action(self):
+        """2e.5 — The ``EmptyState`` widget must show an icon, a title,
+        a body, and (when supplied) an action button. The action
+        button fires the callback when clicked; without a callback
+        the button is hidden."""
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.ui.views.base import EmptyState
+
+        _ = QApplication.instance() or QApplication([])
+
+        called = []
+
+        state = EmptyState(
+            icon="\u2316",
+            title="Nothing here",
+            body="Run a search to populate the view.",
+            action_label="Run Search",
+            action_callback=lambda: called.append("clicked"),
+        )
+        self.assertEqual(state.title_lbl.text(), "Nothing here")
+        self.assertEqual(state.body_lbl.text(), "Run a search to populate the view.")
+        self.assertEqual(state.icon_lbl.text(), "\u2316")
+        self.assertEqual(state.action_btn.text(), "Run Search")
+        state.action_btn.click()
+        self.assertEqual(called, ["clicked"])
+
+        # Without an action callback the button is None (the empty
+        # state is a static hint, not a call to action).
+        plain = EmptyState(title="Read-only", body="Just text.")
+        self.assertIsNone(plain.action_btn)
+
+    def test_friendly_error_message_maps_common_exceptions(self):
+        """2e.5 — ``friendly_error_message`` must translate the common
+        exception types a user is most likely to hit into a one-line
+        user-readable sentence that ends with a hint about the most
+        likely cause. Unknown exceptions fall back to ``str(error)``."""
+        from dataforge.ui.views.base import friendly_error_message
+
+        perm = friendly_error_message(PermissionError(13, "Permission denied", "/etc/shadow"))
+        self.assertIn("Permission denied", perm)
+        self.assertIn("/etc/shadow", perm)
+        self.assertIn("Check the file's permissions", perm)
+
+        nf = friendly_error_message(FileNotFoundError(2, "No such file", "/no/such/path"))
+        self.assertIn("File not found", nf)
+        self.assertIn("/no/such/path", nf)
+
+        ia = friendly_error_message(IsADirectoryError(21, "Is a directory", "/tmp"))
+        self.assertIn("Expected a file", ia)
+
+        nad = friendly_error_message(NotADirectoryError(20, "Not a directory", "/tmp/file"))
+        self.assertIn("Expected a folder", nad)
+
+        v = friendly_error_message(ValueError("bad input"))
+        self.assertIn("Invalid input", v)
+        self.assertIn("bad input", v)
+
+        # Unknown exception types fall back to ``str(error)``.
+        class WeirdError(Exception):
+            pass
+
+        self.assertEqual(friendly_error_message(WeirdError("nope")), "nope")
+        self.assertEqual(friendly_error_message("plain string"), "plain string")
+
+    def test_show_workflow_error_renders_friendly_summary(self):
+        """2e.5 — ``DataForgeApp.show_workflow_error`` must call
+        ``friendly_error_message`` so the dialog body starts with a
+        readable summary before falling back to the raw exception
+        text. The status bar shows just the first line."""
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.ui.app import DataForgeApp
+        from dataforge.ui.views.base import friendly_error_message
+        from unittest.mock import patch as _patch
+
+        _ = QApplication.instance() or QApplication([])
+
+        with _patch("dataforge.ui.app.config") as mock_config:
+            mock_config.get.side_effect = lambda k, d=None: {
+                "theme": "cosmo",
+                "settings_ui_tier": "Simple",
+                "plugins_enabled": False,
+                "collapsed_groups": [],
+            }.get(k, d)
+            mock_config.set = lambda *a, **k: None
+            app = DataForgeApp()
+
+        err = PermissionError(13, "Permission denied", "/etc/shadow")
+        with _patch.object(app, "show_error_dialog") as mock_dialog, \
+             _patch.object(app, "update_status") as mock_status:
+            app.show_workflow_error(err, title="Operation Failed")
+
+        # The dialog body must include the friendly summary *and* the
+        # raw exception string so advanced users can see the cause.
+        self.assertEqual(mock_dialog.call_count, 1)
+        body = mock_dialog.call_args.args[1]
+        self.assertIn("Permission denied", body)
+        self.assertIn("Details: ", body)
+        self.assertIn("/etc/shadow", body)
+
+        # The status bar shows just the first line of the friendly
+        # summary so the persistent message stays compact.
+        self.assertEqual(mock_status.call_count, 1)
+        status_msg = mock_status.call_args.args[0]
+        self.assertIn("Error:", status_msg)
+        self.assertIn("Permission denied", status_msg)
+        # And the status message is just the first line, not the full body.
+        self.assertNotIn("Check the file's permissions", status_msg)
+        self.assertEqual(
+            status_msg,
+            f"Error: {friendly_error_message(err).splitlines()[0]}",
+        )
+
+    def test_search_view_has_purpose_driven_empty_state(self):
+        """2e.5 — The Search view must own an ``EmptyState`` widget
+        that hides the tree when no results match and shows a clear
+        next-step message. The smoke-mount test confirms the widget
+        is wired into the view's layout."""
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.ui.views.search import SearchView
+        from unittest.mock import MagicMock
+
+        _ = QApplication.instance() or QApplication([])
+
+        view = SearchView(None, app=MagicMock())
+        self.assertTrue(hasattr(view, "empty_state"))
+        self.assertEqual(view.empty_state.title_lbl.text(), "No matching files")
+        self.assertEqual(view.empty_state.action_btn.text(), "Run Search")
+        # The action button must point at the view's own start_search.
+        self.assertIsNotNone(view.empty_state.action_callback)
+        # Starts hidden — the user has not searched yet.
+        self.assertFalse(view.empty_state.isVisible())
+
+    def test_duplicates_view_has_purpose_driven_empty_state(self):
+        """2e.5 — The Duplicates view must own an ``EmptyState``
+        widget that hides the tree when a scan finds no duplicates
+        and shows a clear next-step message. The action button is
+        wired to the view's start_scan method."""
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.ui.views.duplicates import DuplicatesView
+        from unittest.mock import MagicMock
+
+        _ = QApplication.instance() or QApplication([])
+
+        view = DuplicatesView(None, app=MagicMock())
+        self.assertTrue(hasattr(view, "empty_state"))
+        self.assertEqual(view.empty_state.title_lbl.text(),
+                         "No duplicate groups yet")
+        self.assertEqual(view.empty_state.action_btn.text(), "Run Scan")
+        self.assertIsNotNone(view.empty_state.action_callback)
+        self.assertFalse(view.empty_state.isVisible())
+
     def test_storage_devices_view_surfaces_fm_devices_in_gui(self):
         """``fm devices`` had no GUI path; the new ``Storage & Devices``
         view wires the same ``device_manager.list_storage_devices`` API

@@ -187,6 +187,23 @@ Once files are found, use the 'Bulk Actions' card to:
         # Connect Selection change
         self.tree.tree.itemSelectionChanged.connect(self.on_preview_select)
         tree_layout.addWidget(self.tree)
+
+        # 2e.5 — purpose-driven empty state. Visible until the first
+        # search returns at least one match. The action button simply
+        # re-runs the search with the current filters, so a user who
+        # tweaks a filter and clicks it again gets instant feedback.
+        self.empty_state = self.make_empty_state(
+            icon="\u2316",
+            title="No matching files",
+            body=(
+                "Run a search to populate this view. "
+                "Pick a folder, then narrow by name, extension, size, or content."
+            ),
+            action_label="Run Search",
+            action_callback=self.start_search,
+        )
+        self.empty_state.setVisible(False)
+        tree_layout.addWidget(self.empty_state)
         self.work_splitter.addWidget(self.tree_widget)
         
         # Right Panel (Preview)
@@ -449,7 +466,7 @@ Once files are found, use the 'Bulk Actions' card to:
         self.lbl_archive_summary.setText("Archive preview not run yet.")
         self.lbl_export_summary.setText("Export ready for current visible search results.")
         self.lbl_results_slice.setText(f"{self._build_results_slice_summary()} | visible {count}")
-        
+
         self.app.update_status(f"Found {count} files (Total Size: {format_size(total_size)}).")
         root = self.entry_path.text().strip()
         for entry in results:
@@ -458,6 +475,23 @@ Once files are found, use the 'Bulk Actions' card to:
                 values=(entry.extension, format_display_path(entry.path, root=root), format_size(entry.size)),
                 path=entry.path,
             )
+
+        # 2e.5 — toggle the empty state. When the search returns zero
+        # matches, hide the (empty) tree and show the empty state with
+        # a "Run Search" button so the user can retry without scrolling
+        # back up to the controls. When results exist, the tree is the
+        # canonical view and the empty state hides.
+        if count == 0:
+            self.tree.setVisible(False)
+            self.empty_state.body_lbl.setText(
+                "No files matched the current filters. "
+                "Try widening the name pattern, lowering the size limits, "
+                "or removing the content search."
+            )
+            self.empty_state.setVisible(True)
+        else:
+            self.tree.setVisible(True)
+            self.empty_state.setVisible(False)
 
     def export_results(self):
         if not self.current_results:

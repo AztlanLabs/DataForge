@@ -178,6 +178,22 @@ class DuplicatesView(BaseView):
         self.tree.heading("size", text="Size")
         self.tree.tree.itemSelectionChanged.connect(self.on_preview_select)
         tree_layout.addWidget(self.tree)
+
+        # 2e.5 — purpose-driven empty state. Visible until the first
+        # scan finds at least one duplicate group.
+        self.empty_state = self.make_empty_state(
+            icon="\u29C9",
+            title="No duplicate groups yet",
+            body=(
+                "Pick a folder and run a scan to find identical files by "
+                "content hash. Empty folders and unique files are ignored."
+            ),
+            action_label="Run Scan",
+            action_callback=self.start_scan,
+        )
+        self.empty_state.setVisible(False)
+        tree_layout.addWidget(self.empty_state)
+
         self.work_splitter.addWidget(self.tree_widget)
 
         # Preview Panel
@@ -340,6 +356,15 @@ class DuplicatesView(BaseView):
             self.lbl_action_summary.setText("Nothing to manage or export until a scan finds duplicates.")
             self.app.update_status("No duplicates found.")
             self.app.show_info_dialog("Result", "No duplicates found.")
+            # 2e.5 — show the empty state with a friendlier body so the
+            # user understands the scan ran cleanly rather than failing.
+            self.tree.setVisible(False)
+            self.empty_state.body_lbl.setText(
+                "No identical files were found. "
+                "If you expected duplicates, try a different folder or "
+                "raise the recursion depth."
+            )
+            self.empty_state.setVisible(True)
             return
 
         duplicates_count = sum(len(entries) for entries in results.values())
@@ -350,6 +375,9 @@ class DuplicatesView(BaseView):
         self.lbl_results_slice.setText(f"{self._build_results_slice_summary()} | visible {len(self.visible_records)}")
         self.lbl_action_summary.setText("Choose a keep strategy, select extra copies, then preview move/copy/delete or export.")
         self.app.update_status(f"Found {len(results)} duplicate groups ({duplicates_count} files total, {format_size(total_size)}).")
+        # 2e.5 — restore the tree once the scan returns content.
+        self.tree.setVisible(True)
+        self.empty_state.setVisible(False)
 
     def on_preview_select(self):
         selection = self.tree.selection()

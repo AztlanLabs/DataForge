@@ -660,8 +660,20 @@ class DataForgeApp(QMainWindow):
         QMessageBox.information(self, title, message)
 
     def show_workflow_error(self, error: Exception | str, title: str = "Operation Failed"):
-        message = str(error)
-        self.update_status(f"Error: {message}")
+        # 2e.5 — translate common Python exceptions into a one-line
+        # user-readable summary via ``friendly_error_message``. The
+        # raw string is still surfaced in the dialog so advanced users
+        # can see the underlying cause; the friendly summary sits
+        # above it as actionable context.
+        from .views.base import friendly_error_message
+        raw = str(error)
+        friendly = friendly_error_message(error)
+        if isinstance(error, BaseException) and friendly != raw:
+            message = f"{friendly}\n\nDetails: {raw}"
+        else:
+            message = friendly
+        first_line = message.split("\n", 1)[0]
+        self.update_status(f"Error: {first_line}")
         self.show_error_dialog(title, message)
 
     def make_progress_callback(self) -> ProgressCallback:
