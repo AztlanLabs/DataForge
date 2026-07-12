@@ -22,6 +22,7 @@ from ..core.utils import format_size
 try:
     from PIL import Image
     from PIL.ExifTags import TAGS
+    Image.MAX_IMAGE_PIXELS = 100_000_000
     HAS_PILLOW = True
 except ImportError:
     HAS_PILLOW = False

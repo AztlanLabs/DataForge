@@ -7,6 +7,9 @@ except ImportError:
     PdfReader = None
     PdfWriter = None
 
+Image.MAX_IMAGE_PIXELS = 100_000_000
+MAX_PDF_PAGES = 10_000
+
 
 def _merge_report(output_path, requested, merged, dry_run=False, cancelled=False, failed_paths=None):
     failed_paths = failed_paths or []
@@ -61,6 +64,10 @@ def merge_pdfs(file_paths, output_path, dry_run=False, progress_callback=None, c
 
         try:
             reader = PdfReader(path)
+            if len(reader.pages) > MAX_PDF_PAGES:
+                logger.error(f"PDF {path} has {len(reader.pages)} pages (max {MAX_PDF_PAGES}); skipping.")
+                failed_paths.append(path)
+                continue
             if not dry_run:
                 for page in reader.pages:
                     writer.add_page(page)
@@ -84,6 +91,8 @@ def split_pdf(path, output_dir, dry_run=False, progress_callback=None, cancel_to
         raise ImportError("pypdf is required for PDF operations")
         
     reader = PdfReader(path)
+    if len(reader.pages) > MAX_PDF_PAGES:
+        return {"error": f"PDF has {len(reader.pages)} pages (max {MAX_PDF_PAGES})", "pages": []}
     base_name = os.path.splitext(os.path.basename(path))[0]
     total_pages = len(reader.pages)
     

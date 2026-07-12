@@ -856,6 +856,7 @@ def detect_steganography(path, threshold_ratio=0.05):
     """
     try:
         from PIL import Image  # type: ignore
+        Image.MAX_IMAGE_PIXELS = 100_000_000
     except Exception:
         return {
             "supported": False,

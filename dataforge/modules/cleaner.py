@@ -2,6 +2,8 @@ import os
 from PIL import Image
 from ..core.logger import logger
 
+Image.MAX_IMAGE_PIXELS = 100_000_000
+
 
 def remove_empty_folders(path, dry_run=True):
     """
