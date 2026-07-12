@@ -217,5 +217,5 @@ Correctness and security caveats from the 2026-07-10 review are tracked in [`doc
 - [CLI reference](./CLI_REFERENCE.md)
 - [GUI workflows](./GUI_WORKFLOWS.md)
 - [Development guide](./DEVELOPMENT_GUIDE.md)
-- [Technical Source of Truth](../TECHNICAL_SOURCE_OF_TRUTH.md)
-- [Project review (bugs, security, UX, roadmap)](./reviews/00_EXECUTIVE_SUMMARY.md)
+- [Technical Source of Truth](./TECHNICAL_SOURCE_OF_TRUTH.md)
+- [Project review (bugs, security, UX, roadmap)](./reviews/EXECUTIVE_SUMMARY.md)

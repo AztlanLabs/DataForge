@@ -418,4 +418,4 @@ fm devices --info /mnt/data
 - [Project overview](../README.md)
 - [Architecture](./ARCHITECTURE.md)
 - [GUI workflows](./GUI_WORKFLOWS.md)
-- [Project review (bugs, security, UX, roadmap)](./reviews/00_EXECUTIVE_SUMMARY.md)
+- [Project review (bugs, security, UX, roadmap)](./reviews/EXECUTIVE_SUMMARY.md)

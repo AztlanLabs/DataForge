@@ -366,8 +366,9 @@ When asked to implement a feature or fix, the AI should:
 1. First produce an **implementation plan** following §5 format
 2. Map every planned change to a conventional commit
 3. State the version impact of the work
-4. Execute commits that match the plan
-5. Verify with `PYTHONPATH=. pytest -q` before declaring done
+4. Identify which docs need updating per §7 (Documentation Maintenance)
+5. Execute commits that match the plan
+6. Verify with `PYTHONPATH=. pytest -q` before declaring done
 
 ### What the AI should NOT do
 
@@ -376,10 +377,63 @@ When asked to implement a feature or fix, the AI should:
 - Commit directly to `main` — all work targets `develop`
 - Generate changelog entries manually (derive from commit log)
 - Add comments to code unless the implementation plan calls for it
+- Modify code without updating the docs that reference it per §7
 
 ---
 
-## Related Documents
+## 7. Documentation Maintenance
+
+**Rule:** Every change to the codebase — feature, fix, refactor, or deletion — must
+update all documentation files that reference the affected area. Code and docs
+stay in lockstep. No stale references survive a push.
+
+### When you change source code, update these docs
+
+| If you changed... | Update these docs |
+| --- | --- |
+| `dataforge/cli.py` (commands, flags, output) | `docs/CLI_REFERENCE.md`, `README.md` (if feature list changes) |
+| `dataforge/core/` (scanner, config, cache, hasher, operations, services, utils) | `docs/ARCHITECTURE.md`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md` |
+| `dataforge/modules/` (feature logic) | `docs/ARCHITECTURE.md`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md`, `docs/CLI_REFERENCE.md` (if CLI-exposed) |
+| `dataforge/ui/app.py` (shell, sidebar, threading, theming) | `docs/ARCHITECTURE.md`, `docs/GUI_WORKFLOWS.md`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md` |
+| `dataforge/ui/views/` (a specific view) | `docs/GUI_WORKFLOWS.md` (that view's section), `docs/TECHNICAL_SOURCE_OF_TRUTH.md` |
+| `dataforge/ui/widgets.py` (shared widgets) | `docs/GUI_WORKFLOWS.md`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md` |
+| `dataforge/ui/plugins/` | `docs/ARCHITECTURE.md` (extension points), `docs/GUI_WORKFLOWS.md` |
+| `dataforge/ui/theme_tokens.py` (colours, tokens, QSS) | `docs/ARCHITECTURE.md` (design tokens layer) |
+| `dataforge/core/actions/` (pipeline engine) | `docs/ARCHITECTURE.md`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md`, `docs/GUI_WORKFLOWS.md` |
+| `tests/` (test structure, coverage) | `docs/DEVELOPMENT_GUIDE.md` (test suite table), `README.md` (test count) |
+| `setup.py`, `build_exe.py`, `requirements*.txt` | `docs/DEVELOPMENT_GUIDE.md`, `README.md` (system at a glance) |
+| A review finding (AUDIT_FINDINGS, IMPROVEMENT_PLAN) progresses to fixed | `docs/reviews/AUDIT_FINDINGS.md`, `docs/reviews/IMPROVEMENT_PLAN.md`, `docs/reviews/EXECUTIVE_SUMMARY.md`, `README.md` (project status section) |
+
+### When you change documentation, update these docs
+
+| If you changed... | Update these docs |
+| --- | --- |
+| Rename, add, or delete any file under `docs/` or `docs/reviews/` | `README.md` (Documentation Map + Directory Structure), `docs/DEVELOPMENT_GUIDE.md` (onboarding order), every file that links to the moved/deleted file |
+| `README.md` (feature list, test count, version, build info) | No automatic cascades — but verify the claim matches `docs/CLI_REFERENCE.md`, `docs/DEVELOPMENT_GUIDE.md`, `setup.py` |
+| `docs/CONTRIBUTING.md` (conventions, process) | `.githooks/commit-msg` (if format rules change) |
+| Test count changes (new tests added, tests removed) | `README.md` (headers: "254 passing tests"), `docs/DEVELOPMENT_GUIDE.md` (test suite table), `CONTRIBUTING.md` (quick reference card) |
+
+### Cross-reference verification
+
+Before pushing any change that touches files listed above:
+
+1. Search for the old filename/command/API name across all docs
+2. Update every reference that would break
+3. Run `grep -rn "old-name" docs/ README.md` — result must be empty or only historical context in review files
+4. Verify relative links resolve: `ls docs/path/to/linked-file.md` for every link in the changed file
+
+### What the AI must do
+
+When implementing a change, the AI must:
+
+1. Identify which docs are affected using the table above
+2. Include doc updates in the implementation plan under a `docs:` commit
+3. Verify no broken links remain before pushing
+4. Report which docs were updated and why in the implementation plan summary
+
+---
+
+## 8. Related Documents
 
 - [`README.md`](../README.md) — project overview, quick start, feature index
 - [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md) — layered design, key abstractions

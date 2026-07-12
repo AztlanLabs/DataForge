@@ -4,11 +4,11 @@
 >
 > For faster onboarding, start with:
 >
-> - [`README.md`](./README.md)
-> - [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
-> - [`docs/CLI_REFERENCE.md`](./docs/CLI_REFERENCE.md)
-> - [`docs/GUI_WORKFLOWS.md`](./docs/GUI_WORKFLOWS.md)
-> - [`docs/DEVELOPMENT_GUIDE.md`](./docs/DEVELOPMENT_GUIDE.md)
+> - [`README.md`](../README.md)
+> - [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md)
+> - [`docs/CLI_REFERENCE.md`](./CLI_REFERENCE.md)
+> - [`docs/GUI_WORKFLOWS.md`](./GUI_WORKFLOWS.md)
+> - [`docs/DEVELOPMENT_GUIDE.md`](./DEVELOPMENT_GUIDE.md)
 
 ## Purpose
 

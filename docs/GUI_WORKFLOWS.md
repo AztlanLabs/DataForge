@@ -238,4 +238,4 @@ Use these heuristics when adding functionality:
 - [Architecture](./ARCHITECTURE.md)
 - [CLI reference](./CLI_REFERENCE.md)
 - [Development guide](./DEVELOPMENT_GUIDE.md)
-- [Project review (bugs, security, UX, roadmap)](./reviews/00_EXECUTIVE_SUMMARY.md)
+- [Project review (bugs, security, UX, roadmap)](./reviews/EXECUTIVE_SUMMARY.md)
