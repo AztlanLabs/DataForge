@@ -32,6 +32,24 @@ from dataforge.modules.password_tools import analyze_password_strength
 
 class TestNewModules(unittest.TestCase):
 
+    def test_junk_scan_never_blanket_classifies_user_supplied_path(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_path = Path(tmpdir)
+            # .tmp/.log are in the scanner's default excluded_extensions and
+            # never reach the classifier, so use .bak (also junk, not excluded).
+            (temp_path / "junk.bak").write_text("junk", encoding="utf-8")
+            (temp_path / "normal.txt").write_text("important", encoding="utf-8")
+
+            # "System Temp" is one of the categories whose *default* system
+            # paths are still blanket-classified, but a user-supplied extra
+            # path under that same category must only match by
+            # extension/filename, never by blanket category membership.
+            results = scan_junk_files(paths=[tmpdir], categories=["System Temp"])
+
+            paths = [e.path for e in results.get("System Temp", [])]
+            self.assertTrue(any("junk.bak" in p for p in paths))
+            self.assertFalse(any("normal.txt" in p for p in paths))
+
     def test_junk_scan_and_savings(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             temp_path = Path(tmpdir)
