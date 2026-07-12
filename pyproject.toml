@@ -17,3 +17,13 @@ ignore = [
 [tool.black]
 line-length = 120
 target-version = ["py310"]
+
+[tool.mypy]
+# No python_version pin: mypy's syntax parser gates PEP 695 constructs
+# (e.g. numpy's bundled stubs) on this setting, but doesn't re-enforce
+# older f-string grammar restrictions from it either (ruff's
+# target-version covers that class of bug instead) - so pinning here
+# only costs us stub compatibility for no added safety.
+ignore_missing_imports = true
+warn_unused_ignores = true
+exclude = ["^build/", "^dist/", "^buildspec/"]
