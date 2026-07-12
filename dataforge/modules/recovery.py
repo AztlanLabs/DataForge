@@ -196,7 +196,38 @@ def _scan_windows_trash(progress_callback=None, cancel_token=None):
     )
 
 
-def restore_from_trash(items, progress_callback=None, cancel_token=None):
+_SYSTEM_DIRS = {
+    "/bin", "/sbin", "/lib", "/lib64", "/usr", "/etc", "/proc",
+    "/sys", "/dev", "/boot", "/root", "/var", "/run",
+}
+
+
+def _is_safe_restore_path(original_path):
+    """Validate a restore destination from .trashinfo metadata.
+
+    Returns (is_safe: bool, reason: str). A path is unsafe when it contains
+    traversal components (``..``), targets a system directory, or is not
+    absolute.
+    """
+    if not original_path or original_path.startswith("(unknown"):
+        return False, "Original path unknown"
+
+    p = Path(original_path)
+    if not p.is_absolute():
+        return False, "Path is not absolute"
+
+    parts = p.parts
+    if ".." in parts:
+        return False, "Path contains traversal component (..)"
+
+    for sys_dir in _SYSTEM_DIRS:
+        if str(p).startswith(sys_dir + "/") or str(p) == sys_dir:
+            return False, f"Path targets system directory ({sys_dir})"
+
+    return True, "ok"
+
+
+def restore_from_trash(items, progress_callback=None, cancel_token=None, restore_root=None):
     """
     Restore files from trash to their original locations.
 
@@ -204,6 +235,9 @@ def restore_from_trash(items, progress_callback=None, cancel_token=None):
         items: list of trash item dicts from scan_trash().
         progress_callback: Progress reporting callback.
         cancel_token: threading.Event for cancellation.
+        restore_root: Directory to confine restores into when the original
+            path fails validation (absolute-path check, traversal, or a
+            system directory). Defaults to ``~/Recovered``.
 
     Returns:
         dict with restored, failed, and cancelled counts.
@@ -230,14 +264,24 @@ def restore_from_trash(items, progress_callback=None, cancel_token=None):
             failed.append({"item": item, "error": "Trash file not found"})
             continue
 
+        is_safe, reason = _is_safe_restore_path(original_path)
+
+        if not is_safe:
+            safe_root = restore_root or os.path.join(os.path.expanduser("~"), "Recovered")
+            safe_name = Path(original_path).name
+            dest = os.path.join(safe_root, safe_name)
+            logger.warning(
+                f"Unsafe restore path ({reason}): {original_path} — "
+                f"redirecting to {dest}"
+            )
+        else:
+            dest = original_path
+
         try:
-            # Create parent directory if needed
-            parent = os.path.dirname(original_path)
+            parent = os.path.dirname(dest)
             if parent and not os.path.exists(parent):
                 os.makedirs(parent, exist_ok=True)
 
-            # Handle collision
-            dest = original_path
             if os.path.exists(dest):
                 base, ext = os.path.splitext(dest)
                 counter = 1
@@ -247,7 +291,6 @@ def restore_from_trash(items, progress_callback=None, cancel_token=None):
 
             shutil.move(trash_path, dest)
 
-            # Remove .trashinfo file
             info_file = item.get("info_file")
             if info_file and os.path.exists(info_file):
                 os.remove(info_file)
