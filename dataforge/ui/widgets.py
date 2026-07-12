@@ -857,6 +857,17 @@ class EnhancedTreeview(QWidget):
         if not os.path.exists(path):
             self._show_warning("Not Found", f"File does not exist anymore:\n{path}")
             return
+        if _is_executable_file(path):
+            reply = QMessageBox.question(
+                self, "Open Executable?",
+                f"This file appears to be an executable:\n{path}\n\n"
+                "Opening untrusted executables can be dangerous. "
+                "Open anyway?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
         try:
             if sys.platform == 'win32':
                 os.startfile(path)
@@ -1605,6 +1616,17 @@ class FilePreviewPanel(QWidget):
     def _open_current_externally(self):
         if not self._current_path:
             return
+        if _is_executable_file(self._current_path):
+            reply = QMessageBox.question(
+                self, "Open Executable?",
+                f"This file appears to be an executable:\n{self._current_path}\n\n"
+                "Opening untrusted executables can be dangerous. "
+                "Open anyway?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
         try:
             if sys.platform == 'win32':
                 os.startfile(self._current_path)  # type: ignore[attr-defined]
@@ -1614,6 +1636,26 @@ class FilePreviewPanel(QWidget):
                 subprocess.call(['xdg-open', self._current_path])
         except Exception as e:
             self._set_label_text(f"Could not open: {e}")
+
+
+_EXECUTABLE_EXTENSIONS = {
+    ".exe", ".msi", ".bat", ".cmd", ".com", ".scr", ".pif",
+    ".sh", ".bash", ".csh", ".ksh", ".fish",
+    ".app", ".dmg", ".pkg", ".deb", ".rpm",
+    ".py", ".pyw", ".rb", ".pl",
+}
+
+
+def _is_executable_file(path):
+    _, ext = os.path.splitext(path)
+    if ext.lower() in _EXECUTABLE_EXTENSIONS:
+        return True
+    if sys.platform != "win32":
+        try:
+            return os.access(path, os.X_OK) and os.path.isfile(path)
+        except OSError:
+            pass
+    return False
 
 
 def _looks_like_text_bytes(header):
