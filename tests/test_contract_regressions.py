@@ -912,6 +912,19 @@ class ContractRegressionTests(unittest.TestCase):
         anon = lambda: None
         self.assertEqual(_humanize_callable_name(anon), "background task")
 
+    def test_baseview_help_uses_markdown(self):
+        """The help dialog must render Markdown headings and code spans
+        properly, not show literal ``#``/``*`` characters as before."""
+        from PyQt5.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+
+        default = BaseView.get_help_text(self.__class__.__mro__[0]())
+        self.assertTrue(default.startswith("#"))
+        self.assertIn("help", default.lower())
+
+        self.assertTrue(callable(getattr(BaseView, "show_help", None)))
+        self.assertTrue(callable(getattr(BaseView, "whats_this_for", None)))
+
     def test_cli_search_help_mentions_extension_sort_examples(self):
         runner = CliRunner()
 

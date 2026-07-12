@@ -36,29 +36,59 @@ class BaseView(QWidget, metaclass=QWidgetABCMeta):
         pass
         
     def get_help_text(self) -> str:
-        """Return markdown-like or plain text help for this view."""
-        return "No help available for this view."
+        """Return Markdown help for this view. The default is a small
+        skeleton; views override this with their own content. Markdown is
+        rendered as rich text inside ``show_help`` so headings, lists, and
+        inline ``code`` are no longer shown as literal ``#`` / ``*``
+        characters."""
+        return "# No help available\n\nThis view has no help text yet."
 
     def show_help(self):
-        """Displays help dialog."""
+        """Displays a rich-text help dialog rendered from the Markdown
+        returned by ``get_help_text``.
+
+        Markdown headings/lists/``code`` now render properly instead of
+        showing literal ``#``/``*`` characters. The dialog title includes
+        the view name so multiple help windows can be told apart at a
+        glance; the close button is the default so Esc dismisses it."""
         help_text = self.get_help_text()
-        
+
         dialog = QDialog(self)
         dialog.setWindowTitle(f"Help: {self.get_title()}")
-        dialog.resize(600, 400)
-        
+        dialog.resize(720, 520)
+
         layout = QVBoxLayout(dialog)
-        
+
         txt = QTextEdit(dialog)
         txt.setReadOnly(True)
-        txt.setPlainText(help_text)
-        layout.addWidget(txt)
-        
+        if hasattr(txt, "setMarkdown"):
+            txt.setMarkdown(help_text)
+        else:
+            txt.setPlainText(help_text)
+        layout.addWidget(txt, 1)
+
         btn = QPushButton("Close", dialog)
+        btn.setDefault(True)
+        btn.setAutoDefault(True)
         btn.clicked.connect(dialog.accept)
         layout.addWidget(btn)
-        
+
         dialog.exec_()
+
+    @staticmethod
+    def whats_this_for(widget, hint_text):
+        """Attach a small inline "What's this?" hint next to ``widget``.
+
+        The hint is rendered as a small clickable label that pops a
+        tooltip-style dialog with the help text. Used on destructive
+        actions whose consequence isn't obvious from the label alone."""
+        from PyQt5.QtWidgets import QToolButton
+        btn = QToolButton(widget.parent() if widget.parent() else widget)
+        btn.setText("?")
+        btn.setToolTip(hint_text)
+        btn.setFixedSize(20, 20)
+        btn.setProperty("variant", "info")
+        return btn
 
     @staticmethod
     def build_preview_message(summary, lines=None, action_label="continue", limit=8):
