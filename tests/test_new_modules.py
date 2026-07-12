@@ -22,7 +22,11 @@ from dataforge.modules.recovery import (
 )
 from dataforge.modules.metadata import MetadataEngine
 from dataforge.modules.hardware import get_hardware_report
-from dataforge.modules.forensics import calculate_hashes, parse_os_artifacts
+from dataforge.modules.forensics import (
+    calculate_hashes,
+    parse_os_artifacts,
+    generate_forensic_report,
+)
 from dataforge.modules.password_tools import analyze_password_strength
 
 
@@ -133,6 +137,32 @@ class TestNewModules(unittest.TestCase):
             self.assertIn("shell_history", artifacts)
             self.assertTrue(len(artifacts["users"]) > 0)
             self.assertEqual(artifacts["users"][0]["username"], "root")
+
+    def test_forensic_report_html_escapes_script_filename(self):
+        malicious = "<script>alert(1)</script>.txt"
+        results = {
+            "file_count": 1,
+            "hashes": [{
+                "filename": malicious,
+                "formatted_size": "1 B",
+                "md5": "0" * 32,
+                "sha256": "0" * 64,
+            }],
+            "artifacts": {
+                "users": [{
+                    "username": malicious,
+                    "uid": 0,
+                    "home": "/root",
+                    "shell": "/bin/bash",
+                }],
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_path = os.path.join(tmpdir, "report.html")
+            generate_forensic_report(results, out_path, fmt="html")
+            html_content = Path(out_path).read_text(encoding="utf-8")
+            self.assertNotIn("<script>alert(1)</script>", html_content)
+            self.assertIn("&lt;script&gt;", html_content)
 
     def test_about_view(self):
         from PyQt5.QtWidgets import QApplication, QWidget
