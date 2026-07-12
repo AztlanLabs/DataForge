@@ -1,7 +1,14 @@
 # Implementation Plan — Sequenced Execution & Release Roadmap
 
-**Date:** 2026-07-11 · **Last verified:** 2026-07-11
-**Target release:** `v0.2.0` · **Current version:** `0.1.0` (`pyproject.toml`)
+**Date:** 2026-07-11 · **Last verified:** 2026-07-12
+**Target releases:** `v0.2.0` (WS-A … WS-H) → `v0.3.0` (WS-I, WS-J) · **Current version:** `0.1.0` (`pyproject.toml`)
+
+> **2026-07-12 expansion.** A fresh code-verification pass confirmed WS-B landed
+> (S4–S13 fixed in source) and re-verified the forensic review's F1–F21 / U1–U11.
+> This revision **carries those findings into the roadmap**: forensic soundness is
+> added to `v0.2.0` as **WS-H**, and engine correctness/growth open a **`v0.3.0`**
+> cycle as **WS-I** and **WS-J** (see [§3](#3-consolidated-backlog--single-index),
+> [§4](#4-work-streams--the-ordered-how), [§7](#7-status-tracking)).
 
 ---
 
@@ -21,7 +28,7 @@ It does not replace the trackers — it **links into** them:
 | UX/engineering rationale, per-item backlog | [`IMPROVEMENT_PLAN.md`](./IMPROVEMENT_PLAN.md) |
 | Doc-defect audit (D1–D7) | [`NOTES_REVIEW.md`](./NOTES_REVIEW.md) |
 | Status overview, brand, Definition of Done | [`EXECUTIVE_SUMMARY.md`](./EXECUTIVE_SUMMARY.md) |
-| Forensic-soundness, security, investigator-UX architectural findings (F1–F19, U1–U11) | [`FORENSIC_SECURITY_REVIEW.md`](./FORENSIC_SECURITY_REVIEW.md) |
+| Forensic-soundness, security, investigator-UX architectural findings (F1–F21, U1–U11) | [`FORENSIC_SECURITY_REVIEW.md`](./FORENSIC_SECURITY_REVIEW.md) |
 | Commit format, branch model, versioning, release checklist | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) §2, §3, §6, §7 |
 
 ### 1.1 Documentation standard — every item answers Where / Why / How
@@ -60,6 +67,18 @@ inside NOTES_REVIEW.md itself* as its audit record. `TECHNICAL_SOURCE_OF_TRUTH.m
 references corrected). Baseline: `PYTHONPATH=. pytest -q` → **255 passed**
 (was 254 at plan authoring; +1 for the S2 regression test).
 
+**2026-07-12 re-verification (forensic-soundness expansion).** A second code pass
+confirmed every WS-B fix is present in the current source (S4 `_is_safe_restore_path`
+at `recovery.py:205-227`; S5 owner/permission guards at `plugin_loader.py:40-75`;
+S7 socket/age guards at `system_cleanup.py:267-286`; S9 `defusedxml` at
+`forensics.py:1048`; S11 executable-open confirm at `widgets.py:860-866`) and
+re-verified the forensic review's F1–F21 / U1–U11 against source (line drift and
+now-stale UI wording corrected in [`FORENSIC_SECURITY_REVIEW.md`](./FORENSIC_SECURITY_REVIEW.md)).
+The eight new modules those findings propose (`core/audit.py`, `core/case.py`,
+`core/image_io.py`, `core/acquire.py`, `core/streams.py`, `core/dt.py`,
+`core/parse_worker.py`, `modules/sanitisation.py`) correctly do **not** exist yet —
+they are the WS-H/WS-I/WS-J deliverables below.
+
 > **Rule of engagement:** every task below maps to a Conventional Commit
 > (`type(scope): description`, see [CONTRIBUTING §3](../CONTRIBUTING.md)) with a stated
 > version impact. All work lands on `develop`; a single `develop`→`main` PR cuts `v0.2.0`.
@@ -70,19 +89,24 @@ references corrected). Baseline: `PYTHONPATH=. pytest -q` → **255 passed**
 
 ### 2.1 Model
 
-The entire backlog ships as **one `v0.2.0` release** (MINOR — the backlog contains
-`feat` work: task-oriented IA, Automations merge, `fm devices` GUI). Work is grouped
-into **seven sequenced work-streams (WS-A … WS-G)**. Each stream lands on `develop`
-and is closed by an **alpha tag** when the suite is green. When *all* streams are
-merged and the release checklist passes, **one** `develop`→`main` PR promotes the
-release through beta → rc → GA.
+`v0.2.0` (MINOR — the backlog contains `feat` work: task-oriented IA, Automations
+merge, `fm devices` GUI) ships **eight sequenced work-streams (WS-A … WS-H)**, where
+**WS-H** adds the forensic-soundness layer (chain-of-custody, Evidence Mode,
+acquisition provenance). Each stream lands on `develop` and is closed by an **alpha
+tag** when the suite is green. When *all* streams are merged and the release checklist
+passes, **one** `develop`→`main` PR promotes the release through beta → rc → GA.
+
+The engine-correctness and engine-growth findings that move DataForge from
+"file manager" to "investigative tool" open a **`v0.3.0`** cycle as **WS-I** and
+**WS-J** — they depend on the WS-F service seams and WS-H forensic layer, so they
+cannot land before `v0.2.0` closes.
 
 ```
-main     ●───────────────────────────────●── v0.2.0-beta.1 ─●── rc.1 ─●── v0.2.0
-          \                              /
-develop    ●──●──●──●──●──●──●──●──●──●──●   (alpha.1 … alpha.7)
-           A  A  B  B  C  D  E  F  G  ↑
-                                      release PR opens here
+main     ●────────────────────────────────────●── v0.2.0-beta.1 ─●── rc.1 ─●── v0.2.0 ─── … ──●── v0.3.0
+          \                                   /                                                /
+develop    ●──●──●──●──●──●──●──●──●──●──●──●──●   (alpha.1 … alpha.8)      ●──●──●──●  (v0.3.0 alphas)
+           A  A  B  B  C  D  E  F  G  H  ↑                                 I  I  J  J
+                                         v0.2.0 release PR opens here
 ```
 
 ### 2.2 When to commit to `develop` — commit-as-you-complete
@@ -110,7 +134,7 @@ git push origin develop --tags
 
 ### 2.3 When to open the release PR — `develop` → `main`
 
-Open the `develop`→`main` PR **only when every work-stream (A–G) is merged** and the
+Open the `develop`→`main` PR **only when every `v0.2.0` work-stream (A–H) is merged** and the
 [CONTRIBUTING §7](../CONTRIBUTING.md) pre-merge checklist passes:
 
 **Definition of releasable (mirrors CONTRIBUTING §7):**
@@ -244,6 +268,47 @@ This is the "tackle any of them" master list.
 | Config out-of-range/unknown keys → clamped/ignored | S10 | B | ✅ Done (`test_config_merge_validates_and_clamps_bad_values`) |
 | Settings persistence round-trip | 2c.2 | C | ⏳ Open |
 | GUI smoke test (pytest-qt) mounts each view | 2d/2e | D/E | ⏳ Open |
+
+### Forensic Soundness & Investigator UX — from [`FORENSIC_SECURITY_REVIEW.md`](./FORENSIC_SECURITY_REVIEW.md)
+
+Per-item **Where/Why/How** and the code-verified evidence live in the review
+(F1–F21 / U1–U11); this table maps them to commit type, version impact, and
+work-stream. `v0.2.0` carries **WS-H**; `v0.3.0` carries **WS-I** and **WS-J**.
+
+| ID | Title | Commit type | Ver | WS |
+| --- | --- | --- | --- | --- |
+| F1 | Chain-of-custody / tamper-evident audit log (`core/audit.py`; builds on ARCH.5) | `feat(core)` | MINOR | H |
+| F2 | Acquisition provenance in reports/manifests | `feat(modules)` | MINOR | H |
+| F3 | Read-only Evidence Mode gate (builds on ARCH.4) | `feat(core)` | MINOR | H |
+| F4 | Move `secure_delete` to `modules/sanitisation.py` | `refactor(modules)` | — | H |
+| F9 | UTC ISO-8601 timestamps everywhere (`core/dt.py`) | `fix(modules)` | PATCH | H |
+| F11 | Hash-chained audit log replacing `app.log` reliance | `feat(core)` | MINOR | H |
+| F21 | Hardlink/reflink-aware `secure_delete` + dedup | `fix(modules)` | PATCH | H |
+| U1 | `CaseContext` (case / evidence / operator) | `feat(ui)` | MINOR | H |
+| U2 | Evidence Mode UI toggle + sticky badge | `feat(ui)` | MINOR | H |
+| F6 | Alignment-free streaming carver (builds on ARCH.6) | `refactor(modules)` | — | I |
+| F8 | ADS / xattrs / Mark-of-the-Web (`core/streams.py`) | `feat(core)` | MINOR | I |
+| F10 | Filename NFC/NFD + bidi/homograph handling | `fix(core)` | PATCH | I |
+| F13 | Untrusted-parser process isolation (`core/parse_worker.py`) | `feat(core)` | MINOR | I |
+| F14 | Streaming ingest + `FileEntry` MACB extension; fix `created_at` mislabel | `refactor(core)` | — | I |
+| F15 | Keyword-worker global memory budget | `fix(modules)` | PATCH | I |
+| F16 | Sparse-file detection | `fix(core)` | PATCH | I |
+| F17 | `_run_cmd` FIFO/regular-file guard | `fix(modules)` | PATCH | I |
+| F18 | System-cleanup allow-list precision (residual) | `fix(modules)` | PATCH | I |
+| F19 | Trash-restore audit-log hook (residual) | `feat(modules)` | MINOR | I |
+| F20a | Locked-file detection (`access_error` surfaced) | `feat(core)` | MINOR | I |
+| U5 | "Suspicious mismatches" filter | `feat(ui)` | MINOR | I |
+| U6 | Pair semantic colour with glyph | `feat(design)` | MINOR | I |
+| U7 | Destructive-preview source correlation | `fix(ui)` | PATCH | I |
+| U8 | Drag-and-drop hardening on evidence views | `fix(ui)` | PATCH | I |
+| U11 | Windows Recycle Bin recovery (`$I`/`$R`) | `feat(modules)` | MINOR | I |
+| F5 | Raw image support E01/AFF4/dd (`core/image_io.py`) | `feat(core)` | MINOR | J |
+| F7 | YARA + TLsh + NSRL known-good (`modules/indicators.py`) | `feat(modules)` | MINOR | J |
+| F20b | Volume Shadow Copy / raw-volume acquisition (`core/acquire.py`) | `feat(core)` | MINOR | J |
+| U3 | Virtualised timeline view | `feat(ui)` | MINOR | J |
+| U4 | Hex field/offset inspector | `feat(ui)` | MINOR | J |
+| U9 | Keyboard-first timeline navigation | `feat(ui)` | MINOR | J |
+| U10 | Windows/macOS OS-artifact parsing parity | `feat(modules)` | MINOR | J |
 
 ---
 
@@ -445,14 +510,110 @@ docs: tick off definition of done and open brand tasks
 BR.1 (GitHub description/topics) is a repo-settings action, not a commit.
 **Version impact:** MINOR (BR.3).
 
-**After WS-G closes `alpha.7`, open the release PR** (see §2.3 and §5).
+### WS-H — Forensic Soundness → `v0.2.0-alpha.8`
+
+- **Where:** new `dataforge/core/audit.py`, `core/case.py`, `core/dt.py`,
+  `modules/sanitisation.py`; the `FileActionService` seam (ARCH.4/ARCH.5 from WS-F);
+  `modules/forensics.py` report writer (F2); `modules/duplicates.py` (F21). Items
+  **F1, F2, F3, F4, F9, F11, F21, U1, U2** — per-item detail in
+  [`FORENSIC_SECURITY_REVIEW.md`](./FORENSIC_SECURITY_REVIEW.md) §2/§4.
+- **Why:** these are the *disqualifying* gaps for any forensic-product claim — no
+  chain-of-custody, no acquisition provenance, no read-only Evidence Mode, mixed-tz
+  timestamps, and a `secure_delete` sitting inside the forensic module. ACPO
+  Principle 1–2, ISO/IEC 27037 §6.4, RFC 3227, and NIST SP 800-86 all require them;
+  without them contested results are excludable and procurement marks "fail."
+- **How:** build the append-only HMAC-chained audit log (F1/F11) on the ARCH.5 hook;
+  add `CaseContext` (U1) and the Evidence-Mode write-gate on the ARCH.4
+  root-confinement seam (F3/U2, with a sticky status-bar badge); standardise every
+  timestamp to UTC ISO-8601 via `core/dt.py` (F9); extend the report dict with
+  operator/host/source-image hash (F2); relocate `secure_delete` to
+  `modules/sanitisation.py` and make it hardlink/reflink-aware (F4/F21). One
+  `feat`/`fix`/`refactor` commit per finding, each with its named test from the
+  review.
+
+**Representative commits:**
+```
+feat(core): add append-only hmac-chained audit log
+feat(core): add case context and evidence-mode write gate
+fix(modules): emit utc iso-8601 timestamps across forensic outputs
+feat(modules): record acquisition provenance in forensic reports
+refactor(modules): move secure_delete to sanitisation module
+fix(modules): make secure_delete and dedup hardlink-aware
+feat(ui): add case/evidence/operator context and evidence-mode badge
+```
+**Version impact:** MINOR (F1/F2/F3/F11/U1/U2 are `feat`). **Gate:** closes
+`v0.2.0-alpha.8`; **the `v0.2.0` release PR opens after this stream** (see §2.3, §5).
+
+---
+
+## 4b. `v0.3.0` Work-Streams — Manager → Investigative Tool
+
+These open after `v0.2.0` ships; they depend on the WS-F seams and the WS-H
+forensic layer. Same commit/alpha-tag discipline as §4.
+
+### WS-I — Engine Correctness → `v0.3.0-alpha.1`
+
+- **Where:** `modules/recovery.py` carver (F6), new `core/streams.py` (F8),
+  `core/scanner.py` + `duplicates.py`/`search.py` (F10, F16), new
+  `core/parse_worker.py` (F13), `core/common.py` `FileEntry` + forensics ingest
+  (F14), `keyword_search` (F15), `_run_cmd` (F17), `system_cleanup.py` residual
+  (F18), trash-restore audit (F19), locked-file detection (F20a), UI (U5, U6, U7,
+  U8), Windows Recycle Bin (U11).
+- **Why:** make the engine *correct* before adding new surface — alignment-free
+  carving, ADS enumeration (omitting it makes the tool dangerous on Windows
+  evidence), Unicode/homograph safety, in-process parser isolation, sparse- and
+  locked-file handling, and the highest-signal investigator-fatigue UI wins.
+- **How:** stream the carver on ARCH.6 with an Aho-Corasick multi-pattern match and
+  a cheap validation pass; add cross-platform stream/xattr enumeration; normalise
+  NFC/NFD and flag bidi/confusables; run untrusted parsers in an rlimited
+  `ProcessPoolExecutor`; stream ingest with MACB fields and fix the `created_at`
+  mislabel; budget keyword-search memory; surface sparse/locked flags in reports;
+  ship the mismatch filter, glyph pairing, preview source-correlation, drag-drop
+  lockdown, and the `$I`/`$R` Recycle Bin parser.
+
+**Representative commits:**
+```
+refactor(modules): stream the carver with alignment-free matching
+feat(core): enumerate alternate data streams and xattrs
+fix(core): normalise filenames and flag bidi/homograph names
+feat(core): isolate untrusted parsers in an rlimited worker pool
+fix(core): detect sparse files and surface locked-file access errors
+feat(ui): add suspicious-mismatch filter and glyph-paired status
+```
+**Version impact:** MINOR. **Gate:** closes `v0.3.0-alpha.1`.
+
+### WS-J — Engine Growth → `v0.3.0-alpha.2`
+
+- **Where:** new `core/image_io.py` (F5), new `modules/indicators.py` + cache schema
+  (F7), new `core/acquire.py` (F20b), new `ui/views/timeline.py` (U3), new
+  `ui/widgets/hexview.py` (U4), timeline keybindings (U9), OS-artifact parity (U10).
+- **Why:** the features that move DataForge from "file manager" to "investigative
+  tool" — read E01/AFF4 without mounting, YARA/TLsh/NSRL triage, Volume Shadow Copy
+  acquisition of locked volumes, a virtualised timeline, a hex field inspector,
+  keyboard-first navigation, and Windows/macOS artifact parity.
+- **How:** dispatch on magic bytes for image formats with a read-only assertion;
+  bundle `yara-python` + TLsh with a `tlsh` cache column and an NSRL hashset table;
+  add the VSS/raw-volume acquisition path (completes F20); build the virtualised
+  `QTreeView` timeline and the `HexView` field inspector; add vim-style keybindings;
+  add `python-registry`/prefetch parsers or scope the README to Linux.
+
+**Representative commits:**
+```
+feat(core): read e01/aff4/dd images without mounting
+feat(modules): add yara, tlsh, and nsrl known-good pivots
+feat(core): acquire locked volumes via volume shadow copy
+feat(ui): add virtualised timeline and hex field inspector
+```
+**Version impact:** MINOR. **Gate:** closes `v0.3.0-alpha.2`; then the
+`v0.3.0` release PR.
 
 ---
 
 ## 5. Release Execution Runbook
 
-Once all seven alpha streams are merged and the §2.3 checklist passes
-(commands from [CONTRIBUTING §6–7](../CONTRIBUTING.md)):
+Once all eight `v0.2.0` alpha streams (A–H) are merged and the §2.3 checklist passes
+(commands from [CONTRIBUTING §6–7](../CONTRIBUTING.md)); the same runbook cuts
+`v0.3.0` after WS-I and WS-J:
 
 ```bash
 # 1. Prep on develop
@@ -497,6 +658,9 @@ passes for the whole suite ([CONTRIBUTING §5](../CONTRIBUTING.md)).
 | E | pytest-qt mounts views with animations/empty states; reduce-motion honored |
 | F | Existing filter/metadata/service suites stay green after consolidation; audit-log append verified |
 | G | GUI About renders tagline; `python setup.py sdist` + `build_exe` succeed |
+| H | Audit-log tamper refuses start (F1); report carries provenance keys (F2); evidence mode blocks every mutator (F3/U2); every timestamp ends `+00:00` (F9); hardlink `secure_delete` refuses (F21) |
+| I | Carver finds mid-sector JPEG + rejects PNG bomb (F6); ADS enumerated (F8); NFD==NFC grouping + bidi flagged (F10); parser worker killed by rlimit (F13); sparse + locked-file flags recorded (F16/F20a); mismatch filter surfaces `evil.jpg` (U5) |
+| J | E01/dd `FileLike` SHA-256 matches raw (F5); YARA/TLsh/NSRL hits (F7); VSS reads a locked fixture (F20b); 100k-event timeline scroll keeps RSS flat (U3); PNG IHDR decoded in hex inspector (U4) |
 
 **Release verification:** the §2.3 "Definition of releasable" checklist gates the
 `develop`→`main` PR; the §5 pre-tag gate gates each stable tag.
@@ -512,10 +676,14 @@ Update the `WS` streams here as they close; the detailed per-item status stays i
 | Stream | Scope | Tag | Status |
 | --- | --- | --- | --- |
 | WS-A | Stabilize & Doc Truth (CI, tooling, S2, doc audit) | `v0.2.0-alpha.1` | ✅ Done — tagged locally |
-| WS-B | Trust & Safety (S4–S13) | `v0.2.0-alpha.2` | ✅ Done — ready to tag |
+| WS-B | Trust & Safety (S4–S13) | `v0.2.0-alpha.2` | ✅ Done — closed |
 | WS-C | Interaction Correctness (2c) | `v0.2.0-alpha.3` | ⏳ Not started |
 | WS-D | IA, Naming & Parity (2d) | `v0.2.0-alpha.4` | ⏳ Not started |
 | WS-E | Motion, Empty/Error, A11y (2e) | `v0.2.0-alpha.5` | ⏳ Not started |
 | WS-F | Architecture Consolidation | `v0.2.0-alpha.6` | ⏳ Not started |
 | WS-G | Brand & Release Polish | `v0.2.0-alpha.7` | ⏳ Not started |
-| — | Release PR `develop`→`main` | `v0.2.0` GA | ⏳ Gated on A–G |
+| WS-H | Forensic Soundness (F1–F4, F9, F11, F21, U1, U2) | `v0.2.0-alpha.8` | ⏳ Not started |
+| — | Release PR `develop`→`main` | `v0.2.0` GA | ⏳ Gated on A–H |
+| WS-I | Engine Correctness (F6, F8, F10, F13–F20a, U5–U8, U11) | `v0.3.0-alpha.1` | ⏳ Not started |
+| WS-J | Engine Growth (F5, F7, F20b, U3, U4, U9, U10) | `v0.3.0-alpha.2` | ⏳ Not started |
+| — | Release PR `develop`→`main` | `v0.3.0` GA | ⏳ Gated on I–J |
