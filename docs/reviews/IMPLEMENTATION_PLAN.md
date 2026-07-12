@@ -42,21 +42,22 @@ standard. Per-item Where/Why/How lives in the linked trackers.
 The backlog below was **checked against the current source tree**, not copied on
 trust from the review files. Verified open, with evidence:
 
-| ID | Verified open at | Evidence |
-| --- | --- | --- |
-| S2 | `dataforge/modules/forensics.py:581-625` | interpolated values, no `html.escape()` |
-| S4 | `dataforge/modules/recovery.py:225-250` | `original_path` → `shutil.move` + `os.makedirs` |
-| S5 | `dataforge/ui/plugin_loader.py:38-51` | `exec_module()`, no signing/sandbox |
-| S7 | `dataforge/modules/system_cleanup.py:249` | blanket junk classification |
-| S8 | `dataforge/modules/password_tools.py:246` | `open(hash_file, "w")`, no `0o600` |
-| S9 | `dataforge/modules/forensics.py:1033` | `xml.etree.ElementTree`, no `defusedxml` |
-| S10 | `dataforge/core/config.py` | blind merge, zero validation |
+| ID | Verified open at (2026-07-11, plan authoring) | Evidence | Status |
+| --- | --- | --- | --- |
+| S2 | `dataforge/modules/forensics.py:581-625` | interpolated values, no `html.escape()` | ✅ **Fixed** (WS-A) |
+| S4 | `dataforge/modules/recovery.py:225-250` | `original_path` → `shutil.move` + `os.makedirs` | ⏳ Open |
+| S5 | `dataforge/ui/plugin_loader.py:38-51` | `exec_module()`, no signing/sandbox | ⏳ Open |
+| S7 | `dataforge/modules/system_cleanup.py:249` | blanket junk classification | ⏳ Open |
+| S8 | `dataforge/modules/password_tools.py:246` | `open(hash_file, "w")`, no `0o600` | ⏳ Open |
+| S9 | `dataforge/modules/forensics.py:1033` | `xml.etree.ElementTree`, no `defusedxml` | ⏳ Open |
+| S10 | `dataforge/core/config.py` | blind merge, zero validation | ⏳ Open |
 
 Also verified: NOTES_REVIEW **D1–D3 are already resolved in the source docs** — the
 broken anchor, `"224"` count, and dead `docs/reviews/01` refs now survive *only
-inside NOTES_REVIEW.md itself* as its audit record. Still open: `TECHNICAL_SOURCE_OF_TRUTH.md`
-carries ~16 unprefixed `core/`/`modules/` path references (D4/D5). Baseline:
-`PYTHONPATH=. pytest -q` → **255 passed**.
+inside NOTES_REVIEW.md itself* as its audit record. `TECHNICAL_SOURCE_OF_TRUTH.md`'s
+~16 unprefixed `core/`/`modules/` path references (D4/D5) are **fixed** (WS-A, 17
+references corrected). Baseline: `PYTHONPATH=. pytest -q` → **255 passed**
+(was 254 at plan authoring; +1 for the S2 regression test).
 
 > **Rule of engagement:** every task below maps to a Conventional Commit
 > (`type(scope): description`, see [CONTRIBUTING §3](../CONTRIBUTING.md)) with a stated
@@ -136,29 +137,29 @@ This is the "tackle any of them" master list.
 
 ### Security — from [`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md) Part 2
 
-| ID | Severity | Title | Commit type | Ver | WS |
-| --- | --- | --- | --- | --- | --- |
-| S2 | 🔴 High | Forensic HTML report XSS (no `html.escape`) | `fix(modules)` | PATCH | **A** |
-| S4 | 🟠 Med | Trash-restore trusts `.trashinfo` path → arbitrary write | `fix(modules)` | PATCH | B |
-| S7 | 🟠 Med | System Cleanup blanket-classifies `/tmp`/cache as junk | `fix(modules)` | PATCH | B |
-| S5 | 🟠 Med | Plugin loader executes arbitrary local Python | `fix(ui)` | PATCH | B |
-| S6 | 🟠 Med | `secure_delete` overstates guarantee; trash fallback | `fix(modules)` | PATCH | B |
-| S8 | 🟠 Med | Credential material world-readable; password leak | `fix(modules)` | PATCH | B |
-| S9 | 🟡 Low | Unhardened XML parsing (billion-laughs) | `fix(modules)` | PATCH | B |
-| S10 | 🟡 Low | No config validation; blind merge of `config.json` | `fix(core)` | PATCH | B |
-| S11 | 🟡 Low | Opening scanned files via OS handler | `fix(ui)` | PATCH | B |
-| S12 | 🟡 Low | Forensic outputs world-readable | `fix(modules)` | PATCH | B |
-| S13 | 🟡 Low | Decompression-bomb exposure (Pillow/PDF) | `fix(modules)` | PATCH | B |
+| ID | Severity | Title | Commit type | Ver | WS | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| S2 | 🔴 High | Forensic HTML report XSS (no `html.escape`) | `fix(modules)` | PATCH | **A** | ✅ Done |
+| S4 | 🟠 Med | Trash-restore trusts `.trashinfo` path → arbitrary write | `fix(modules)` | PATCH | B | ⏳ Open |
+| S7 | 🟠 Med | System Cleanup blanket-classifies `/tmp`/cache as junk | `fix(modules)` | PATCH | B | ⏳ Open |
+| S5 | 🟠 Med | Plugin loader executes arbitrary local Python | `fix(ui)` | PATCH | B | ⏳ Open |
+| S6 | 🟠 Med | `secure_delete` overstates guarantee; trash fallback | `fix(modules)` | PATCH | B | ⏳ Open |
+| S8 | 🟠 Med | Credential material world-readable; password leak | `fix(modules)` | PATCH | B | ⏳ Open |
+| S9 | 🟡 Low | Unhardened XML parsing (billion-laughs) | `fix(modules)` | PATCH | B | ⏳ Open |
+| S10 | 🟡 Low | No config validation; blind merge of `config.json` | `fix(core)` | PATCH | B | ⏳ Open |
+| S11 | 🟡 Low | Opening scanned files via OS handler | `fix(ui)` | PATCH | B | ⏳ Open |
+| S12 | 🟡 Low | Forensic outputs world-readable | `fix(modules)` | PATCH | B | ⏳ Open |
+| S13 | 🟡 Low | Decompression-bomb exposure (Pillow/PDF) | `fix(modules)` | PATCH | B | ⏳ Open |
 
 ### Documentation — from [`NOTES_REVIEW.md`](./NOTES_REVIEW.md) §3–4
 
-| ID | Title | Commit type | Ver | WS |
-| --- | --- | --- | --- | --- |
-| D4/D5 | TSOT `dataforge/` path-prefix audit (~16 unprefixed refs) | `docs` | — | A |
-| — (3.1) | Full path-audit sweep of ARCHITECTURE + TSOT | `docs` | — | A |
-| — (3.2) | Add "Last verified: YYYY-MM-DD" datestamps to review/source docs | `docs` | — | A |
-| — (3.3) | Drop the TSOT A5 staleness `[!WARNING]` caveat after audit | `docs` | — | A |
-| — | Reconcile/close NOTES_REVIEW.md (D1–D3 already fixed in source) | `docs` | — | A |
+| ID | Title | Commit type | Ver | WS | Status |
+| --- | --- | --- | --- | --- | --- |
+| D4/D5 | TSOT `dataforge/` path-prefix audit (~16 unprefixed refs) | `docs` | — | A | ✅ Done (17 fixed) |
+| — (3.1) | Full path-audit sweep of ARCHITECTURE + TSOT | `docs` | — | A | ✅ Done (ARCHITECTURE.md was already clean) |
+| — (3.2) | Add "Last verified: YYYY-MM-DD" datestamps to review/source docs | `docs` | — | A | ✅ Done |
+| — (3.3) | Drop the TSOT A5 staleness `[!WARNING]` caveat after audit | `docs` | — | A | ✅ Done (narrowed, not dropped — see NOTES_REVIEW.md) |
+| — | Reconcile/close NOTES_REVIEW.md (D1–D3 already fixed in source) | `docs` | — | A | ✅ Done (D1–D7 all closed) |
 
 > **Note:** NOTES_REVIEW D1 (broken anchor), D2 (test count "224"), D3 (dead
 > `docs/reviews/01` refs) are **already resolved in the source docs** — those strings
@@ -168,15 +169,15 @@ This is the "tackle any of them" master list.
 
 ### Engineering & Process — from [`IMPROVEMENT_PLAN.md`](./IMPROVEMENT_PLAN.md) §4.1
 
-| Item | Title | Commit type | Ver | WS |
-| --- | --- | --- | --- | --- |
-| P0.1 | CI (GitHub Actions): pytest + ruff + mypy + coverage on push/PR | `chore(repo)` | — | A |
-| P0.2 | Linting/formatting config (ruff + black) | `chore(build)` | — | A |
-| P0.3 | Type-check config (mypy/pyright) | `chore(build)` | — | A |
-| P0.4 | Pre-commit hooks | `chore(repo)` | — | A |
-| P0.5 | Coverage reporting | `chore(repo)` | — | A |
-| P0.6 | Migrate `setup.py` → `pyproject.toml` | `chore(build)` | — | A |
-| P0.7 | Pin security libs + `pip-audit`/Dependabot | `chore(build)` | — | A |
+| Item | Title | Commit type | Ver | WS | Status |
+| --- | --- | --- | --- | --- | --- |
+| P0.1 | CI (GitHub Actions): pytest + ruff + mypy + coverage on push/PR | `chore(repo)` | — | A | ✅ Done |
+| P0.2 | Linting/formatting config (ruff + black) | `chore(build)` | — | A | ✅ Done |
+| P0.3 | Type-check config (mypy/pyright) | `chore(build)` | — | A | ✅ Done (mypy advisory-only; 65 pre-existing errors are future work) |
+| P0.4 | Pre-commit hooks | `chore(repo)` | — | A | ✅ Done |
+| P0.5 | Coverage reporting | `chore(repo)` | — | A | ✅ Done (34% baseline, no fail-under threshold yet) |
+| P0.6 | Migrate `setup.py` → `pyproject.toml` | `chore(build)` | — | A | ✅ Done |
+| P0.7 | Pin security libs + `pip-audit`/Dependabot | `chore(build)` | — | A | ✅ Done |
 
 ### Interaction Correctness — [`IMPROVEMENT_PLAN.md`](./IMPROVEMENT_PLAN.md) §6 Phase 2c
 
@@ -234,14 +235,14 @@ This is the "tackle any of them" master list.
 
 ### Testing gaps — [`IMPROVEMENT_PLAN.md`](./IMPROVEMENT_PLAN.md) §4.3 (land with their WS)
 
-| Guard | For | WS |
-| --- | --- | --- |
-| Forensic HTML report escapes `<script>` filename | S2 | A |
-| Malicious `.trashinfo` (absolute/`..`) → restore confined | S4 | B |
-| Cleanup never flags user folder as blanket junk | S7 | B |
-| Config out-of-range/unknown keys → clamped/ignored | S10 | B |
-| Settings persistence round-trip | 2c.2 | C |
-| GUI smoke test (pytest-qt) mounts each view | 2d/2e | D/E |
+| Guard | For | WS | Status |
+| --- | --- | --- | --- |
+| Forensic HTML report escapes `<script>` filename | S2 | A | ✅ Done (`test_forensic_report_html_escapes_script_filename`) |
+| Malicious `.trashinfo` (absolute/`..`) → restore confined | S4 | B | ⏳ Open |
+| Cleanup never flags user folder as blanket junk | S7 | B | ⏳ Open |
+| Config out-of-range/unknown keys → clamped/ignored | S10 | B | ⏳ Open |
+| Settings persistence round-trip | 2c.2 | C | ⏳ Open |
+| GUI smoke test (pytest-qt) mounts each view | 2d/2e | D/E | ⏳ Open |
 
 ---
 
@@ -251,7 +252,7 @@ Streams run **in order** (stabilize-first). Each closes with an alpha tag on
 `develop` once `PYTHONPATH=. pytest -q` is green. Every stream is stated as
 **Where / Why / How** ([§1.1](#11-documentation-standard--every-item-answers-where--why--how)).
 
-### WS-A — Stabilize & Doc Truth → `v0.2.0-alpha.1`
+### WS-A — Stabilize & Doc Truth → `v0.2.0-alpha.1` ✅ CLOSED
 
 - **Where:** `.github/workflows/`, `pyproject.toml`, `.githooks/`,
   `dataforge/modules/forensics.py:581-625`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md`,
@@ -277,7 +278,7 @@ test(modules): guard forensic report against script-tag filename
 docs: prefix core and modules paths with dataforge in source-of-truth
 docs: add last-verified datestamps and retire staleness caveat
 ```
-**Version impact:** PATCH (from S2). **Gate:** CI must be green before WS-B opens.
+**Version impact:** PATCH (from S2). **Gate:** CI must be green before WS-B opens — ✅ satisfied (255 passed, ruff clean, pip-audit clean; `v0.2.0-alpha.1` tagged locally on `develop`).
 
 ### WS-B — Trust & Safety (remaining security) → `v0.2.0-alpha.2`
 
