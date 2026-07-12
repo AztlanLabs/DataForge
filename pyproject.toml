@@ -1,3 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dataforge"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "click",
+    "rich",
+    "tqdm",
+    "send2trash",
+    "psutil>=5.9.0",
+    "python-magic>=0.4.27",
+    "PyExifTool>=0.5.0",
+    "mutagen>=1.47.0",
+    "py-cpuinfo>=9.0.0",
+]
+
+[project.scripts]
+fm = "dataforge.cli:main"
+
+# PyQt5 and Pillow are intentionally excluded from [project.dependencies]:
+# they only back the desktop GUI (run_ui.py), not the `fm` CLI console
+# script. Install from requirements.txt for full GUI/media support.
+
+[tool.setuptools.packages.find]
+include = ["dataforge*"]
+
 [tool.ruff]
 line-length = 120
 target-version = "py310"
