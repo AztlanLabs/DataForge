@@ -175,6 +175,29 @@ BROWSER_ARTIFACT_PATTERNS = {
 # Public API
 # ---------------------------------------------------------------------------
 
+_SYSTEM_TEMP_DIRS = {"/tmp", "/var/tmp"}
+
+
+def _is_socket_or_fifo(path):
+    """Return True if *path* is a Unix socket, FIFO, or other special file
+    that should never be classified as junk."""
+    try:
+        mode = os.stat(path).st_mode
+        import stat
+        return stat.S_ISSOCK(mode) or stat.S_ISFIFO(mode)
+    except OSError:
+        return False
+
+
+def _is_under_system_temp(scan_dir):
+    """Return True when *scan_dir* is (or is under) a well-known system temp
+    tree like ``/tmp`` or ``/var/tmp``."""
+    for t in _SYSTEM_TEMP_DIRS:
+        if scan_dir == t or scan_dir.startswith(t + "/"):
+            return True
+    return False
+
+
 def scan_junk_files(
     paths=None,
     categories=None,
@@ -218,11 +241,13 @@ def scan_junk_files(
             progress_callback(idx, total_categories, f"Scanning: {category}")
 
         category_files = []
-        scan_dirs = platform_paths[category]
+        scan_dirs = list(platform_paths[category])
+        user_supplied = set()
 
-        # Add user-specified paths to the first category
         if paths and idx == 0:
-            scan_dirs = list(scan_dirs) + list(paths)
+            for p in paths:
+                scan_dirs.append(p)
+                user_supplied.add(p)
 
         for scan_dir in scan_dirs:
             if cancel_token and cancel_token.is_set():
@@ -231,21 +256,35 @@ def scan_junk_files(
             if not os.path.isdir(scan_dir):
                 continue
 
+            is_user_path = scan_dir in user_supplied
+            is_sys_temp = _is_under_system_temp(scan_dir) and not is_user_path
+
             try:
                 for entry in scan_directory(scan_dir, recursive=True, max_depth=5, cancel_token=cancel_token):
                     if entry.is_dir:
                         continue
 
-                    # Apply age filter
+                    if _is_socket_or_fifo(entry.path):
+                        continue
+
                     if cutoff_time and entry.modified_at > cutoff_time:
                         continue
 
-                    # Check if file matches junk patterns
-                    is_junk = (
-                        entry.extension.lower() in JUNK_EXTENSIONS
-                        or entry.filename.lower() in JUNK_FILENAMES
-                        or category in ("System Temp", "User Cache", "Thumbnails", "Trash", "Crash Reports")
-                    )
+                    if is_sys_temp:
+                        if entry.modified_at > (datetime.now() - timedelta(days=1)).timestamp():
+                            continue
+
+                    if is_user_path:
+                        is_junk = (
+                            entry.extension.lower() in JUNK_EXTENSIONS
+                            or entry.filename.lower() in JUNK_FILENAMES
+                        )
+                    else:
+                        is_junk = (
+                            entry.extension.lower() in JUNK_EXTENSIONS
+                            or entry.filename.lower() in JUNK_FILENAMES
+                            or category in ("System Temp", "User Cache", "Thumbnails", "Trash", "Crash Reports")
+                        )
 
                     if is_junk:
                         category_files.append(entry)
