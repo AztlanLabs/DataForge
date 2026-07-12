@@ -508,7 +508,7 @@ Update the `WS` streams here as they close; the detailed per-item status stays i
 
 | Stream | Scope | Tag | Status |
 | --- | --- | --- | --- |
-| WS-A | Stabilize & Doc Truth (CI, tooling, S2, doc audit) | `v0.2.0-alpha.1` | ⏳ Not started |
+| WS-A | Stabilize & Doc Truth (CI, tooling, S2, doc audit) | `v0.2.0-alpha.1` | ✅ Done — tagged locally |
 | WS-B | Trust & Safety (S4–S13) | `v0.2.0-alpha.2` | ⏳ Not started |
 | WS-C | Interaction Correctness (2c) | `v0.2.0-alpha.3` | ⏳ Not started |
 | WS-D | IA, Naming & Parity (2d) | `v0.2.0-alpha.4` | ⏳ Not started |
