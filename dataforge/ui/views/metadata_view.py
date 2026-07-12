@@ -8,10 +8,8 @@ import os
 import json
 
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,
-    QGroupBox, QGridLayout, QTabWidget, QSplitter, QTextEdit,
-    QLineEdit, QTreeWidgetItem, QComboBox, QCheckBox,
-    QMessageBox
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QGroupBox, QTabWidget, QSplitter, QTextEdit,
+    QLineEdit, QMessageBox
 )
 from PyQt5.QtCore import Qt
 
@@ -19,10 +17,9 @@ from .base import BaseView
 from ..theme_tokens import TYPE_SCALE
 from .. import dialogs
 from ..widgets import EnhancedTreeview, FilePreviewPanel, CollapsibleCard, attach_tooltips
-from ...core.utils import format_size
 from ...core.scanner import scan_directory
 from ...modules.metadata import MetadataEngine
-from ...modules.search import build_search_query, search_files, export_result_rows
+from ...modules.search import export_result_rows
 
 
 class MetadataView(BaseView):

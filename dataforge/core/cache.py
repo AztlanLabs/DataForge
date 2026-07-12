@@ -2,7 +2,6 @@ import sqlite3
 import os
 import threading
 from .logger import logger
-from .config import config
 
 class CacheManager:
     def __init__(self, db_path=None):

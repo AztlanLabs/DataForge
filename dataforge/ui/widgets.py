@@ -1,7 +1,6 @@
 import os
 import subprocess
 import sys
-import math
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,
     QTreeWidget, QTreeWidgetItem, QHeaderView, QMenu, QMessageBox, QDialog,

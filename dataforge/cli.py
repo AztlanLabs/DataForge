@@ -4,7 +4,7 @@ from collections import defaultdict
 import click
 from .core.scanner import scan_directory
 from .modules.duplicates import build_duplicate_export_rows, build_duplicate_records, find_duplicates, order_duplicate_records, serialize_duplicate_record
-from .modules.search import SearchQuery, build_search_query, export_result_rows, iter_search_files, order_search_results, search_files
+from .modules.search import build_search_query, export_result_rows, iter_search_files, order_search_results, search_files
 from .modules.organizer import Organizer
 from .modules.renamer import bulk_rename
 from .modules.cleaner import remove_empty_folders
@@ -288,7 +288,6 @@ def check(path, snapshot):
 @click.option('--dry-run/--execute', default=True, help='Preview cleanup without deleting')
 def cleanup(path, category, min_age, dry_run):
     """Scan and remove junk files."""
-    import os
     from .modules.system_cleanup import scan_junk_files, estimate_cleanup_savings
     from .core.services import FileActionService
     from .core.utils import format_size
@@ -375,7 +374,6 @@ def performance(processes, startup, disk_health):
 @click.option('--types', help='Comma-separated file extensions to carve (e.g. jpg,png,pdf)')
 def recover(trash, restore_trash, carve, out, types):
     """Recover deleted files from trash or carve from disk images."""
-    import os
     from .modules.recovery import scan_trash, restore_from_trash, carve_files_from_image, TrashScanUnsupported
 
     if trash:
@@ -472,7 +470,6 @@ def metadata(path, edit, strip, strip_gps):
 def hardware(export, out):
     """Display comprehensive system hardware diagnostics."""
     from .modules.hardware import get_hardware_report, get_upgrade_recommendations, export_hardware_report
-    from .core.utils import format_size
     
     click.echo("Running hardware diagnostics...")
     report = get_hardware_report()

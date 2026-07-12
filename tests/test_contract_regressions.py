@@ -704,8 +704,6 @@ class ContractRegressionTests(unittest.TestCase):
         self.assertIn("abcdef123456", label)
 
     def test_duplicates_view_expand_all_groups_opens_every_group(self):
-        first_group = MagicMock()
-        second_group = MagicMock()
         view = type("DummyDuplicatesView", (), {})()
         view.group_items = {"group-a": "hash-a", "group-b": "hash-b"}
         view.tree = MagicMock()

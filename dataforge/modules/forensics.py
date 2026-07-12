@@ -8,20 +8,17 @@ import os
 import json
 import math
 import html
-import hashlib
 import binascii
 import subprocess
 import platform
-import struct
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
-from pathlib import Path
 
 from ..core.config import config
 from ..core.logger import logger
 from ..core.scanner import scan_directory
-from ..core.hasher import get_file_hash, BLOCK_SIZE
+from ..core.hasher import get_file_hash
 from ..core.utils import format_size
 
 
@@ -144,7 +141,6 @@ def parse_os_artifacts(root_path, progress_callback=None, cancel_token=None):
         "system_services": [],
     }
 
-    system = platform.system()
     total_steps = 8
 
     # --- Step 1: Users ---
@@ -213,7 +209,7 @@ def parse_os_artifacts(root_path, progress_callback=None, cancel_token=None):
                             "user": user_entry["username"],
                             "file": hist_file,
                             "line_count": len(lines),
-                            "recent": [l.strip() for l in lines[-50:]],
+                            "recent": [line.strip() for line in lines[-50:]],
                         })
                 except (OSError, IOError):
                     pass
@@ -1052,7 +1048,6 @@ def collect_recent_documents(platform_system=None):
                 tree = ET.parse(c)
                 root = tree.getroot()
                 # xbel bookmarks
-                ns = {"": "http://www.python.org/topics/xml/xbel/"}
                 for bm in root.findall(".//bookmark"):
                     href = bm.attrib.get("href")
                     added = bm.attrib.get("added")

@@ -6,13 +6,10 @@ using a tiered handler approach: ExifTool → Pillow → pypdf → mutagen.
 """
 import os
 import json
-import struct
 import subprocess
-import platform
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from functools import lru_cache
-from pathlib import Path
 
 from ..core.config import config
 from ..core.logger import logger
@@ -24,7 +21,7 @@ from ..core.utils import format_size
 
 try:
     from PIL import Image
-    from PIL.ExifTags import TAGS, GPSTAGS
+    from PIL.ExifTags import TAGS
     HAS_PILLOW = True
 except ImportError:
     HAS_PILLOW = False
@@ -37,11 +34,6 @@ except ImportError:
 
 try:
     import mutagen
-    from mutagen.easyid3 import EasyID3
-    from mutagen.mp3 import MP3
-    from mutagen.flac import FLAC
-    from mutagen.oggvorbis import OggVorbis
-    from mutagen.mp4 import MP4
     HAS_MUTAGEN = True
 except ImportError:
     HAS_MUTAGEN = False

@@ -6,15 +6,12 @@ reporting, usage, renamer, organizer, actions, and operations.
 
 import csv
 import json
-import math
 import os
-import sqlite3
 import tempfile
 import time
 import unittest
-from collections import Counter
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from PIL import Image
 try:
     from pypdf import PdfWriter
@@ -22,7 +19,6 @@ except ImportError:
     PdfWriter = None
 
 from dataforge.core.common import FileEntry
-from dataforge.core.config import ConfigManager
 from dataforge.core.hasher import get_file_hash, get_hashes
 from dataforge.core.media_ops import merge_pdfs, split_pdf, convert_image
 from dataforge.core.scanner import scan_directory
@@ -38,10 +34,10 @@ from dataforge.core.operations.files import (
     apply_result_to_entry,
     format_operation_message,
 )
-from dataforge.core.actions.base import ActionContext, ActionStep
-from dataforge.core.actions.filters import SearchFilter, SizeFilter, DateFilter, ImagePropFilter
-from dataforge.core.actions.io import MoveStep, CopyStep, DeleteStep, ZipStep
-from dataforge.core.actions.modifications import RenameStep, MetaCleanStep
+from dataforge.core.actions.base import ActionContext
+from dataforge.core.actions.filters import SearchFilter, SizeFilter, DateFilter
+from dataforge.core.actions.io import DeleteStep, ZipStep
+from dataforge.core.actions.modifications import MetaCleanStep
 from dataforge.core.services import FileActionService
 from dataforge.core.actions.media import ConvertImageStep
 from dataforge.modules.search import SearchQuery, search_files, build_search_query, export_result_rows, export_search_results, order_search_results, serialize_file_entry
@@ -52,7 +48,6 @@ from dataforge.modules.reporting import ReportGenerator
 from dataforge.modules.usage import analyze_size, generate_usage_report
 from dataforge.modules.renamer import bulk_rename
 from dataforge.modules.organizer import Organizer
-from dataforge.ui.views.duplicates import DuplicatesView
 
 
 def _make_entry(path="test.txt", size=100, ext=".txt", mtime=None):
@@ -1082,7 +1077,7 @@ class TestRemoveEmptyFolders(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             os.makedirs(os.path.join(tmp, "empty"))
             log = remove_empty_folders(tmp, dry_run=True)
-            self.assertTrue(any("DRY-RUN" in l for l in log))
+            self.assertTrue(any("DRY-RUN" in line for line in log))
             self.assertTrue(os.path.exists(os.path.join(tmp, "empty")))
 
     def test_non_empty_folder_kept(self):
@@ -1090,7 +1085,7 @@ class TestRemoveEmptyFolders(unittest.TestCase):
             sub = os.path.join(tmp, "notempty")
             os.makedirs(sub)
             Path(os.path.join(sub, "a.txt")).write_text("data")
-            log = remove_empty_folders(tmp, dry_run=False)
+            remove_empty_folders(tmp, dry_run=False)
             self.assertTrue(os.path.exists(sub))
 
 
@@ -1141,8 +1136,6 @@ class TestIntegrity(unittest.TestCase):
             self.assertEqual(create_report["saved"], 2)
             report = IntegrityMonitor.verify_snapshot(tmp, snap)
             issues = report["discrepancies"]
-            # snap.json itself will show as NEW since it wasn't in original scan
-            news = [i for i in issues if i.startswith("NEW")]
             mods = [i for i in issues if i.startswith("MODIFIED")]
             self.assertEqual(len(mods), 0)
 
@@ -1302,13 +1295,13 @@ class TestBulkRename(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             _make_files(Path(tmp), {"report_old.txt": "data"})
             log = bulk_rename(tmp, r"old", "new", dry_run=True)
-            self.assertTrue(any("Would rename" in l for l in log))
+            self.assertTrue(any("Would rename" in line for line in log))
             self.assertTrue(os.path.exists(os.path.join(tmp, "report_old.txt")))
 
     def test_rename_execute(self):
         with tempfile.TemporaryDirectory() as tmp:
             _make_files(Path(tmp), {"report_old.txt": "data"})
-            log = bulk_rename(tmp, r"old", "new", dry_run=False)
+            bulk_rename(tmp, r"old", "new", dry_run=False)
             self.assertTrue(os.path.exists(os.path.join(tmp, "report_new.txt")))
 
 
@@ -1324,7 +1317,7 @@ class TestOrganizer(unittest.TestCase):
             dest = str(root / "dest")
             os.makedirs(dest)
             q = SearchQuery().set_extensions(".txt")
-            log = Organizer.organize_files(str(root), q, "copy", dest, dry_run=False)
+            Organizer.organize_files(str(root), q, "copy", dest, dry_run=False)
             self.assertTrue(os.path.exists(os.path.join(dest, "a.txt")))
 
     def test_organize_dry_run(self):
@@ -1334,7 +1327,7 @@ class TestOrganizer(unittest.TestCase):
             dest = str(root / "dest")
             os.makedirs(dest)
             q = SearchQuery().set_extensions(".txt")
-            log = Organizer.organize_files(str(root), q, "move", dest, dry_run=True)
+            Organizer.organize_files(str(root), q, "move", dest, dry_run=True)
             self.assertTrue(os.path.exists(str(root / "a.txt")))
 
     def test_delete_files(self):

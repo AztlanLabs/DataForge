@@ -10,13 +10,13 @@ import sys
 import psutil
 
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QScrollArea, QGridLayout, QGroupBox, QTextEdit
+    QWidget, QVBoxLayout, QLabel, QFrame,
+    QScrollArea, QGridLayout, QGroupBox
 )
 from PyQt5.QtCore import Qt
 
 from .base import BaseView
-from ..theme_tokens import TOKENS, TYPE_SCALE
+from ..theme_tokens import TYPE_SCALE
 from ..widgets import CollapsibleCard
 
 class AboutView(BaseView):
@@ -76,10 +76,8 @@ class AboutView(BaseView):
         try:
             mem = psutil.virtual_memory()
             total_ram = f"{mem.total / (1024**3):.1f} GB"
-            cpu_usage = f"{psutil.cpu_percent()}%"
         except Exception:
             total_ram = "Unknown"
-            cpu_usage = "Unknown"
 
         diagnostics = [
             ("Operating System:", f"{platform.system()} {platform.release()} ({platform.machine()})"),

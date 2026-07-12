@@ -1,12 +1,9 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox,
-    QSpinBox, QPushButton, QLineEdit, QListWidget, QTabWidget, QGridLayout,
-    QGroupBox, QMessageBox
+    QSpinBox, QPushButton, QLineEdit, QListWidget, QTabWidget, QGroupBox, QMessageBox
 )
-from PyQt5.QtCore import Qt
 from .base import BaseView
 from .. import dialogs
-from ..theme_tokens import TOKENS
 from ...core.config import config
 from ...core.logger import logger
 from ...core.cache import file_cache

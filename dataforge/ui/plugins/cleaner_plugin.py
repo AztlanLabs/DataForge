@@ -2,11 +2,9 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, 
     QGroupBox, QSpinBox, QMessageBox, QGridLayout
 )
-from PyQt5.QtCore import Qt
 import os
 
 from ..views.base import BaseView
-from ..theme_tokens import TOKENS
 from ..widgets import EnhancedTreeview
 from ...modules.search import build_search_query, search_files
 from ...modules.cleaner import MetadataCleaner

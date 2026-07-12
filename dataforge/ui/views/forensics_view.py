@@ -9,8 +9,7 @@ import json
 
 # NOTE: `json` is used by the Integrity tab to write/read baseline snapshots.
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,
-    QGroupBox, QGridLayout, QTabWidget, QLineEdit, QTextEdit,
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QGroupBox, QGridLayout, QTabWidget, QLineEdit, QTextEdit,
     QCheckBox, QComboBox, QMessageBox, QSpinBox, QSplitter
 )
 from PyQt5.QtCore import Qt
@@ -24,10 +23,8 @@ from ...modules.forensics import (
     calculate_hashes,
     verify_hash,
     parse_os_artifacts,
-    keyword_search,
     ingest_disk_image,
     generate_forensic_report,
-    identify_file_by_signature,
     profile_directory_types,
     calculate_entropy,
     calculate_entropy_batch,
@@ -37,7 +34,6 @@ from ...modules.forensics import (
     secure_delete,
     snapshot_file_state,
     verify_file_state,
-    collect_recent_documents,
 )
 from ...modules.password_tools import (
     extract_password_hashes,

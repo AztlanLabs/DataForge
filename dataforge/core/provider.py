@@ -1,6 +1,4 @@
 from abc import ABC, abstractmethod
-from ..common import FileEntry
-import os
 import shutil
 
 class FileProvider(ABC):

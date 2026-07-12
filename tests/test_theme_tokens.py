@@ -12,7 +12,6 @@ Guards the acceptance gates from doc 05 §8 / doc 06 §2b:
 
 import unittest
 import re
-from string import Template
 
 from dataforge.ui.theme_tokens import (
     TOKENS,

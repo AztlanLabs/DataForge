@@ -18,7 +18,6 @@ from dataforge.modules.performance import (
 )
 from dataforge.modules.recovery import (
     scan_trash,
-    carve_files_from_image,
 )
 from dataforge.modules.metadata import MetadataEngine
 from dataforge.modules.hardware import get_hardware_report
@@ -43,7 +42,7 @@ class TestNewModules(unittest.TestCase):
             # Scan with Log Files category so files inside tmpdir are filtered by extension/pattern,
             # rather than everything inside a System Temp directory being treated as junk automatically.
             results = scan_junk_files(paths=[tmpdir], categories=["Log Files"])
-            savings = estimate_cleanup_savings(results)
+            estimate_cleanup_savings(results)
 
             self.assertIn("Log Files", results)
             paths = [e.path for e in results["Log Files"]]

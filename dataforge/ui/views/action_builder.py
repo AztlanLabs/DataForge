@@ -7,7 +7,6 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 
 from .base import BaseView
-from ..theme_tokens import TOKENS
 from ..widgets import EnhancedTreeview, FlowLayout, FlowContainer, ElidingLabel, attach_tooltips
 from ...core.scanner import scan_directory
 from ...core.actions.base import ActionContext

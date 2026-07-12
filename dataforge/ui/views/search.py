@@ -1,19 +1,15 @@
 import os
 import zipfile
 import datetime
-from functools import partial
 
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,
-    QLineEdit, QCheckBox, QSpinBox, QComboBox, QSplitter, QGroupBox,
-    QGridLayout
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QLineEdit, QCheckBox, QSpinBox, QComboBox, QSplitter, QGroupBox
 )
 from PyQt5.QtCore import Qt
 
 from .base import BaseView
 from .. import dialogs
 from ...core.services import FileActionService
-from ..theme_tokens import TOKENS
 from ..widgets import EnhancedTreeview, FilePreviewPanel, FlowLayout, FlowContainer, attach_tooltips
 from ...modules.search import build_search_query, export_search_results, order_search_results, search_files
 from ...core.utils import format_size, format_display_path

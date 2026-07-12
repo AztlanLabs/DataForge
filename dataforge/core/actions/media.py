@@ -1,5 +1,5 @@
 import os
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QComboBox, QSlider
+from PyQt5.QtWidgets import QHBoxLayout, QLabel, QComboBox, QSlider
 from PyQt5.QtCore import Qt
 
 from .base import ActionStep

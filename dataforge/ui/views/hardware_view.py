@@ -4,7 +4,6 @@ Hardware Diagnostics GUI view.
 System hardware profiling with CPU, RAM, storage, GPU details,
 upgrade recommendations, and exportable reports.
 """
-import os
 import json
 
 from PyQt5.QtWidgets import (
@@ -17,8 +16,7 @@ from PyQt5.QtCore import Qt
 from .base import BaseView
 from ..theme_tokens import TYPE_SCALE
 from .. import dialogs
-from ..widgets import EnhancedTreeview, CollapsibleCard, attach_tooltips
-from ...core.utils import format_size
+from ..widgets import EnhancedTreeview, attach_tooltips
 from ...modules.hardware import (
     get_hardware_report,
     get_upgrade_recommendations,

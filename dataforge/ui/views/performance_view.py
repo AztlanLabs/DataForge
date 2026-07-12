@@ -4,19 +4,16 @@ System Performance Monitor GUI view.
 Provides real-time system metrics, process monitoring,
 startup management, and disk health reporting.
 """
-import os
-from functools import partial
 
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,
-    QGroupBox, QGridLayout, QTabWidget, QComboBox, QProgressBar,
-    QMessageBox, QHeaderView
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QGroupBox, QGridLayout, QTabWidget, QComboBox, QProgressBar,
+    QMessageBox
 )
 from PyQt5.QtCore import Qt, QTimer
 
 from .base import BaseView
 from ..theme_tokens import TYPE_SCALE
-from ..widgets import EnhancedTreeview, CollapsibleCard, attach_tooltips
+from ..widgets import EnhancedTreeview, attach_tooltips
 from ...core.utils import format_size
 from ...modules.performance import (
     check_availability,

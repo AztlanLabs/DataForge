@@ -1,6 +1,5 @@
 import os
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox
-from PyQt5.QtCore import Qt
 
 from .io import IOStep
 from ...core.services import FileActionService

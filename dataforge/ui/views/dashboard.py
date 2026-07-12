@@ -12,7 +12,6 @@ from PyQt5.QtCore import Qt
 
 from .base import BaseView
 from ..theme_tokens import TOKENS, TYPE_SCALE
-from ...modules.usage import analyze_size
 from ...core.config import config
 from ...core.utils import format_size, categorize_extension, CATEGORY_COLORS
 

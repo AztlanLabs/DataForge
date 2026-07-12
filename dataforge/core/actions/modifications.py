@@ -1,6 +1,4 @@
-import os
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QCheckBox
-from PyQt5.QtCore import Qt
 
 from .base import ActionStep
 from ...core.config import config

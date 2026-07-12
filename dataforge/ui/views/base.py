@@ -1,5 +1,4 @@
 from PyQt5.QtWidgets import QWidget, QMessageBox, QTextEdit, QVBoxLayout, QPushButton, QDialog
-from PyQt5.QtCore import Qt
 from abc import ABCMeta, abstractmethod
 import re
 
@@ -247,7 +246,7 @@ class BaseView(QWidget, metaclass=QWidgetABCMeta):
         msg_box.setText("Select a file?\n\nChoose Yes for a file, No for a folder, or Cancel to keep the current path.")
         yes_btn = msg_box.addButton(QMessageBox.Yes)
         no_btn = msg_box.addButton(QMessageBox.No)
-        cancel_btn = msg_box.addButton(QMessageBox.Cancel)
+        msg_box.addButton(QMessageBox.Cancel)
         msg_box.setDefaultButton(QMessageBox.Cancel)
         
         msg_box.exec_()

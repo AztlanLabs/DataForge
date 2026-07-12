@@ -12,8 +12,6 @@ import configparser
 from pathlib import Path
 from datetime import datetime
 
-from ..core.common import FileEntry
-from ..core.scanner import build_file_entry
 from ..core.logger import logger
 from ..core.utils import format_size
 from .file_signatures import SIGNATURES, identify_file_type

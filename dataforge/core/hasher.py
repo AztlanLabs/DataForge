@@ -1,5 +1,4 @@
 import hashlib
-import os
 
 BLOCK_SIZE = 65536  # 64kb chunks
 

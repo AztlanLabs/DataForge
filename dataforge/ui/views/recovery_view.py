@@ -9,7 +9,7 @@ import os
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,
     QCheckBox, QSpinBox, QGroupBox, QGridLayout, QTabWidget,
-    QLineEdit, QComboBox, QMessageBox, QSplitter
+    QLineEdit, QMessageBox, QSplitter
 )
 from PyQt5.QtCore import Qt
 

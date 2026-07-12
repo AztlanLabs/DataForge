@@ -1,16 +1,12 @@
 import os
-from functools import partial
 
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,
-    QLineEdit, QCheckBox, QSpinBox, QComboBox, QSplitter, QGroupBox,
-    QGridLayout
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QLineEdit, QCheckBox, QSpinBox, QComboBox, QSplitter, QGroupBox
 )
 from PyQt5.QtCore import Qt
 
 from .base import BaseView
 from .. import dialogs
-from ..theme_tokens import TOKENS
 from ..widgets import EnhancedTreeview, FilePreviewPanel, CollapsibleCard, attach_tooltips
 from ...core.config import config
 from ...core.services import FileActionService
@@ -19,11 +15,9 @@ from ...modules.duplicates import (
     KEEP_STRATEGIES,
     build_duplicate_export_rows,
     build_duplicate_records,
-    choose_duplicate_keeper,
     find_duplicates,
     order_duplicate_records,
     select_duplicate_records,
-    serialize_duplicate_record,
 )
 from ...modules.search import export_result_rows
 

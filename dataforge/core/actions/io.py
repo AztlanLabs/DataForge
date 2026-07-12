@@ -1,7 +1,6 @@
 import os
 import zipfile
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox
 
 from .base import ActionStep
 from ...ui import dialogs

@@ -7,12 +7,10 @@ redundant logs, and browser artifacts for storage reclamation.
 import os
 import platform
 import glob
-import shutil
 from pathlib import Path
 from datetime import datetime, timedelta
 
-from ..core.common import FileEntry
-from ..core.scanner import build_file_entry, scan_directory
+from ..core.scanner import scan_directory
 from ..core.logger import logger
 from ..core.utils import format_size
 

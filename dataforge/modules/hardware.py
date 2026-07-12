@@ -4,12 +4,10 @@ Hardware diagnostics module.
 Provides detailed system hardware reporting for CPU, RAM, storage,
 GPU, network, and motherboard with upgrade recommendations.
 """
-import os
 import platform
 import subprocess
 import json
 
-from ..core.logger import logger
 from ..core.utils import format_size
 
 try:

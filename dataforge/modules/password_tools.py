@@ -7,16 +7,11 @@ via external tools (hashcat/john), and password strength analysis.
 import os
 import subprocess
 import platform
-import hashlib
-import string
 import re
-import shutil
 import tempfile
 import time
 import zipfile
-from pathlib import Path
 
-from ..core.logger import logger
 
 
 # ---------------------------------------------------------------------------

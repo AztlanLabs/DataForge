@@ -11,7 +11,6 @@ import time
 from pathlib import Path
 from datetime import datetime
 
-from ..core.logger import logger
 
 # psutil is an optional dependency — degrade gracefully
 try:

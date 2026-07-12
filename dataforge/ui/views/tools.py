@@ -8,7 +8,6 @@ import os
 
 from .base import BaseView
 from .. import dialogs
-from ..theme_tokens import TOKENS
 from ...core.scanner import scan_directory
 from ...core.services import FileActionService
 from ...modules import integrity

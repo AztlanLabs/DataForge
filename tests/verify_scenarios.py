@@ -7,7 +7,6 @@ from dataforge.modules.duplicates import find_duplicates
 from dataforge.modules.search import SearchQuery, search_files
 from dataforge.modules.renamer import bulk_rename
 from dataforge.modules.cleaner import remove_empty_folders
-from dataforge.modules.organizer import Organizer
 from dataforge.modules.integrity import IntegrityMonitor
 
 TEST_DIR = "test_env"
@@ -52,7 +51,7 @@ class TestDataForge(unittest.TestCase):
         self.assertEqual(len(results), 3)
         
     def test_cleaner(self):
-        log = remove_empty_folders(TEST_DIR, dry_run=False)
+        remove_empty_folders(TEST_DIR, dry_run=False)
         # Should remove empty_dir and deep/empty and deep (if empty after child removed)
         self.assertFalse(os.path.exists(os.path.join(TEST_DIR, "empty_dir")))
         

@@ -7,7 +7,6 @@ to extend optimization and scanning across all connected storage.
 import os
 import platform
 import subprocess
-from pathlib import Path
 
 from ..core.logger import logger
 from ..core.scanner import scan_directory

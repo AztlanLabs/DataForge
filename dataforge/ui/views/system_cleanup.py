@@ -5,12 +5,11 @@ Provides junk file scanning, browser artifact detection, and cleanup
 with preview-confirm-execute workflow following BaseView patterns.
 """
 import os
-from functools import partial
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,
     QCheckBox, QSpinBox, QSplitter, QGroupBox, QGridLayout,
-    QLineEdit, QTabWidget, QProgressBar
+    QLineEdit, QTabWidget
 )
 from PyQt5.QtCore import Qt
 
@@ -392,9 +391,6 @@ class SystemCleanupView(BaseView):
         if not targets:
             self.app.show_warning_dialog("Nothing Selected", "Select junk files to clean first.")
             return
-
-        total_size = sum(t["entry"].size for t in targets)
-        summary = f"Delete {len(targets)} junk files ({format_size(total_size)})?"
 
         self.app.run_workflow(
             self._preview_clean_worker,

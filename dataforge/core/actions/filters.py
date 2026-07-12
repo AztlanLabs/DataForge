@@ -1,12 +1,8 @@
 import os
 import re
-import fnmatch
-import time
-from abc import ABC, abstractmethod
 from collections import defaultdict
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit, QCheckBox, QSpinBox, QComboBox
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit, QCheckBox, QComboBox
 
 from .base import ActionStep
 from ...core.config import config

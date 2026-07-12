@@ -1,7 +1,4 @@
-import sys
 import threading
-import queue
-import time
 from typing import Any, Callable, Dict, Protocol, Type, TypeAlias
 from functools import partial
 import inspect
@@ -9,10 +6,10 @@ import os
 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLabel, QCheckBox, QSplitter, QStackedWidget, QProgressBar,
+    QLabel, QCheckBox, QStackedWidget, QProgressBar,
     QStatusBar, QMessageBox, QScrollArea, QFrame
 )
-from PyQt5.QtCore import QThread, pyqtSignal, Qt, QTimer, QPropertyAnimation, QEasingCurve
+from PyQt5.QtCore import QThread, pyqtSignal, Qt, QTimer
 
 from .views.base import BaseView
 from .views.dashboard import DashboardView
@@ -32,7 +29,6 @@ from .views.about import AboutView
 from .plugin_loader import PluginLoader
 from .theme_tokens import generate_qss, generate_palette, TYPE_SCALE
 from ..core.config import config
-from ..core.logger import logger
 
 HEADER_COLORS = {
     "light": {
