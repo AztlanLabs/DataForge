@@ -158,7 +158,8 @@ python build_exe.py debug
 
 **Contributing:**
 - [`docs/COMMIT_CONVENTION.md`](./docs/COMMIT_CONVENTION.md) - standardized commit message format and enforcement hook
-- [`docs/VERSIONING.md`](./docs/VERSIONING.md) - semantic versioning rules and release process
+- [`docs/VERSIONING.md`](./docs/VERSIONING.md) - semantic versioning rules, dev vs main lifecycle, version matrix
+- [`docs/RELEASE_PROCESS.md`](./docs/RELEASE_PROCESS.md) - when to PR to main, gate criteria, release checklist
 
 ### Project Review & Audit (2026-07-10)
 

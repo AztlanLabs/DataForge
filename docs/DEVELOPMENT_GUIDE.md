@@ -174,5 +174,5 @@ New top-level screens and plugins should inherit from `BaseView` and use its sha
 2. Read [`./ARCHITECTURE.md`](./ARCHITECTURE.md)
 3. Read [`./GUI_WORKFLOWS.md`](./GUI_WORKFLOWS.md) or [`./CLI_REFERENCE.md`](./CLI_REFERENCE.md), depending on your work area
 4. Use [`./TECHNICAL_SOURCE_OF_TRUTH.md`](./TECHNICAL_SOURCE_OF_TRUTH.md) when you need file-by-file depth
-5. Read [`./COMMIT_CONVENTION.md`](./COMMIT_CONVENTION.md) and [`./VERSIONING.md`](./VERSIONING.md) before your first commit
+5. Read [`./COMMIT_CONVENTION.md`](./COMMIT_CONVENTION.md) and [`./VERSIONING.md`](./VERSIONING.md) before your first commit; [`./RELEASE_PROCESS.md`](./RELEASE_PROCESS.md) for the PR-to-main workflow
 6. Skim [`./reviews/EXECUTIVE_SUMMARY.md`](./reviews/EXECUTIVE_SUMMARY.md) for the current bug/security/UX backlog before picking up work
