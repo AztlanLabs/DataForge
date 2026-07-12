@@ -23,7 +23,7 @@ if ! echo "$COMMIT_MSG" | head -1 | grep -qE "$PATTERN"; then
     echo "  fix(core): prevent symlink recursion in scanner"
     echo "  docs: restructure review documentation"
     echo ""
-    echo "See docs/COMMIT_CONVENTION.md for the full standard."
+    echo "See docs/CONTRIBUTING.md for the full standard."
     exit 1
 fi
 

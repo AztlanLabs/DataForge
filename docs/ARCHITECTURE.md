@@ -86,7 +86,7 @@ The CLI in `dataforge/cli.py` is a thin orchestration layer:
 3. A module or service performs the real work.
 4. CLI-specific formatting happens at the end (text, JSON, JSONL, CSV/TXT export).
 
-The CLI is therefore mostly an adapter around `modules/` plus some export helpers.
+The CLI is therefore mostly an adapter around `dataforge/modules/` plus some export helpers.
 
 ### 3. GUI flow
 
@@ -204,9 +204,9 @@ If a new feature starts from file discovery, it should usually build on:
 
 - The repository root contains a nested application root (`DataForge/`), so command examples and tooling must be explicit about where they run.
 - `setup.py` only lists a minimal dependency set, while `requirements.txt` contains the full GUI/media/test toolchain. Treat `requirements.txt` as the authoritative development environment definition.
-- Some feature overlap is intentional but real: metadata cleaning exists both inside `Tools & Workflows` and as a standalone plugin view (and in two different implementations — `modules/cleaner.py::MetadataCleaner` vs `modules/metadata.py::MetadataEngine`).
-- The Action Builder filters (`core/actions/filters.py`) are an independent implementation of the same size/date/name filtering as `modules/search.py::SearchQuery`; the two can drift.
-- `core/provider.py` (`FileProvider`/`LocalProvider`) is defined but unused — dead abstraction.
+- Some feature overlap is intentional but real: metadata cleaning exists both inside `Tools & Workflows` and as a standalone plugin view (and in two different implementations — `dataforge/modules/cleaner.py::MetadataCleaner` vs `dataforge/modules/metadata.py::MetadataEngine`).
+- The Action Builder filters (`dataforge/core/actions/filters.py`) are an independent implementation of the same size/date/name filtering as `dataforge/modules/search.py::SearchQuery`; the two can drift.
+- `dataforge/core/provider.py` (`FileProvider`/`LocalProvider`) is defined but unused — dead abstraction.
 - Generated build output exists in-repo (`build/`, `dist/`), but it is not maintained source.
 
 Correctness and security caveats from the 2026-07-10 review are tracked in [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md). Key points: the scanner no longer follows symlinks, the cache is thread-safe, integrity/dedup default to SHA-256. Open risks include forensic-report HTML injection (S2) and trash-restore path traversal (S4).

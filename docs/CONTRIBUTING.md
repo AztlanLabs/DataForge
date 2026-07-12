@@ -1,76 +1,135 @@
-# DataForge Development Workflow
+# Contributing to DataForge
 
 > **Audience:** Human developers and AI assistants working on this repo.
-> Feed this file as global context before any implementation task.
 
 ---
 
-## Quick Reference Card
+## Quick Reference
 
 | Rule | Value |
 | --- | --- |
+| License | GPL-3.0 |
 | Commit format | `type(scope): description` — [Conventional Commits](https://www.conventionalcommits.org/) |
-| Tabs vs spaces | Follow existing file convention — do not mix |
-| Test command | `PYTHONPATH=. pytest -q` (254+ pass required) |
-| Before push | Tests must pass; commit message must match convention |
+| Test command | `PYTHONPATH=. pytest -q` |
+| Before push | All tests pass; commit message matches convention |
 | Default branch | `develop` — all feature work merges here |
-| Stable branch | `main` — tagged releases only; PR from `develop` required |
-| Version source | `setup.py` `version=` — single source of truth |
-| Hook enforcement | `git config core.hooksPath .githooks` |
-| Changelog | Keep a Changelog format in `CHANGELOG.md` |
+| Stable branch | `main` — tagged releases only |
+| Version source | `setup.py` `version=` field |
+| Hook setup | `git config core.hooksPath .githooks` |
+| Changelog | [Keep a Changelog](https://keepachangelog.com/) format in `CHANGELOG.md` |
 
 ---
 
-## 1. Branching Model
+## 1. Getting Started
+
+### Prerequisites
+
+- Python 3.10+
+- Git
+
+### Setup
+
+```bash
+git clone https://github.com/AztlanLabs/DataForge.git
+cd DataForge
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt -r requirements-dev.txt
+pip install -e .
+git config core.hooksPath .githooks
+```
+
+### Verify
+
+```bash
+PYTHONPATH=. pytest -q           # all tests must pass
+fm --help                        # CLI works
+python run_ui.py                 # GUI launches
+```
+
+### Project Layout
+
+```
+DataForge/
+├── dataforge/
+│   ├── cli.py                   # Click CLI (fm command)
+│   ├── core/                    # Scanner, config, cache, hasher, operations, services
+│   │   ├── actions/             # Action Builder pipeline engine
+│   │   ├── operations/          # Low-level file mutation primitives
+│   │   └── services/            # FileActionService (central batch operations)
+│   ├── modules/                 # Feature logic (search, duplicates, forensics, etc.)
+│   └── ui/                      # PyQt5 desktop app
+│       ├── app.py               # Main window, threading, navigation
+│       ├── views/               # Built-in screens (14 views)
+│       ├── plugins/             # Plugin views
+│       ├── widgets.py           # Shared widgets
+│       └── theme_tokens.py      # Design tokens (colours, type scale, QSS)
+├── tests/                       # pytest test suite
+├── docs/                        # Documentation
+├── .githooks/                   # Commit-msg hook
+├── setup.py                     # Package definition + version
+├── requirements.txt             # Runtime dependencies
+├── requirements-dev.txt         # Dev dependencies (pytest, pyinstaller)
+├── build_exe.py                 # PyInstaller build script
+├── run_ui.py                    # GUI entry point
+└── CHANGELOG.md                 # Version history
+```
+
+---
+
+## 2. Branching Model
 
 ```
 main     ●────────────●────── v0.1.0-beta.1     ●────── v0.1.0
           \          /                           /
 develop    ●─●─●─●─●●─●─●─●─●─●─●  (alpha tags)
+              \         \
+feature       ●─●─●     ●─●─●
 ```
 
-| Branch | Purpose | Version tags allowed |
+| Branch | Purpose | Tags allowed |
 | --- | --- | --- |
-| `develop` | Integration branch. All feature/fix branches merge here. | `vX.Y.Z-alpha.N` only |
-| `main` | Stable channel. Only accepts merges from `develop` via PR. | `vX.Y.Z-beta.N` · `vX.Y.Z-rc.N` · `vX.Y.Z` |
+| `develop` | Integration branch. All feature/fix branches merge here. | `vX.Y.Z-alpha.N` |
+| `main` | Stable channel. Only accepts merges from `develop`. | `vX.Y.Z-beta.N`, `vX.Y.Z-rc.N`, `vX.Y.Z` |
+| Feature branches | Branch off `develop`, merge back via PR or direct push. | None |
 
-### Feature branches (short-lived)
+### Workflow
 
-Branch off `develop`, merge back via PR or direct push (solo project):
-
-```
+```bash
 git checkout -b feat/my-feature develop
-# ... commits ...
+# ... work ...
 git checkout develop && git merge feat/my-feature
 ```
 
 ---
 
-## 2. Commit Convention
+## 3. Commit Convention
+
+All commits are validated by the `commit-msg` hook in `.githooks/`. Messages that don't match are rejected.
 
 ### Format
 
 ```
-<type>(<scope>): <short description>
+type(scope): short description
 
 [optional body]
 
-[optional footer with BREAKING CHANGE]
+[optional footer]
 ```
 
 ### Types
 
-| Type | When to use | Version bump |
+| Type | Version bump | When to use |
 | --- | --- | --- |
-| `feat` | New feature or capability | MINOR |
-| `fix` | Bug fix | PATCH |
-| `docs` | Documentation only | — |
-| `refactor` | Code change, no bug fix or feature | — |
-| `test` | Adding or updating tests | — |
-| `chore` | Build, tooling, CI, repo maintenance | — |
-| `style` | Formatting, whitespace, linting (no logic) | — |
-| `perf` | Performance improvement | — |
-| `revert` | Revert a previous commit | — |
+| `feat` | MINOR | New feature or capability |
+| `fix` | PATCH | Bug fix |
+| `docs` | — | Documentation only |
+| `refactor` | — | Code change that neither fixes a bug nor adds a feature |
+| `test` | — | Adding or updating tests |
+| `chore` | — | Build, tooling, CI, repo maintenance |
+| `style` | — | Formatting, whitespace, linting (no logic change) |
+| `perf` | — | Performance improvement |
+| `revert` | — | Revert a previous commit |
 
 ### Scopes
 
@@ -89,16 +148,16 @@ git checkout develop && git merge feat/my-feature
 
 Omit scope for cross-cutting changes: `docs: update all cross-references`
 
-### Short description rules
+### Rules
 
 - Imperative mood: `add` not `added`, `fix` not `fixes`
 - No trailing period
-- 72 characters max
+- 72 characters max (enforced by hook)
 - Backtick-quote symbols: `` `theme_tokens.py` ``
 
-### BREAKING CHANGES
+### Breaking Changes
 
-Append `!` or add `BREAKING CHANGE:` footer:
+Append `!` to the type or add `BREAKING CHANGE:` footer:
 
 ```
 feat(cli)!: remove deprecated --legacy flag
@@ -117,69 +176,123 @@ test(design): add 30 regression guards for colour tokens
 chore(repo): add commitlint git hook
 ```
 
-### Enforcement
+---
 
-A `commit-msg` hook in `.githooks/` validates every message:
+## 4. Code Style
 
-```bash
-git config core.hooksPath .githooks
-```
+### General
+
+- Follow the existing style of the file you're editing
+- Use 4-space indentation (Python), 2-space for YAML/JSON
+- No trailing whitespace
+- UTF-8 encoding everywhere
+- Maximum line length: 120 characters (soft limit)
+
+### Python
+
+- Type hints on public functions
+- Docstrings on public classes and functions (Google style)
+- Use `pathlib.Path` over `os.path` for new code
+- Prefer f-strings over `.format()` or `%` formatting
+- Use `logging` module, never `print()` for errors
+
+### PyQt5 / GUI
+
+- All views inherit from `BaseView`
+- Long-running work goes through `app.run_workflow()` or `app.run_background()`
+- Never block the Qt main thread
+- Use design tokens from `theme_tokens.py` — no hardcoded hex colours
+- Follow the preview → confirm → execute pattern for destructive operations
+
+### File Mutations
+
+- All file mutations go through `FileActionService` or `dataforge/core/operations/files.py`
+- Never call `shutil.move`, `shutil.copy2`, or `os.remove` directly from views or modules
+- Always support `dry_run` parameter
 
 ---
 
-## 3. Versioning
+## 5. Testing
+
+### Running Tests
+
+```bash
+PYTHONPATH=. pytest -q                    # all tests
+PYTHONPATH=. pytest tests/test_comprehensive.py -v   # one file, verbose
+PYTHONPATH=. pytest -k "symlink" -v       # filter by keyword
+```
+
+### Test Structure
+
+| File | Focus |
+| --- | --- |
+| `tests/test_comprehensive.py` | Core modules, services, operations, actions |
+| `tests/test_integration.py` | End-to-end workflows, plugin packaging |
+| `tests/test_contract_regressions.py` | CLI and GUI contract stability |
+| `tests/test_new_modules.py` | Newer modules (hardware, forensics, recovery, metadata) |
+| `tests/test_theme_tokens.py` | Design token regression guards |
+| `tests/verify_scenarios.py` | Scenario-style validation (standalone script) |
+
+### Writing Tests
+
+- Test files: `tests/test_*.py`
+- Test classes: `Test<Feature>` (e.g., `TestSearchQuery`)
+- Test functions: `test_<behavior>` (e.g., `test_search_by_extension`)
+- Use `tmp_path` fixture for temporary files
+- Use `monkeypatch` for mocking, not `unittest.mock` where possible
+- Every bug fix must include a regression test
+- Every new feature must include tests for its public API
+
+### What to Test
+
+- Public API of every module
+- Edge cases: empty input, missing files, permission errors, symlinks
+- Cancellation: pass a `threading.Event` as `cancel_token`, set it, verify early exit
+- Dry-run: verify no filesystem changes when `dry_run=True`
+- Error paths: invalid input, missing files, corrupt data
+
+---
+
+## 6. Versioning
 
 DataForge follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH[-PRE]`.
 
 | Component | Trigger | Example |
 | --- | --- | --- |
-| MAJOR | `feat!` / `fix!` (breaking change) | `1.0.0` |
-| MINOR | `feat` (new feature) | `0.2.0` |
-| PATCH | `fix` (bug fix) | `0.1.1` |
+| MAJOR | Breaking change (`feat!` / `fix!`) | `1.0.0` |
+| MINOR | New feature (`feat`) | `0.2.0` |
+| PATCH | Bug fix (`fix`) | `0.1.1` |
 
-`docs`, `style`, `refactor`, `test`, `chore`, `perf` do not bump version on their own.
+`docs`, `style`, `refactor`, `test`, `chore`, `perf` do not bump version.
 
-**Current version:** `0.1.0` — pre-release development on `develop`. Leading `0`
-means the public API is unstable — anything may change without a MAJOR bump.
+**Current version:** `0.1.0` (pre-release). Leading `0` means the public API is unstable.
 
-### Version lifecycle
+### Version Lifecycle
 
 | Stage | Branch | `setup.py` version | Git tag |
 | --- | --- | --- | --- |
-| Development | `develop` | `0.1.0` or `0.1.0.dev` | No tag |
-| Alpha checkpoint | `develop` | `0.1.0-alpha.N` | `v0.1.0-alpha.N` |
-| Beta (feature freeze) | `main` | `0.1.0-beta.N` | `v0.1.0-beta.N` |
-| Release candidate | `main` | `0.1.0-rc.N` | `v0.1.0-rc.N` |
-| GA release | `main` | `0.1.0` | `v0.1.0` |
+| Development | `develop` | `0.1.0` or `0.1.0.dev` | — |
+| Alpha | `develop` | `0.1.0-alpha.N` | `v0.1.0-alpha.N` |
+| Beta | `main` | `0.1.0-beta.N` | `v0.1.0-beta.N` |
+| RC | `main` | `0.1.0-rc.N` | `v0.1.0-rc.N` |
+| GA | `main` | `0.1.0` | `v0.1.0` |
 
-**Branch-version matrix:**
-
-| What | `develop` | `main` |
-| --- | --- | --- |
-| Works-in-progress | `0.X.Y.dev` | N/A |
-| Feature-incomplete | `v0.X.Y-alpha.N` | N/A |
-| Feature-complete | N/A | `v0.X.Y-beta.N` |
-| QA freeze | N/A | `v0.X.Y-rc.N` |
-| Public release | N/A | `v0.X.Y` |
-
-`setup.py version=` is the single authority. Read it programmatically:
+### Read Version
 
 ```bash
 python setup.py --version
 ```
 
-### Tagging an alpha on develop
+### Tag a Release
 
 ```bash
+# Alpha on develop
 git checkout develop
-PYTHONPATH=. pytest -q          # must be green
+PYTHONPATH=. pytest -q
 git tag v0.1.0-alpha.1
 git push origin develop --tags
-```
 
-### Tagging a beta/RC/GA on main
-
-```bash
+# Beta/RC/GA on main
 git checkout main
 git merge develop --no-ff
 # bump version in setup.py
@@ -190,41 +303,20 @@ git push origin main --tags
 
 ---
 
-## 4. Release Process
+## 7. Release Process
 
-### When to PR from develop → main
+### Before Merging `develop` → `main`
 
-| # | Gate | Status (2026-07-11) |
-| --- | --- | --- |
-| G1 | Test suite green (254+) | ✅ |
-| G2 | No HIGH-severity open bugs | ✅ |
-| G3 | No HIGH-severity open security findings | ❌ — S2 (XSS in forensic report) |
-| G4 | CI wired (tests run automatically) | ❌ — no CI yet |
-| G5 | Docs accurate against current sources | ✅ |
-| G6 | MEDIUM security (S4, S7) fixed | ❌ |
-| G7 | No regression in primary workflows | ✅ |
-| G8 | PR reviewed (solo project: self-review) | ✅ |
-
-### Recommended first-PR path to v0.1.0-beta.1
-
-1. Fix S2 (HTML-escape forensic report — 2-line fix + test)
-2. Wire GitHub Actions CI (pytest on push)
-3. Fix S4 (trash-restore path traversal)
-4. Fix S7 (System Cleanup safe-guards)
-5. Merge `develop` → `main`, tag `v0.1.0-beta.1`
-
-### Release checklist (for any main-branch release)
-
-- [ ] `PYTHONPATH=. pytest -q` — 254+ tests, 0 failures
+- [ ] `PYTHONPATH=. pytest -q` — all tests pass
 - [ ] `setup.py version=` matches intended tag
-- [ ] `CHANGELOG.md` entry under new version heading
+- [ ] `CHANGELOG.md` updated (move [Unreleased] entries under new version heading)
 - [ ] `docs/` cross-references verified (no broken links)
 - [ ] `python setup.py sdist` succeeds
 - [ ] `python build_exe.py release` succeeds
-- [ ] Smoke: `fm dupes --help`, `fm search --help`, GUI launches
-- [ ] Tag pushed with `--tags`
+- [ ] Smoke test: `fm dupes --help`, `fm search --help`, GUI launches
+- [ ] No HIGH-severity open security findings
 
-### After a release
+### After a Release
 
 ```bash
 git checkout develop && git merge main && git push origin develop
@@ -233,211 +325,154 @@ git checkout develop && git merge main && git push origin develop
 
 ---
 
-## 5. Implementation Plan Guidance
+## 8. Documentation
 
-When creating an implementation plan — whether you are an AI assistant or a
-human developer — structure the plan so each task maps cleanly to commits that
-follow this document's conventions.
+Every code change must update the docs that reference it. Code and docs stay in lockstep.
 
-### Plan structure
+### When You Change Code
 
-For each implementation task in the plan, specify:
+| Changed | Update |
+| --- | --- |
+| `dataforge/cli.py` | `docs/CLI_REFERENCE.md`, `README.md` |
+| `dataforge/core/` | `docs/ARCHITECTURE.md`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md` |
+| `dataforge/modules/` | `docs/ARCHITECTURE.md`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md`, `docs/CLI_REFERENCE.md` |
+| `dataforge/ui/app.py` | `docs/ARCHITECTURE.md`, `docs/GUI_WORKFLOWS.md`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md` |
+| `dataforge/ui/views/` | `docs/GUI_WORKFLOWS.md`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md` |
+| `dataforge/ui/widgets.py` | `docs/GUI_WORKFLOWS.md`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md` |
+| `dataforge/ui/plugins/` | `docs/ARCHITECTURE.md`, `docs/GUI_WORKFLOWS.md` |
+| `dataforge/ui/theme_tokens.py` | `docs/ARCHITECTURE.md` |
+| `dataforge/core/actions/` | `docs/ARCHITECTURE.md`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md`, `docs/GUI_WORKFLOWS.md` |
+| `tests/` | `docs/DEVELOPMENT_GUIDE.md`, `README.md` (test count) |
+| `setup.py`, `build_exe.py`, `requirements*.txt` | `docs/DEVELOPMENT_GUIDE.md`, `README.md` |
+| Any user-facing change | `CHANGELOG.md` |
 
-1. **What** — the change being made
-2. **Files touched** — which source files are affected
-3. **Commit type + scope** — the conventional commit that will carry this change
-4. **Version impact** — whether this triggers a version bump (and which component)
-5. **Test impact** — what test file needs updating or what new test is needed
+### When You Change Docs
 
-### Example: a feature implementation plan
+| Changed | Update |
+| --- | --- |
+| Add/rename/delete `docs/` file | `README.md`, `docs/DEVELOPMENT_GUIDE.md`, all files linking to it |
+| `README.md` | Verify claims match `docs/CLI_REFERENCE.md`, `docs/DEVELOPMENT_GUIDE.md`, `setup.py` |
+| `docs/CONTRIBUTING.md` | `.githooks/commit-msg` (if format rules change) |
+| Test count changes | `README.md`, `docs/DEVELOPMENT_GUIDE.md`, this file (Quick Reference) |
+
+### Verify Before Push
+
+```bash
+# Search for old names across all docs
+grep -rn "old-name" docs/ README.md
+
+# Verify relative links resolve
+ls docs/path/to/linked-file.md
+```
+
+---
+
+## 9. Security
+
+### Reporting
+
+If you find a security vulnerability, **do not open a public issue**. Email the maintainers or file a private security advisory on GitHub.
+
+### Current Status
+
+Open security findings are tracked in [`docs/reviews/AUDIT_FINDINGS.md`](./reviews/AUDIT_FINDINGS.md). Key open items:
+
+- **S2** — Forensic HTML report does not escape interpolated data (XSS risk)
+- **S4** — Trash restore trusts attacker-controllable `.trashinfo` paths (path traversal)
+- **S7** — System Cleanup blanket-classifies `/tmp` and cache trees (data-loss risk)
+
+### Guidelines
+
+- Never log secrets, passwords, or API keys
+- Use `html.escape()` on all user-controlled data in HTML output
+- Validate and sanitize file paths before use in `shutil.move`, `os.makedirs`, etc.
+- Prefer `send2trash` over `os.remove` for user-facing delete operations
+- Write sensitive files with `0o600` permissions
+- Use `defusedxml` for XML parsing (not yet adopted — see S9)
+
+---
+
+## 10. Implementation Plans
+
+For non-trivial changes, write a plan before coding. Structure each task as:
+
+1. **What** — the change
+2. **Files touched** — affected source files
+3. **Commit** — `type(scope): description`
+4. **Version impact** — MINOR / PATCH / none
+5. **Test** — which test file to update or create
+
+### Example
 
 ```
-## Task: Add disk-health trend tracking to Performance view
+Task: Fix symlink recursion in scanner
 
-Files touched: dataforge/modules/performance.py,
-               dataforge/ui/views/performance_view.py,
-               tests/test_new_modules.py
-
-Commits:
-  1. feat(modules): add SMART attribute history collector
-     → bumps MINOR (0.1.0 → 0.2.0)
-  2. feat(ui): add trend-chart widget to Performance view
-     → no separate bump (same feature)
-  3. test: add history-collector unit tests
-     → no bump
-
-Verification:
-  - pytest tests/test_new_modules.py -k smart
-  - manual: open Performance view, verify chart renders with live data
-```
-
-### Example: a bug-fix plan
-
-```
-## Task: Fix symlink recursion in scanner
-
-Files touched: dataforge/core/scanner.py, tests/test_comprehensive.py
+Files: dataforge/core/scanner.py, tests/test_comprehensive.py
 
 Commits:
   1. fix(core): prevent symlink recursion with follow_symlinks=False
-     → bumps PATCH (0.1.0 → 0.1.1)
+     → PATCH (0.1.0 → 0.1.1)
   2. test: add symlink-loop regression guard
      → no bump
 
-Verification:
-  - create symlink loop in /tmp, run fm scan /tmp --recursive
+Verify:
   - pytest tests/test_comprehensive.py -k symlink
+  - create symlink loop in /tmp, run fm scan /tmp --recursive
 ```
 
-### Example: a refactor plan
+### Rules
 
-```
-## Task: Consolidate two metadata-cleaning implementations
-
-Files touched: dataforge/modules/cleaner.py,
-               dataforge/modules/metadata.py,
-               dataforge/ui/views/tools.py,
-               dataforge/ui/plugins/cleaner_plugin.py,
-               tests/test_comprehensive.py
-
-Commits:
-  1. refactor(modules): unify metadata cleaning into MetadataEngine
-     → no version bump (refactor)
-  2. refactor(ui): update Tools and CleanerPlugin to use unified engine
-     → no version bump
-  3. test: update metadata tests for unified API
-     → no bump
-
-Verification:
-  - pytest tests/test_comprehensive.py -k metadata
-  - manual: scan+clean metadata in both Tools tab and CleanerPlugin
-```
-
-### Rules for plans
-
-1. **One commit per logical change.** If a task touches 5 files for the same
-   reason, it's one commit. If it does two unrelated things, it's two commits.
-2. **Commits that belong to the same feature should be sequential.** Don't
-   interleave feature-A commits with feature-B commits in your plan.
-3. **Test commits come after their implementation commit** unless adding tests
-   first (TDD), in which case `test:` commits come first with known failures.
-4. **Multi-scope changes omit scope** (e.g. `docs:` not `docs(readme):` when
-   updating 6 doc files across the tree).
-5. **Breaking changes must be explicit.** If your plan removes an API, changes a
-   CLI flag, or alters a public contract, use `!` in the commit type and add a
-   `BREAKING CHANGE:` footer.
-6. **Version impact is cumulative across commits pushed together.** If you push
-   3 `feat:` commits, the version bumps MINOR once, not three times.
-
-### Plan checklist
-
-Before executing any implementation plan, verify:
-
-- [ ] Each commit maps to a valid `type(scope)` combination from §2
-- [ ] Breaking changes are marked with `!` and have a footer
-- [ ] `feat` commits correctly predict MINOR bump; `fix` commits predict PATCH
-- [ ] Test verification steps are concrete (exact pytest invocation)
-- [ ] No commit crosses 72 characters in the subject line
-- [ ] The sequence of commits tells a coherent story in `git log --oneline`
+- One commit per logical change
+- Sequential commits for the same feature (don't interleave)
+- Test commits after implementation (unless TDD)
+- Multi-scope changes omit scope: `docs:` not `docs(readme):`
+- Breaking changes: use `!` and add `BREAKING CHANGE:` footer
+- Version impact is cumulative (3 `feat:` commits = one MINOR bump)
 
 ---
 
-## 6. Working with AI Assistants
+## 11. AI Assistants
 
-When using an AI coding assistant (Claude, Copilot, etc.), include this file
-as global context at the start of the session.
-
-### AI prompt template
+When using an AI coding assistant, include this file as context:
 
 ```
-You are working on the DataForge repo at /path/to/DataForge.
-Read docs/CONTRIBUTING.md for the full development workflow —
-commit conventions, versioning rules, release process, and
-implementation plan format. Follow that document's conventions
-for all commits you create.
+You are working on the DataForge repo.
+Read docs/CONTRIBUTING.md for the development workflow.
+Follow that document's conventions for all commits.
 
-Your task: [describe the task here]
+Your task: [describe the task]
 ```
 
-### What the AI should produce
+### AI Workflow
 
-When asked to implement a feature or fix, the AI should:
+1. Produce an implementation plan (§10)
+2. Map every change to a conventional commit
+3. State the version impact
+4. Identify docs to update (§8)
+5. Execute commits matching the plan
+6. Verify with `PYTHONPATH=. pytest -q`
 
-1. First produce an **implementation plan** following §5 format
-2. Map every planned change to a conventional commit
-3. State the version impact of the work
-4. Identify which docs need updating per §7 (Documentation Maintenance)
-5. Execute commits that match the plan
-6. Verify with `PYTHONPATH=. pytest -q` before declaring done
-
-### What the AI should NOT do
+### AI Must Not
 
 - Create commits with messages like "update code", "fix bug", "WIP"
 - Skip the test run before pushing
-- Commit directly to `main` — all work targets `develop`
-- Generate changelog entries manually (derive from commit log)
-- Add comments to code unless the implementation plan calls for it
-- Modify code without updating the docs that reference it per §7
+- Commit directly to `main`
+- Add comments unless the plan calls for it
+- Modify code without updating the docs that reference it
 
 ---
 
-## 7. Documentation Maintenance
+## 12. Related Documents
 
-**Rule:** Every change to the codebase — feature, fix, refactor, or deletion — must
-update all documentation files that reference the affected area. Code and docs
-stay in lockstep. No stale references survive a push.
-
-### When you change source code, update these docs
-
-| If you changed... | Update these docs |
+| Document | Purpose |
 | --- | --- |
-| `dataforge/cli.py` (commands, flags, output) | `docs/CLI_REFERENCE.md`, `README.md` (if feature list changes) |
-| `dataforge/core/` (scanner, config, cache, hasher, operations, services, utils) | `docs/ARCHITECTURE.md`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md` |
-| `dataforge/modules/` (feature logic) | `docs/ARCHITECTURE.md`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md`, `docs/CLI_REFERENCE.md` (if CLI-exposed) |
-| `dataforge/ui/app.py` (shell, sidebar, threading, theming) | `docs/ARCHITECTURE.md`, `docs/GUI_WORKFLOWS.md`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md` |
-| `dataforge/ui/views/` (a specific view) | `docs/GUI_WORKFLOWS.md` (that view's section), `docs/TECHNICAL_SOURCE_OF_TRUTH.md` |
-| `dataforge/ui/widgets.py` (shared widgets) | `docs/GUI_WORKFLOWS.md`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md` |
-| `dataforge/ui/plugins/` | `docs/ARCHITECTURE.md` (extension points), `docs/GUI_WORKFLOWS.md` |
-| `dataforge/ui/theme_tokens.py` (colours, tokens, QSS) | `docs/ARCHITECTURE.md` (design tokens layer) |
-| `dataforge/core/actions/` (pipeline engine) | `docs/ARCHITECTURE.md`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md`, `docs/GUI_WORKFLOWS.md` |
-| `tests/` (test structure, coverage) | `docs/DEVELOPMENT_GUIDE.md` (test suite table), `README.md` (test count) |
-| `setup.py`, `build_exe.py`, `requirements*.txt` | `docs/DEVELOPMENT_GUIDE.md`, `README.md` (system at a glance) |
-| A review finding (AUDIT_FINDINGS, IMPROVEMENT_PLAN) progresses to fixed | `docs/reviews/AUDIT_FINDINGS.md`, `docs/reviews/IMPROVEMENT_PLAN.md`, `docs/reviews/EXECUTIVE_SUMMARY.md`, `README.md` (project status section) |
-
-### When you change documentation, update these docs
-
-| If you changed... | Update these docs |
-| --- | --- |
-| Rename, add, or delete any file under `docs/` or `docs/reviews/` | `README.md` (Documentation Map + Directory Structure), `docs/DEVELOPMENT_GUIDE.md` (onboarding order), every file that links to the moved/deleted file |
-| `README.md` (feature list, test count, version, build info) | No automatic cascades — but verify the claim matches `docs/CLI_REFERENCE.md`, `docs/DEVELOPMENT_GUIDE.md`, `setup.py` |
-| `docs/CONTRIBUTING.md` (conventions, process) | `.githooks/commit-msg` (if format rules change) |
-| Test count changes (new tests added, tests removed) | `README.md` (headers: "254 passing tests"), `docs/DEVELOPMENT_GUIDE.md` (test suite table), `CONTRIBUTING.md` (quick reference card) |
-
-### Cross-reference verification
-
-Before pushing any change that touches files listed above:
-
-1. Search for the old filename/command/API name across all docs
-2. Update every reference that would break
-3. Run `grep -rn "old-name" docs/ README.md` — result must be empty or only historical context in review files
-4. Verify relative links resolve: `ls docs/path/to/linked-file.md` for every link in the changed file
-
-### What the AI must do
-
-When implementing a change, the AI must:
-
-1. Identify which docs are affected using the table above
-2. Include doc updates in the implementation plan under a `docs:` commit
-3. Verify no broken links remain before pushing
-4. Report which docs were updated and why in the implementation plan summary
-
----
-
-## 8. Related Documents
-
-- [`README.md`](../README.md) — project overview, quick start, feature index
-- [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md) — layered design, key abstractions
-- [`docs/DEVELOPMENT_GUIDE.md`](./DEVELOPMENT_GUIDE.md) — setup, testing, packaging
-- [`docs/reviews/EXECUTIVE_SUMMARY.md`](./reviews/EXECUTIVE_SUMMARY.md) — current audit status and backlog
-- [`docs/reviews/AUDIT_FINDINGS.md`](./reviews/AUDIT_FINDINGS.md) — bug and security tracker
-- [`docs/reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md) — UX roadmap and phased plan
+| [`README.md`](../README.md) | Project overview, quick start, feature index |
+| [`CHANGELOG.md`](../CHANGELOG.md) | Version history and release notes |
+| [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md) | Layered design, key abstractions |
+| [`docs/DEVELOPMENT_GUIDE.md`](./DEVELOPMENT_GUIDE.md) | Setup, testing, packaging |
+| [`docs/CLI_REFERENCE.md`](./CLI_REFERENCE.md) | Complete CLI command reference |
+| [`docs/GUI_WORKFLOWS.md`](./GUI_WORKFLOWS.md) | Desktop app workflows |
+| [`docs/TECHNICAL_SOURCE_OF_TRUTH.md`](./TECHNICAL_SOURCE_OF_TRUTH.md) | File-by-file source map |
+| [`docs/reviews/EXECUTIVE_SUMMARY.md`](./reviews/EXECUTIVE_SUMMARY.md) | Audit status and backlog |
+| [`docs/reviews/AUDIT_FINDINGS.md`](./reviews/AUDIT_FINDINGS.md) | Bug and security tracker |
+| [`docs/reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md) | UX roadmap and phased plan |

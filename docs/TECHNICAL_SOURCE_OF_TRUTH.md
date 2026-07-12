@@ -92,10 +92,10 @@ Runtime flow:
 
 The repository contains two orchestration models:
 
-- **Module-based**: `modules/organizer.py`, `modules/renamer.py`, `modules/search.py`, `modules/duplicates.py` — direct function calls, used by CLI and most GUI views.
-- **Pipeline-based**: `core/actions/*.py` — composable step chains, used by the Action Builder view.
+- **Module-based**: `dataforge/modules/organizer.py`, `dataforge/modules/renamer.py`, `dataforge/modules/search.py`, `dataforge/modules/duplicates.py` — direct function calls, used by CLI and most GUI views.
+- **Pipeline-based**: `dataforge/core/actions/*.py` — composable step chains, used by the Action Builder view.
 
-Both models now delegate filesystem mutations to `FileActionService` → `core/operations/files.py`. The orchestration differs but the mutation rules are shared.
+Both models now delegate filesystem mutations to `FileActionService` → `dataforge/core/operations/files.py`. The orchestration differs but the mutation rules are shared.
 
 ## Architectural Facts That Matter
 
@@ -129,14 +129,14 @@ Most of the system passes `FileEntry` objects around once a scan begins.
 
 ### 5. `FileActionService` is the central batch operations layer
 
-`dataforge/core/services/file_actions.py` provides `FileActionService`, a class of class methods that wrap `core/operations/files.py` with batch execution, progress reporting, cancellation, and dry-run support. It is used by:
+`dataforge/core/services/file_actions.py` provides `FileActionService`, a class of class methods that wrap `dataforge/core/operations/files.py` with batch execution, progress reporting, cancellation, and dry-run support. It is used by:
 
-- `modules/organizer.py` and `modules/renamer.py` for CLI-facing operations
-- `ui/views/search.py`, `ui/views/duplicates.py`, `ui/views/tools.py` for GUI batch actions
-- `ui/widgets.py` (`EnhancedTreeview`) for context-menu file operations
-- `core/actions/io.py` and `core/actions/modifications.py` for pipeline steps
+- `dataforge/modules/organizer.py` and `dataforge/modules/renamer.py` for CLI-facing operations
+- `dataforge/ui/views/search.py`, `dataforge/ui/views/duplicates.py`, `dataforge/ui/views/tools.py` for GUI batch actions
+- `dataforge/ui/widgets.py` (`EnhancedTreeview`) for context-menu file operations
+- `dataforge/core/actions/io.py` and `dataforge/core/actions/modifications.py` for pipeline steps
 
-This is the most important architectural evolution in the codebase: filesystem mutations are now centralized through `FileActionService` → `core/operations/files.py`, even though the calling patterns (module-direct vs. pipeline-step) differ.
+This is the most important architectural evolution in the codebase: filesystem mutations are now centralized through `FileActionService` → `dataforge/core/operations/files.py`, even though the calling patterns (module-direct vs. pipeline-step) differ.
 
 ### 6. GUI threading is centralized
 
@@ -217,7 +217,7 @@ How it works:
 - `search` uses `build_search_query` → `search_files` or `iter_search_files` → `order_search_results` for sliced output. Supports `--name-glob` / `--name-regex` (mutually exclusive). Invalid flag combinations can return JSON errors with `--error-format json`.
 - `organize` builds a `SearchQuery` and calls `Organizer.organize_files`.
 - `rename` calls `bulk_rename`.
-- `clean` calls `remove_empty_folders` from `modules.cleaner`.
+- `clean` calls `remove_empty_folders` from `dataforge.modules.cleaner`.
 - `usage` calls `analyze_size` and `generate_usage_report`.
 - `integrity` is a nested Click group for snapshot creation and verification.
 

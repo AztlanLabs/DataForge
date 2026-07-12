@@ -122,7 +122,7 @@ Those folders should be treated as outputs, not maintained source.
 
 ### Prefer shared services over ad hoc file writes
 
-If you are implementing move/copy/delete/rename/archive behavior, check `FileActionService` and `core/operations/files.py` first. That is the intended mutation path.
+If you are implementing move/copy/delete/rename/archive behavior, check `FileActionService` and `dataforge/core/operations/files.py` first. That is the intended mutation path.
 
 ### Keep long-running GUI work off the main thread
 

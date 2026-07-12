@@ -159,6 +159,9 @@ python build_exe.py debug
 **Contributing:**
 - [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md) — complete development workflow: commit convention, versioning, release process, implementation plan guidance for AI and developers
 
+**Project History:**
+- [`CHANGELOG.md`](./CHANGELOG.md) — version history, release notes, and migration notes
+
 ### Project Review & Audit (2026-07-10)
 
 A comprehensive engineering, security, and UX audit lives under [`docs/reviews/`](./docs/reviews/):
@@ -171,6 +174,7 @@ A comprehensive engineering, security, and UX audit lives under [`docs/reviews/`
 
 | Path | Purpose |
 | --- | --- |
+| **`CHANGELOG.md`** | Version history and release notes (Keep a Changelog format) |
 | **`run_ui.py`** | Desktop GUI entry point (PyQt5 application launcher) |
 | **`build_exe.py`** | PyInstaller bundler for standalone executables (release/debug) |
 | **`dataforge/cli.py`** | 17 CLI commands via Click (scan, dupes, search, organize, rename, clean, usage, integrity, cleanup, performance, recover, metadata, hardware, forensics, hash-calc, devices) |
