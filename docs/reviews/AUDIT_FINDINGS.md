@@ -14,7 +14,7 @@
 
 ## Part 1 — Code Correctness Bugs
 
-> **Status:** every correctness finding below has been **fixed**. 276 tests pass. Kept as a changelog with file/line pointers — not open work.
+> **Status:** every correctness finding below has been **fixed**. 301 tests pass. Kept as a changelog with file/line pointers — not open work.
 
 ### Severity legend
 

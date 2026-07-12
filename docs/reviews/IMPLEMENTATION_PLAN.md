@@ -9,6 +9,12 @@
 > added to `v0.2.0` as **WS-H**, and engine correctness/growth open a **`v0.3.0`**
 > cycle as **WS-I** and **WS-J** (see [§3](#3-consolidated-backlog--single-index),
 > [§4](#4-work-streams--the-ordered-how), [§7](#7-status-tracking)).
+>
+> **2026-07-12 expansion (continued).** A third code-verification pass confirmed
+> WS-C, WS-D, and now **WS-E** all landed on `develop` — WS-E's seven
+> 2e.x commits close the Motion, Empty/Error, and A11y polish; the next
+> open phase is **WS-F** (architecture consolidation, items ARCH.1–ARCH.6).
+> The test count is **301** (was 276 at the start of WS-E).
 
 ---
 
@@ -228,15 +234,15 @@ This is the "tackle any of them" master list.
 
 ### Motion, Empty/Error, A11y — [`IMPROVEMENT_PLAN.md`](./IMPROVEMENT_PLAN.md) §6 Phase 2e
 
-| ID | Title | Commit type | Ver | WS |
-| --- | --- | --- | --- | --- |
-| 2e.1 | Sidebar collapse + view-switch crossfade animation | `feat(ui)` | MINOR | E |
-| 2e.2 | Replace Braille spinner with QProgressBar indeterminate | `fix(ui)` | PATCH | E |
-| 2e.3 | "Reduce motion" settings flag | `feat(ui)` | MINOR | E |
-| 2e.4 | Focus-ring token + `:focus` outline rules | `feat(design)` | MINOR | E |
-| 2e.5 | Purposeful empty states + friendly errors | `feat(ui)` | MINOR | E |
-| 2e.6 | Screen-reader accessible names + colour-blind channel | `feat(ui)` | MINOR | E |
-| 2e.7 | Sidebar icon set (16–20 monochrome SVGs) | `feat(design)` | MINOR | E |
+| ID | Title | Commit type | Ver | WS | Status |
+| --- | --- | --- | --- | --- | --- |
+| 2e.1 | Sidebar collapse + view-switch crossfade animation | `feat(ui)` | MINOR | E | ✅ Done (WS-E) |
+| 2e.2 | Replace Braille spinner with QProgressBar indeterminate | `fix(ui)` | PATCH | E | ✅ Done (WS-E) |
+| 2e.3 | "Reduce motion" settings flag | `feat(ui)` | MINOR | E | ✅ Done (WS-E) |
+| 2e.4 | Focus-ring token + `:focus` outline rules | `feat(design)` | MINOR | E | ✅ Done (WS-E) |
+| 2e.5 | Purposeful empty states + friendly errors | `feat(ui)` | MINOR | E | ✅ Done (WS-E) |
+| 2e.6 | Screen-reader accessible names + colour-blind channel | `feat(ui)` | MINOR | E | ✅ Done (WS-E) |
+| 2e.7 | Sidebar icon set (16–20 monochrome SVGs) | `feat(design)` | MINOR | E | ✅ Done (WS-E) |
 
 ### Architecture Consolidation — [`IMPROVEMENT_PLAN.md`](./IMPROVEMENT_PLAN.md) §1, §4.2
 
@@ -267,7 +273,14 @@ This is the "tackle any of them" master list.
 | Cleanup never flags user folder as blanket junk | S7 | B | ✅ Done (`test_junk_scan_never_blanket_classifies_user_supplied_path`) |
 | Config out-of-range/unknown keys → clamped/ignored | S10 | B | ✅ Done (`test_config_merge_validates_and_clamps_bad_values`) |
 | Settings persistence round-trip | 2c.2 | C | ✅ Done (`test_settings_autosave_persists_on_change`) |
-| GUI smoke test (pytest-qt) mounts each view | 2d/2e | D | ✅ Done (`test_all_registered_views_smoke_mount`); 2e still open |
+| GUI smoke test (pytest-qt) mounts each view | 2d/2e | D | ✅ Done (`test_all_registered_views_smoke_mount`) |
+| Sidebar per-group container + crossfade opacity effect | 2e.1 | E | ✅ Done (`test_sidebar_animations_use_dedicated_container_per_group`, `test_view_crossfade_attaches_opacity_effect_to_every_view`, `test_switch_view_fades_in_new_view`, `test_toggle_sidebar_group_animates_container_height`) |
+| Indeterminate `QProgressBar` busy indicator | 2e.2 | E | ✅ Done (`test_braille_spinner_is_replaced_by_indeterminate_progress_bar`, `test_run_background_shows_indeterminate_progress_bar`, `test_update_progress_switches_bar_to_determinate`) |
+| Reduce-motion setting zeroes animation duration | 2e.3 | E | ✅ Done (`test_ui_reduce_motion_config_default_and_validation`, `test_reduce_motion_zeroes_animation_duration`, `test_reduce_motion_sets_zero_duration_on_new_animations`, `test_settings_view_has_reduce_motion_checkbox`) |
+| Focus-ring token + `:focus` QSS for interactive widgets | 2e.4 | E | ✅ Done (`test_focus_ring_token_exists_in_both_themes`, `test_qss_contains_focus_rules_for_interactive_widgets`, `test_button_border_is_stable_across_focus_state`) |
+| Purposeful empty states + friendly error messages | 2e.5 | E | ✅ Done (`test_empty_state_widget_renders_icon_title_body_and_action`, `test_friendly_error_message_maps_common_exceptions`, `test_show_workflow_error_renders_friendly_summary`, `test_search_view_has_purpose_driven_empty_state`, `test_duplicates_view_has_purpose_driven_empty_state`) |
+| Accessible names + colour-blind channel | 2e.6 | E | ✅ Done (`test_sidebar_buttons_carry_accessible_names`, `test_status_bar_widgets_carry_accessible_names`, `test_destructive_preview_button_has_glyph_and_accessible_label`) |
+| 18-icon monochrome sidebar icon set | 2e.7 | E | ✅ Done (`test_sidebar_icon_set_has_eighteen_monochrome_svgs`, `test_build_icons_renders_for_both_themes`, `test_sidebar_buttons_have_icons_for_every_view`) |
 
 ### Forensic Soundness & Investigator UX — from [`FORENSIC_SECURITY_REVIEW.md`](./FORENSIC_SECURITY_REVIEW.md)
 
@@ -442,32 +455,57 @@ view titles are stable; the new Storage & Devices and Automations views
 mount cleanly; the smoke test confirms every registered view is
 instantiable. Ready for the `v0.2.0-alpha.4` tag on `develop`).
 
-### WS-E — Motion, Empty/Error, A11y (Phase 2e) → `v0.2.0-alpha.5`
+### WS-E — Motion, Empty/Error, A11y (Phase 2e) → `v0.2.0-alpha.5` ✅ CLOSED
 
-- **Where:** `dataforge/ui/app.py:220-234` (Braille spinner), `theme_tokens.py`
-  (focus-ring), views (empty/error states, accessible names), new
-  `dataforge/ui/resources/icons/`. Items 2e.1–2e.7.
-- **Why:** the spinner is a character hack, there is no focus-ring rule after
-  `outline:0` was removed, empty/error states are generic, group identity is
-  colour-only, and there is no reduce-motion or screen-reader support — accessibility
-  and polish gaps that exclude keyboard and assistive-tech users.
-- **How:** animate sidebar collapse + view crossfade; replace the spinner with an
-  indeterminate `QProgressBar`; add a reduce-motion flag; add a focus-ring token and
-  `:focus` rules; give each view a purposeful empty state and friendly errors; add
-  accessible names and a non-colour channel (icons + spacing); ship a monochrome
-  sidebar icon set.
+- **Where:** `dataforge/ui/app.py` (sidebar animation containers,
+  `QGraphicsOpacityEffect` per view, animation helpers, accessible
+  names on sidebar buttons + status bar, `_refresh_sidebar_icons`),
+  `dataforge/ui/views/base.py` (`EmptyState`, `friendly_error_message`,
+  destructive-preview colour-blind glyph + accessible name),
+  `dataforge/ui/views/settings.py` (Reduce motion checkbox), new
+  `dataforge/ui/resources/icons.py` (18 monochrome SVGs), new
+  `theme_tokens.focus_ring` token + `:focus` QSS rules. Items 2e.1–2e.7.
+- **Why:** the spinner was a font-hack label, there was no focus-ring
+  rule after the dark Fusion palette suppressed the OS default, empty
+  states gave the user no next step, errors dumped the raw exception
+  text, and group identity was colour-only — accessibility and polish
+  gaps that excluded keyboard, screen-reader, and colour-blind users.
+- **How:** added `QPropertyAnimation` for sidebar group expand/collapse
+  (per-group container, 180ms OutCubic) and view-switch crossfade
+  (per-view `QGraphicsOpacityEffect`, 160ms); replaced the Braille
+  label with a native `QProgressBar` in indeterminate mode
+  (`setRange(0, 0)`); added `ui_reduce_motion` config + Settings
+  checkbox that zero-duration the animations at runtime; added a
+  `focus_ring` token and pre-allocated 2px transparent borders on
+  buttons/inputs/lists/tabs/checkbox-indicator so `:focus` only
+  changes the border colour (no layout shift); added `EmptyState`
+  widget and wired it into Search and Duplicates; added
+  `friendly_error_message` for the common exception types; added
+  `accessibleName` / `accessibleDescription` to sidebar buttons,
+  the status bar, and the destructive Proceed button (which is
+  prefixed with a `⚠` glyph for the colour-blind channel when the
+  caller's label is not already a destructive verb); shipped 18
+  stroke-only SVG icons in `dataforge/ui/resources/icons.py` and
+  regenerated the icon tone on every theme change.
 
 **Representative commits:**
 ```
 feat(ui): animate sidebar collapse and view-switch crossfade
 fix(ui): replace braille spinner with indeterminate progress bar
-feat(ui): add reduce-motion preference
-feat(design): add focus-ring token and focus outline rules
-feat(ui): add per-view empty states and friendly error messages
-feat(ui): add accessible names and colour-blind icon channel
-feat(design): add monochrome sidebar icon set
+feat(ui): add reduce-motion preference that disables 2e.1 animations
+feat(design): add focus-ring token and :focus outline rules
+feat(ui): add purposeful empty states and friendly error messages
+feat(ui): add accessible names and colour-blind channel for destructive actions
+feat(design): add 18-icon monochrome sidebar icon set
 ```
-**Version impact:** MINOR.
+**Version impact:** MINOR. **Gate:** ✅ satisfied (301 passed —
+276 → 301 over seven incremental commits: 4 animations, 4
+spinner, 4 reduce-motion, 3 focus-ring, 5 empty-states, 3
+accessible-names, 3 icon-set. Reduce-motion setting gates both
+animation durations; pytest-qt smoke-mounts every view with
+animations active; the icon set has 18 entries within the
+16-20 IMPROVEMENT_PLAN budget. Ready for the
+`v0.2.0-alpha.5` tag on `develop`).
 
 ### WS-F — Architecture Consolidation → `v0.2.0-alpha.6`
 
@@ -687,7 +725,7 @@ Update the `WS` streams here as they close; the detailed per-item status stays i
 | WS-B | Trust & Safety (S4–S13) | `v0.2.0-alpha.2` | ✅ Done — closed |
 | WS-C | Interaction Correctness (2c) | `v0.2.0-alpha.3` | ✅ Done — closed |
 | WS-D | IA, Naming & Parity (2d) | `v0.2.0-alpha.4` | ✅ Done — closed |
-| WS-E | Motion, Empty/Error, A11y (2e) | `v0.2.0-alpha.5` | ⏳ Not started |
+| WS-E | Motion, Empty/Error, A11y (2e) | `v0.2.0-alpha.5` | ✅ Done — closed |
 | WS-F | Architecture Consolidation | `v0.2.0-alpha.6` | ⏳ Not started |
 | WS-G | Brand & Release Polish | `v0.2.0-alpha.7` | ⏳ Not started |
 | WS-H | Forensic Soundness (F1–F4, F9, F11, F21, U1, U2) | `v0.2.0-alpha.8` | ⏳ Not started |

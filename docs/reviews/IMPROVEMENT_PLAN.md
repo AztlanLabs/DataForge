@@ -3,6 +3,8 @@
 **Date:** 2026-07-10 · **Updated:** 2026-07-12 · **Last verified:** 2026-07-12
 **Consolidates** the old `03_UIUX_REVIEW.md` + `04_IMPROVEMENTS_AND_ROADMAP.md` + `05_VISUAL_DESIGN_SYSTEM.md` + `06_UIUX_IMPLEMENTATION_PLAN.md` + cross-cutting quality observations from `01_CODE_REVIEW_AND_BUGS.md`. No information was removed — this is a merge, not a rewrite.
 
+> **2026-07-12 update:** WS-C (Interaction Correctness), WS-D (IA, Naming & Parity), and now **WS-E (Motion, Empty/Error, A11y — items 2e.1–2e.7)** are all **shipped**. The next open phase is **WS-F** (architecture consolidation, items ARCH.1–ARCH.6). The test count is **301** (was 276 at the start of WS-E; +25 over seven 2e.x commits).
+
 > **2026-07-12 update:** Phases 2c (Interaction Correctness) and 2d (IA, Naming & Parity) are now **shipped** — see §6 below and [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) WS-C/WS-D. The test count is now **276** (was 255 at the start of WS-C). 2e (Motion, Empty/Error, A11y) is the next open phase.
 
 ---
@@ -147,7 +149,7 @@ Named scale constants in `theme_tokens.py` — `caption 11 / body 13 / subheadin
 | Item | Status |
 | --- | --- |
 | Under version control (git + `.gitignore`) | ✅ Done |
-| Test suite green — 276 tests pass | ✅ Done |
+| Test suite green — 301 tests pass | ✅ Done |
 | CI (GitHub Actions) running pytest/lint/type-check on push | ✅ Done |
 | Linting (ruff + black) | ✅ Done |
 | Type checking (mypy/pyright, advisory) | ✅ Done |
@@ -199,9 +201,9 @@ Named scale constants in `theme_tokens.py` — `caption 11 / body 13 / subheadin
 
 ✅ **Sprint B (2c)** — 7 interaction fixes shipped in WS-C (`v0.2.0-alpha.3`): path picker, settings autosave, dark-mode dedup, progressive disclosure, destructive checklist, named busy task, rich help. 270 tests pass.
 
-✅ **Sprint C (2d)** — IA/naming shipped in WS-D (`v0.2.0-alpha.4`): task-oriented sidebar groups (Home / Find & Organize / Clean & Optimize / Recover & Investigate / System); Tools & Workflows + Action Builder merged into Automations; `fm devices` GUI surfaced as **Storage & Devices**; labels renamed to user-facing names (Search, Metadata & EXIF, Forensics, Hardware Info, Clean Up Space); the "Experience Level" setting is now **Detail level** (`Simple` / `Standard` / `Everything`). 276 tests pass.
+✅ **Sprint C (2d)** — IA/naming shipped in WS-D (`v0.2.0-alpha.4`): task-oriented sidebar groups (Home / Find & Organize / Clean & Optimize / Recover & Investigate / System); Tools & Workflows + Action Builder merged into Automations; `fm devices` GUI surfaced as **Storage & Devices**; labels renamed to user-facing names (Search, Metadata & EXIF, Forensics, Hardware Info, Clean Up Space); the "Experience Level" setting is now **Detail level** (`Simple` / `Standard` / `Everything`).
 
-⏳ **Sprint D (2e)** — sidebar animation, Braille spinner replacement, reduce-motion, focus-ring, empty/error states, screen-reader support, icon set.
+✅ **Sprint D (2e)** — Motion / Empty/Error / A11y polish shipped in WS-E (`v0.2.0-alpha.5`): animated sidebar group expand/collapse and view-switch crossfade via `QPropertyAnimation`; Braille-character busy label replaced by a native `QProgressBar` in indeterminate mode; a new **Reduce motion** setting gates both animations; a `focus_ring` token + `:focus` QSS rules for every interactive widget; purposeful `EmptyState` widget wired into Search and Duplicates; `friendly_error_message` for common Python exceptions; `accessibleName` / `accessibleDescription` on sidebar buttons, status bar, and the destructive Proceed button (which is prefixed with a `⚠` glyph for the colour-blind channel); an 18-icon monochrome SVG sidebar set with the tone regenerated on every theme change. 301 tests pass.
 
 ### Phase 3 — Grow (ongoing)
 
@@ -249,17 +251,17 @@ Task-first dashboard · scheduled cleanup/integrity · saved searches/automation
 | 2d.4 | ✅ | Surface `fm devices` in the GUI as "Storage & Devices" view | 🟠 |
 | 2d.5 | ✅ | Stray-name consistency sweep (residual "File Manager"/"filemanager-utils") | 🟢 |
 
-### ⏳ Phase 2e — Motion, Empty/Error States, Accessibility Polish
+### ✅ Phase 2e — Motion, Empty/Error States, Accessibility Polish
 
 | # | Done | Item | Risk |
 | --- | --- | --- | --- |
-| 2e.1 | ⏳ | Animate sidebar collapse + view-switch crossfade (dead QPropertyAnimation import) | 🟢 |
-| 2e.2 | ⏳ | Replace Braille-character spinner with QProgressBar indeterminate | 🟠 |
-| 2e.3 | ⏳ | "Reduce motion" settings flag | 🟢 |
-| 2e.4 | ⏳ | Focus-ring token + :focus outline/accelerators | 🟠 |
-| 2e.5 | ⏳ | Purposeful per-view empty states; friendly error messages | 🟢 |
-| 2e.6 | ⏳ | Screen-reader accessible names + colour-blind channel (icons + spacing) | 🟢 |
-| 2e.7 | ⏳ | Sidebar icon set (16–20 monochrome SVGs under `ui/resources/icons/`) | 🟠 |
+| 2e.1 | ✅ | Animate sidebar collapse + view-switch crossfade (per-group container + `QGraphicsOpacityEffect`) | 🟢 |
+| 2e.2 | ✅ | Replace Braille-character spinner with `QProgressBar` indeterminate | 🟠 |
+| 2e.3 | ✅ | "Reduce motion" settings flag (gates both animations) | 🟢 |
+| 2e.4 | ✅ | Focus-ring token + :focus outline rules (2px pre-allocated border, no layout shift) | 🟠 |
+| 2e.5 | ✅ | Purposeful per-view empty states + `friendly_error_message` for common exceptions | 🟢 |
+| 2e.6 | ✅ | Screen-reader accessible names + colour-blind channel (⚠ glyph on destructive Proceed) | 🟢 |
+| 2e.7 | ✅ | Sidebar icon set (18 monochrome SVGs under `dataforge/ui/resources/icons.py`) | 🟠 |
 
 ---
 

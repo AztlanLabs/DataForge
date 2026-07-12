@@ -2,6 +2,19 @@
 
 **Last verified:** 2026-07-12
 
+> **2026-07-12 update:** WS-E (Motion, Empty/Error, A11y) is now shipped. New
+> touch points: `dataforge/ui/app.py` adds `QPropertyAnimation` per-group
+> containers + per-view `QGraphicsOpacityEffect` (2e.1), the Braille-character
+> busy label is gone in favour of a native `QProgressBar` (2e.2), the
+> `_reduce_motion` flag + `apply_motion_preference` runtime hook gate both
+> animations (2e.3); `dataforge/ui/theme_tokens.py` adds a `focus_ring` token
+> and `:focus` QSS rules for buttons, inputs, lists, trees, and tabs (2e.4);
+> `dataforge/ui/views/base.py` adds `EmptyState` and `friendly_error_message`
+> (2e.5); sidebar buttons, the status bar, and the destructive-preview Proceed
+> button carry `accessibleName` / `accessibleDescription` and a `⚠` glyph
+> for the colour-blind channel (2e.6); new `dataforge/ui/resources/icons.py`
+> ships 18 stroke-only monochrome SVGs (2e.7).
+
 > This is the deepest technical map in the repository.
 >
 > For faster onboarding, start with:
@@ -25,7 +38,7 @@ It is intended to answer four questions for a new maintainer:
 
 This document is based on the current source files in the repository, not on intended behavior.
 
-The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5** and several new modules were added after this document was written. Path references have been audited and corrected (all `core/`/`modules/` mentions now carry the `dataforge/` prefix; the old dead `docs/reviews/01/` links are gone) - see [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) A5/D4/D5. The 2c (Interaction Correctness) and 2d (IA/Naming/Parity) work has been re-audited against the new source: 276 tests pass, integrity defaults to SHA-256 (not MD5), the scanner no longer follows symlinks, the SQLite cache is thread-safe, the forensic-report HTML injection (S2) is fixed, and the rest of the S1–S13 backlog (trash-restore path confinement S4, System Cleanup safeguards S7, plugin-loader hardening S5, `0600` reports/credentials, `defusedxml`, config validation, executable-open confirm, decompression-bomb caps) is also fixed.
+The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5** and several new modules were added after this document was written. Path references have been audited and corrected (all `core/`/`modules/` mentions now carry the `dataforge/` prefix; the old dead `docs/reviews/01/` links are gone) - see [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) A5/D4/D5. The 2c (Interaction Correctness), 2d (IA/Naming/Parity), and 2e (Motion/Empty-Error/A11y) work has been re-audited against the new source: 301 tests pass, integrity defaults to SHA-256 (not MD5), the scanner no longer follows symlinks, the SQLite cache is thread-safe, the forensic-report HTML injection (S2) is fixed, the rest of the S1–S13 backlog (trash-restore path confinement S4, System Cleanup safeguards S7, plugin-loader hardening S5, `0600` reports/credentials, `defusedxml`, config validation, executable-open confirm, decompression-bomb caps) is also fixed, the sidebar carries a per-group container with animated expand/collapse plus a per-view opacity effect, the busy indicator is a native `QProgressBar`, every interactive widget draws a `focus_ring` border on `:focus`, the Search and Duplicates views show a purposeful `EmptyState` with an action button, the destructive Proceed button is prefixed with a `⚠` glyph, and an 18-icon monochrome SVG set is attached to every sidebar view.
 
 ## Scope
 
@@ -565,15 +578,15 @@ Layout:
 
 - Root window: `resize(1100, 750)`, `setMinimumSize(700, 450)`.
 - `QHBoxLayout` central layout — fixed-width nav `QFrame` (`setFixedWidth(230)`, non-collapsible) + `QStackedWidget` content area (stretch factor 1).
-- Nav frame: title label, dark-mode `QCheckBox`, separator, then a scrollable (`QScrollArea`) list of collapsible group headers (Home, Find & Organize, Clean & Optimize, Recover & Investigate, System, and Plugins when present) each containing plain-text `QPushButton`s (no icons). The group labels are task-oriented (2d.1) and every group is always shown regardless of the user's Detail Level.
-- Status bar: cancel button, spinner label, progress bar, status label.
+- Nav frame: title label, dark-mode `QCheckBox` (with the 2e.7 sun/moon monochrome icon next to it via `_update_theme_icon`), separator, then a scrollable (`QScrollArea`) list of collapsible group headers (Home, Find & Organize, Clean & Optimize, Recover & Investigate, System, and Plugins when present) each containing plain-text `QPushButton`s with a monochrome SVG icon (2e.7 — see `dataforge/ui/resources/icons.py`). Every sidebar button carries an `accessibleName` ("Open {title}") and `accessibleDescription` (2e.6). The group labels are task-oriented (2d.1) and every group is always shown regardless of the user's Detail Level. Each group's buttons live inside a per-group `QWidget` container (`objectName="navGroup"`) so `_animate_max_height` can drive the expand/collapse transition (2e.1).
+- Status bar: cancel button (with `accessibleName`/`accessibleDescription` — 2e.6), indeterminate `QProgressBar` (2e.2 — replaces the previous Braille-character label), and status label.
 
 Key methods:
 
 - `add_view(view_cls)` — instantiates and registers a view by title.
 - `build_navigation_sidebar()` — (re)builds the grouped nav buttons; persists per-group collapsed state via `config.get/set("collapsed_groups", ...)`.
-- `toggle_sidebar_group(group_name, header_button)` — expands/collapses one nav group (the sidebar itself is fixed-width and does not collapse).
-- `switch_view(title)` — unmounts current view, shows new one via `QStackedWidget`, highlights the matching nav button (`setChecked`).
+- `toggle_sidebar_group(group_name, header_button)` — expands/collapses one nav group (the sidebar itself is fixed-width and does not collapse); swaps the header chevron icon between `expand` and `collapse` and animates the per-group container's `maximumHeight` over `SIDEBAR_ANIM_MS` (180ms OutCubic — 2e.1).
+- `switch_view(title)` — unmounts current view, shows new one via `QStackedWidget`, highlights the matching nav button (`setChecked`), and starts a `QPropertyAnimation` on the new view's `QGraphicsOpacityEffect` (`VIEW_ANIM_MS` = 160ms OutCubic — 2e.1). Both animations honour the `ui_reduce_motion` setting (2e.3) via `apply_motion_preference()`.
 - `update_status(message)` / `update_progress(current, total, step_name)` — update status bar text and progress bar.
 - `cancel_action()` — sets `cancel_event` so a running `BackgroundWorker` can stop cooperatively.
 - `run_workflow(target, on_success, *args, on_error, progress, error_title)` — inspects the target's signature for `progress_callback`/`cancel_token` params and injects them, then delegates to `run_background`.
@@ -581,8 +594,9 @@ Key methods:
 - `run_in_thread()` — thin compatibility wrapper around `run_background`.
 - `post_to_main(callback, *args, **kwargs)` — marshals a callback onto the UI thread via the `post_signal` Qt signal (not a queue).
 - `post_progress(current, total, step_name)` / `post_status(message)` — safe to call from a `BackgroundWorker` thread; emit the worker's Qt signals when called off-thread, or update the UI directly when called on the UI thread.
-- `toggle_theme()` — switches between the light/dark stylesheets (generated from `ui/theme_tokens.py`) and persists `"cosmo"`/`"darkly"` as the saved theme name.
-- `show_error_dialog`, `show_warning_dialog`, `show_info_dialog`, `show_workflow_error` — `QMessageBox`-based dialog helpers.
+- `toggle_theme()` — switches between the light/dark stylesheets (generated from `ui/theme_tokens.py`) and persists `"cosmo"`/`"darkly"` as the saved theme name; refreshes the sun/moon theme icon (`_update_theme_icon`) and every sidebar button icon via `_refresh_sidebar_icons(is_dark)` so the 2e.7 monochrome SVGs recolour on theme change.
+- `apply_motion_preference(reduce_motion: bool)` — updates `self._reduce_motion` at runtime so the next `_animate_max_height` / `_animate_opacity` call shortens its duration to 0 (2e.3).
+- `show_error_dialog`, `show_warning_dialog`, `show_info_dialog`, `show_workflow_error` — `QMessageBox`-based dialog helpers. `show_workflow_error` runs the exception through `friendly_error_message` (2e.5) so the dialog body starts with a one-line user-readable summary before falling back to the raw exception text.
 - `make_progress_callback() -> ProgressCallback` — returns `self.post_progress` for injection into worker targets.
 - `show_current_help()` — delegates to the current view's `show_help()`.
 
@@ -620,6 +634,17 @@ Classes:
   - Text files: `tk.Text` widget with scrollbars, 4 KB limit.
   - Other files: "No Preview Available".
 
+#### `dataforge/ui/resources/icons.py`
+
+2e.7 sidebar icon set — 18 stroke-only monochrome SVGs (16x16 viewBox, 1.6px stroke, round caps/joins) covering every registered sidebar view, the expand/collapse chevrons, and the sun/moon theme toggle. Public API:
+
+- `ICON_PATHS: Dict[str, str]` — `{key: "d=..."}` for the 18 keys (`dashboard`, `search`, `duplicates`, `automations`, `media`, `cleanup`, `storage`, `performance`, `recovery`, `metadata`, `forensics`, `hardware`, `settings`, `about`, `expand`, `collapse`, `sun`, `moon`).
+- `ICON_KEYS: List[str]` — ordered list of the 18 keys (drives the 16-20 entry budget per IMPROVEMENT_PLAN §2.5).
+- `TONE_LIGHT = "#374151"`, `TONE_DARK = "#e2e8f0"` — the monochrome stroke colour the data URLs are baked with.
+- `build_icons(tone: str) -> Dict[str, str]` — returns a fresh `{key: "data:image/svg+xml;base64,..."}` dict with the requested tone. Called by `DataForgeApp.build_navigation_sidebar` and again by `toggle_theme` (via `_refresh_sidebar_icons`) so a theme switch recolours every sidebar icon.
+
+`DataForgeApp.SIDEBAR_ICON_KEYS` maps each registered view title to its icon key. `DataForgeApp._apply_button_icon(btn, key)` attaches the rendered `QIcon` and sets the icon size to the button's font height. `_update_theme_icon` paints an 18x18 `QPixmap` from the sun/moon SVG into the dark-mode checkbox row.
+
 #### `dataforge/ui/views/base.py`
 
 Abstract base class for all GUI views.
@@ -644,6 +669,13 @@ Shared static/instance helpers:
 - `validate_filename_candidate(name)` — checks empty, invalid chars, "." or "..".
 - `restore_tree_selection(tree, item_ids, on_select)` — set selection, focus, see.
 - `choose_file_or_directory(file_title, directory_title, filetypes)` — Yes=file, No=folder chooser.
+
+2e.5 / 2e.6 additions to `dataforge/ui/views/base.py`:
+
+- `EmptyState(QFrame)` — purposeful empty state with optional icon, title, body, and action button. Built once and added to a view's layout; views toggle `.setVisible()` based on result count.
+- `friendly_error_message(error)` — translates `PermissionError`, `FileNotFoundError`, `IsADirectoryError`, `NotADirectoryError`, `OSError`, `ValueError`, `TimeoutError`, `KeyboardInterrupt`, `MemoryError`, `RecursionError` into one-line user-readable summaries; unknown types fall back to `str(error)`.
+- `BaseView.make_empty_state(...)` — convenience constructor that returns a fresh `EmptyState` parented to the view.
+- `confirm_destructive_preview` prefixes the destructive Proceed button with a `⚠` glyph when the caller's `action_label` is not already a destructive verb (Delete / Remove / Trash / Drop / Purge / Wipe) so colour-blind users get the same danger signal sighted users get from the red background. The button's `accessibleName` appends "(destructive)" and its `accessibleDescription` explains the consequence for screen-reader users.
 
 #### `dataforge/ui/views/dashboard.py`
 
@@ -787,7 +819,7 @@ GUI editor for persisted configuration. Title: "Settings".
 
 - `SettingsView(BaseView)` — `QTabWidget` with 4 tabs and `TOOLTIP_TEXTS`.
 
-**Tab 1: General** — read-only theme label that mirrors the sidebar Dark Mode checkbox (sidebar is the single source of truth; the previous `QComboBox` was removed in 2c.3), safe mode checkbox, log level combobox.
+**Tab 1: General** — read-only theme label that mirrors the sidebar Dark Mode checkbox (sidebar is the single source of truth; the previous `QComboBox` was removed in 2c.3), a **Reduce motion** checkbox (2e.3) that writes through to the `ui_reduce_motion` config key and calls `app.apply_motion_preference()` so the next animation honours the new duration, safe mode checkbox, log level combobox.
 
 **Tab 2: Performance** — hash algorithm combobox, size unit combobox, max threads spinbox. All fields autosave on change (no Save button — 2c.2). Clear Cache DB button (confirms before clearing `file_cache`).
 
@@ -938,6 +970,8 @@ All GUI bulk operations follow: dry-run preview → user confirmation → execut
 ### 10. Design tokens are the single source of truth for colour
 
 `dataforge/ui/theme_tokens.py` (added Phase 2b — 2026-07-11) — semantic colour tokens with validated AA contrast, a template-driven `generate_qss(mode)` function that replaces the two ~200-line hand-written `LIGHT_STYLE`/`DARK_STYLE` blocks in `app.py`, `generate_palette(mode)` for `QPalette`, `TYPE_SCALE` named font-size constants, and SVG glyph helpers for checkbox/spinbox/combobox indicators. All per-widget hardcoded hex colours across the views have been migrated to Qt dynamic-property variant rules (`setProperty("variant", "danger")` etc.) driven by the token module.
+
+**2e.4 additions:** A new `focus_ring` token (`#1d4ed8` light / `#a5b4fc` dark) drives a 2px pre-allocated border on every interactive widget — `QPushButton`, `QLineEdit`/`QSpinBox`/`QComboBox`, `QTreeWidget`/`QTreeView`/`QListWidget`/`QTextEdit`, `QTabBar::tab`, and `QCheckBox::indicator` — so toggling focus only changes the border colour without shifting the content. Exposed as `theme_tokens.FOCUS_RING_TOKEN = "focus_ring"` so tests and help text can reference the token by name.
 
 ### `LocalProvider` is unused infrastructure
 
