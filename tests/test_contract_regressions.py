@@ -804,8 +804,7 @@ class ContractRegressionTests(unittest.TestCase):
         from PyQt5.QtWidgets import QApplication
         from dataforge.core.config import config as dfconfig
 
-        existing_app = QApplication.instance()
-        app = existing_app if existing_app is not None else QApplication([])
+        _ = QApplication.instance() or QApplication([])
 
         snapshot = {
             "hash_algorithm": dfconfig.get("hash_algorithm"),
@@ -849,10 +848,8 @@ class ContractRegressionTests(unittest.TestCase):
         """The Settings theme control must mirror the sidebar Dark Mode
         checkbox — only the sidebar is writable."""
         from PyQt5.QtWidgets import QApplication
-        from PyQt5.QtCore import Qt
 
-        existing_app = QApplication.instance()
-        app = existing_app if existing_app is not None else QApplication([])
+        _ = QApplication.instance() or QApplication([])
 
         fake_app = MagicMock()
         fake_app.theme_chk.isChecked.return_value = False
@@ -909,14 +906,17 @@ class ContractRegressionTests(unittest.TestCase):
         v = View()
         self.assertEqual(_humanize_callable_name(v.start_search), "start search")
 
-        anon = lambda: None
+        class NamelessCallable:
+            pass
+
+        anon = NamelessCallable()
         self.assertEqual(_humanize_callable_name(anon), "background task")
 
     def test_baseview_help_uses_markdown(self):
         """The help dialog must render Markdown headings and code spans
         properly, not show literal ``#``/``*`` characters as before."""
         from PyQt5.QtWidgets import QApplication
-        QApplication.instance() or QApplication([])
+        _ = QApplication.instance() or QApplication([])
 
         default = BaseView.get_help_text(self.__class__.__mro__[0]())
         self.assertTrue(default.startswith("#"))
