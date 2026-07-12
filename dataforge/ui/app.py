@@ -268,6 +268,11 @@ class DataForgeApp(QMainWindow):
         self.apply_theme(is_dark)
         self._update_theme_icon(is_dark)
 
+        # 2e.3 — Reduce-motion preference. The two animation helpers
+        # read this on every call so a Settings toggle takes effect on
+        # the next transition without restarting the app.
+        self._reduce_motion = bool(config.get("ui_reduce_motion", False))
+
         # Initialize Base Views. Progress here is real (not simulated): each
         # step corresponds to an actual view being constructed, so a caller
         # showing a splash screen (see ui/splash.py) can track true startup
@@ -493,9 +498,13 @@ class DataForgeApp(QMainWindow):
         animation finishes; pass ``None`` to leave the animated value in
         place. The animation object is kept alive in
         :attr:`_active_animations` so PyQt5 does not garbage-collect it
-        mid-flight."""
+        mid-flight.
+
+        When :attr:`_reduce_motion` is True, the animation runs with a
+        zero duration so the constraint snaps to its end value
+        immediately (2e.3)."""
         anim = QPropertyAnimation(widget, b"maximumHeight")
-        anim.setDuration(self.SIDEBAR_ANIM_MS)
+        anim.setDuration(0 if getattr(self, "_reduce_motion", False) else self.SIDEBAR_ANIM_MS)
         anim.setEasingCurve(self.ANIM_EASING)
         anim.setStartValue(start)
         anim.setEndValue(end)
@@ -504,6 +513,14 @@ class DataForgeApp(QMainWindow):
         self._active_animations.append(anim)
         anim.finished.connect(lambda a=anim: self._drop_finished_animation(a))
         anim.start()
+
+    def apply_motion_preference(self, reduce_motion: bool) -> None:
+        """Update :attr:`_reduce_motion` at runtime (2e.3).
+
+        Called by ``SettingsView`` when the user toggles the Reduce
+        Motion checkbox. Does not interrupt in-flight animations — the
+        next ``_animate_*`` call reads the new value."""
+        self._reduce_motion = bool(reduce_motion)
 
     def _drop_finished_animation(self, anim):
         try:
@@ -557,9 +574,13 @@ class DataForgeApp(QMainWindow):
                     btn.setChecked(False)
 
     def _animate_opacity(self, effect, start, end):
-        """Fade a ``QGraphicsOpacityEffect`` from *start* to *end*."""
+        """Fade a ``QGraphicsOpacityEffect`` from *start* to *end*.
+
+        When :attr:`_reduce_motion` is True the animation runs with a
+        zero duration (2e.3) so the effect snaps to its end value
+        immediately."""
         anim = QPropertyAnimation(effect, b"opacity")
-        anim.setDuration(self.VIEW_ANIM_MS)
+        anim.setDuration(0 if getattr(self, "_reduce_motion", False) else self.VIEW_ANIM_MS)
         anim.setEasingCurve(self.ANIM_EASING)
         anim.setStartValue(start)
         anim.setEndValue(end)

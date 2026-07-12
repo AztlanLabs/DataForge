@@ -26,6 +26,7 @@ class SettingsView(BaseView):
         "dashboard_paths": "These folders feed the dashboard overview and quick statistics cards.",
         "dashboard_add": "Add another folder to the dashboard watch list.",
         "dashboard_remove": "Remove the currently selected dashboard folder from the list.",
+        "reduce_motion": "Disable view-switch crossfade and sidebar collapse animations. Use this if you experience motion sickness or vestibular issues from animated UI, or simply prefer a snappier desktop feel.",
     }
 
     def get_title(self):
@@ -102,6 +103,16 @@ class SettingsView(BaseView):
         path_display_layout.addStretch()
         frame_theme_layout.addLayout(path_display_layout)
         attach_tooltips([(self.cb_path_display, self.TOOLTIP_TEXTS["path_display_mode"])])
+
+        # 2e.3 — Reduce Motion checkbox. Toggling the checkbox persists
+        # the new value to ``ui_reduce_motion`` and asks the running
+        # app to apply it on the next animation; in-flight transitions
+        # finish normally and the change takes effect from then on.
+        self.chk_reduce_motion = QCheckBox("Reduce motion", frame_theme)
+        self.chk_reduce_motion.setChecked(bool(config.get("ui_reduce_motion", False)))
+        self.chk_reduce_motion.stateChanged.connect(self.save_reduce_motion)
+        frame_theme_layout.addWidget(self.chk_reduce_motion)
+        attach_tooltips([(self.chk_reduce_motion, self.TOOLTIP_TEXTS["reduce_motion"])])
 
         gen_layout.addWidget(frame_theme)
 
@@ -349,6 +360,19 @@ class SettingsView(BaseView):
     def save_safe(self, event=None):
         config.set("safe_mode", self.chk_safe.isChecked())
         config.set("log_level", self.cb_log.currentText())
+        self._flash_saved_indicator()
+
+    def save_reduce_motion(self, _state=None):
+        """2e.3 — Persist the Reduce Motion preference and ask the app
+        shell to apply it on the next animation. The autosave path
+        flashes the same 'Saved ✓' indicator the rest of the page uses
+        so the toggle feels consistent with the other settings."""
+        if getattr(self, "_suppress_autosave", False):
+            return
+        value = bool(self.chk_reduce_motion.isChecked())
+        config.set("ui_reduce_motion", value)
+        if getattr(self, "app", None) and hasattr(self.app, "apply_motion_preference"):
+            self.app.apply_motion_preference(value)
         self._flash_saved_indicator()
 
     def clear_cache_db(self):

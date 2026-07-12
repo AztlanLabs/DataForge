@@ -28,6 +28,12 @@ class ConfigManager:
         "settings_ui_tier": "Simple",
         "duplicate_default_keep_strategy": "first path",
         "plugins_enabled": False,
+        # 2e.3 accessibility — when True, every ``QPropertyAnimation``
+        # in the app (sidebar collapse, view crossfade) runs with a
+        # zero duration so the transition is instantaneous. Honors the
+        # OS-level "reduce motion" preference for users who experience
+        # motion sickness or vestibular issues from animated UI.
+        "ui_reduce_motion": False,
     }
 
     def __new__(cls, *args, **kwargs):
@@ -96,7 +102,7 @@ class ConfigManager:
             return isinstance(val, str) and val in _VALID_PATH_MODES
         if key == "settings_ui_tier":
             return isinstance(val, str) and val in _VALID_TIERS
-        if key in ("safe_mode", "plugins_enabled"):
+        if key in ("safe_mode", "plugins_enabled", "ui_reduce_motion"):
             return isinstance(val, bool)
         if key in ("excluded_extensions", "excluded_folders", "dashboard_paths"):
             return isinstance(val, list)

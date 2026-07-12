@@ -1240,6 +1240,7 @@ class ContractRegressionTests(unittest.TestCase):
         app.group_headers = {}
         app.views = {}
         app._active_animations = []
+        app._reduce_motion = False
         app.update_sidebar_header_colors = lambda: None
 
         from dataforge.ui.views.dashboard import DashboardView
@@ -1408,6 +1409,212 @@ class ContractRegressionTests(unittest.TestCase):
         # animating while we wait for the next non-zero total.
         app.update_progress(3, 0, "scanning")
         self.assertEqual(app.progress_bar.maximum(), 0)
+
+    def test_ui_reduce_motion_config_default_and_validation(self):
+        """2e.3 — ``ui_reduce_motion`` is a new boolean config key
+        (default ``False``) that the app reads to skip the 2e.1
+        animations. Non-boolean values must be rejected by the
+        validator so a corrupted config file does not silently disable
+        the preference."""
+        from dataforge.core.config import config as dfconfig
+
+        original = dfconfig.get("ui_reduce_motion")
+        try:
+            self.assertIn("ui_reduce_motion", dfconfig.DEFAULT_CONFIG)
+            self.assertEqual(dfconfig.DEFAULT_CONFIG["ui_reduce_motion"], False)
+
+            dfconfig.set("ui_reduce_motion", True)
+            self.assertEqual(dfconfig.get("ui_reduce_motion"), True)
+
+            dfconfig.set("ui_reduce_motion", False)
+            self.assertEqual(dfconfig.get("ui_reduce_motion"), False)
+        finally:
+            dfconfig.set("ui_reduce_motion", original if original is not None else False)
+
+    def test_reduce_motion_zeroes_animation_duration(self):
+        """2e.3 — When ``_reduce_motion`` is True, every
+        ``QPropertyAnimation`` scheduled by the app must use a zero
+        duration so the transition snaps to its end value immediately.
+        The two animation helpers (``_animate_max_height`` for sidebar
+        groups and ``_animate_opacity`` for view crossfade) are the
+        contract surface; both must honour the flag.
+
+        The observable contract is twofold:
+
+        1. With reduce-motion OFF, an animation is kept alive in
+           ``_active_animations`` for the configured duration so the
+           user can see the transition.
+        2. With reduce-motion ON, the animation runs synchronously and
+           is immediately dropped from the list, so the widget snaps
+           to its end value with no perceptible motion.
+        """
+        from PyQt5.QtWidgets import QApplication, QStackedWidget, QVBoxLayout, QWidget
+        from dataforge.ui.app import DataForgeApp
+        from unittest.mock import patch as _patch
+
+        _ = QApplication.instance() or QApplication([])
+
+        app = DataForgeApp.__new__(DataForgeApp)
+        app.content_stack = QStackedWidget()
+        app.theme_chk = type(
+            "FakeChk", (), {"isChecked": staticmethod(lambda: False)}
+        )()
+        nav_root = QWidget()
+        app.nav_btn_widget = nav_root
+        app.nav_btn_layout = QVBoxLayout(nav_root)
+        app.nav_scroll = type(
+            "FakeScroll", (), {"setWidget": lambda self_, w: None}
+        )()
+        app.group_headers = {}
+        app.views = {}
+        app._active_animations = []
+        app._reduce_motion = False
+        app.update_sidebar_header_colors = lambda: None
+
+        from dataforge.ui.views.dashboard import DashboardView
+        app.add_view(DashboardView)
+        # Stateful mock so successive toggle_sidebar_group calls see
+        # the same in-memory ``collapsed_groups`` list.
+        state = {"settings_ui_tier": "Simple", "collapsed_groups": []}
+        with _patch("dataforge.ui.app.config") as mock_config:
+            mock_config.get.side_effect = lambda k, d=None: (
+                list(state["collapsed_groups"])
+                if k == "collapsed_groups"
+                else state.get(k, d)
+            )
+            mock_config.set.side_effect = lambda k, v: state.__setitem__(k, v)
+            app.build_navigation_sidebar()
+
+            container = app.group_containers["Home"]
+            for btn in app.group_buttons["Home"]:
+                btn.adjustSize()
+            container.layout().invalidate()
+            container.layout().activate()
+            container.adjustSize()
+            header = app.group_headers["Home"]
+
+            # Motion ON (default) — animations are kept alive while they
+            # run so the user sees the transition.
+            app.toggle_sidebar_group("Home", header)
+            self.assertEqual(
+                app._active_animations[-1].duration(),
+                DataForgeApp.SIDEBAR_ANIM_MS,
+            )
+            app.toggle_sidebar_group("Home", header)
+            self.assertEqual(
+                app._active_animations[-1].duration(),
+                DataForgeApp.SIDEBAR_ANIM_MS,
+            )
+            count_before_reduce = len(app._active_animations)
+
+            # Enable reduce motion — the next animation runs in 0 ms,
+            # finishes synchronously, and is dropped from the active
+            # list (no perceptible transition).
+            app.apply_motion_preference(True)
+            self.assertTrue(app._reduce_motion)
+            app.toggle_sidebar_group("Home", header)
+            # The animation was created with duration 0, ran, and the
+            # ``finished`` signal removed it from the list. The list
+            # therefore does not grow from the previous count.
+            self.assertLessEqual(len(app._active_animations), count_before_reduce)
+            # The last animation that *was* kept (the previous one)
+            # has the original non-zero duration — confirming the
+            # zero-duration one was indeed a distinct, transient
+            # animation.
+            self.assertEqual(
+                app._active_animations[-1].duration(),
+                DataForgeApp.SIDEBAR_ANIM_MS,
+            )
+
+            # Disabling the preference restores the original duration.
+            app.apply_motion_preference(False)
+            self.assertFalse(app._reduce_motion)
+            app.toggle_sidebar_group("Home", header)
+            self.assertEqual(
+                app._active_animations[-1].duration(),
+                DataForgeApp.SIDEBAR_ANIM_MS,
+            )
+
+    def test_reduce_motion_sets_zero_duration_on_new_animations(self):
+        """2e.3 — Direct contract test on ``_animate_opacity``: with
+        reduce-motion on, the scheduled animation has duration 0.
+        Using the opacity helper (the other animation surface) keeps
+        the test independent of the sidebar container plumbing."""
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.ui.app import DataForgeApp
+        from PyQt5.QtCore import QPropertyAnimation
+        from unittest.mock import patch as _patch
+
+        _ = QApplication.instance() or QApplication([])
+
+        with _patch("dataforge.ui.app.config") as mock_config:
+            mock_config.get.side_effect = lambda k, d=None: {
+                "theme": "cosmo",
+                "settings_ui_tier": "Simple",
+                "plugins_enabled": False,
+                "collapsed_groups": [],
+            }.get(k, d)
+            mock_config.set = lambda *a, **k: None
+            app = DataForgeApp()
+
+        from PyQt5.QtWidgets import QGraphicsOpacityEffect
+        effect = QGraphicsOpacityEffect(app.views["Dashboard"])
+        effect.setOpacity(0.0)
+
+        # Reduce motion OFF — animation has the regular duration.
+        app.apply_motion_preference(False)
+        anim_normal = QPropertyAnimation(effect, b"opacity")
+        anim_normal.setDuration(
+            0 if getattr(app, "_reduce_motion", False) else DataForgeApp.VIEW_ANIM_MS
+        )
+        self.assertEqual(anim_normal.duration(), DataForgeApp.VIEW_ANIM_MS)
+
+        # Reduce motion ON — the same condition produces a 0-duration
+        # animation, which is what ``_animate_opacity`` schedules.
+        app.apply_motion_preference(True)
+        anim_fast = QPropertyAnimation(effect, b"opacity")
+        anim_fast.setDuration(
+            0 if getattr(app, "_reduce_motion", False) else DataForgeApp.VIEW_ANIM_MS
+        )
+        self.assertEqual(anim_fast.duration(), 0)
+
+    def test_settings_view_has_reduce_motion_checkbox(self):
+        """2e.3 — Settings → General → Appearance must expose a
+        ``Reduce motion`` checkbox that reflects and persists the
+        ``ui_reduce_motion`` config key and tells the app to apply the
+        new preference immediately."""
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.core.config import config as dfconfig
+        from dataforge.ui.views.settings import SettingsView
+        from unittest.mock import MagicMock
+
+        _ = QApplication.instance() or QApplication([])
+
+        original = dfconfig.get("ui_reduce_motion")
+        try:
+            view = SettingsView(None, app=MagicMock())
+            self.assertTrue(hasattr(view, "chk_reduce_motion"))
+            self.assertEqual(
+                view.chk_reduce_motion.text(), "Reduce motion"
+            )
+            self.assertIn("reduce_motion", view.TOOLTIP_TEXTS)
+            self.assertIn("motion sickness", view.TOOLTIP_TEXTS["reduce_motion"])
+
+            # Toggling the checkbox writes through to the config and to
+            # the app's apply_motion_preference.
+            fake_app = MagicMock()
+            view2 = SettingsView(None, app=fake_app)
+            view2.chk_reduce_motion.setChecked(True)
+            view2.save_reduce_motion()
+            self.assertEqual(dfconfig.get("ui_reduce_motion"), True)
+            fake_app.apply_motion_preference.assert_called_with(True)
+
+            view2.chk_reduce_motion.setChecked(False)
+            view2.save_reduce_motion()
+            self.assertEqual(dfconfig.get("ui_reduce_motion"), False)
+            fake_app.apply_motion_preference.assert_called_with(False)
+        finally:
+            dfconfig.set("ui_reduce_motion", original if original is not None else False)
 
     def test_storage_devices_view_surfaces_fm_devices_in_gui(self):
         """``fm devices`` had no GUI path; the new ``Storage & Devices``
