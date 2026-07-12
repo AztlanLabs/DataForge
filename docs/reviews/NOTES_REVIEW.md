@@ -17,10 +17,11 @@ and consolidated here as the single source of truth for these review notes.
 > they carried forward to WS-B, **which is now closed — S4–S13 are all fixed**
 > (re-verified 2026-07-12; see [`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md) and
 > [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md)). The tables below
-> (§1–§3) are kept as-is as the frozen record of what the audit found and
-> verified at the time — including the original "224"/`docs/reviews/01`
-> quotes in §2 and the "still open (WS-B)" markers for S4–S10, which are
-> evidence of the state at audit time, not a live claim.
+> (§1–§3) retain their audit-time finding descriptions and `path:line`
+> evidence; **status cells have been updated to reflect WS-B closure** so no
+> row reads "open" for a fixed item. The verbatim "224"/`docs/reviews/01`
+> quotes in §2 are preserved as evidence of the original doc defect, not a
+> live claim.
 
 ---
 
@@ -115,8 +116,8 @@ new section should be created.
 | Scanner skips symlinks | ✅ | `dataforge/core/scanner.py:57` — `if entry.is_symlink():` + `follow_symlinks=False` on dir/file checks |
 | Cache thread-safe (lock+WAL) | ✅ | Lock-wrapped methods + `PRAGMA journal_mode=WAL` in cache module |
 | Integrity uses SHA-256, not MD5 | ✅ | Config default `hash_algorithm = sha256`; dedup byte-verifies groups |
-| Forensic report HTML-injectable (S2) | ✅ **Still open** | `dataforge/modules/forensics.py:581-625` — no `html.escape()` on interpolated values |
-| Trash-restore trusts .trashinfo (S4) | ✅ **Still open** | `dataforge/modules/recovery.py:225-250` — `original_path` used directly as `shutil.move` destination with `os.makedirs` |
+| Forensic report HTML-injectable (S2) | ✅ Fixed (WS-A) | Was open at `dataforge/modules/forensics.py:581-625`; interpolated values are now `html.escape()`d (`test_forensic_report_html_escapes_script_filename`) |
+| Trash-restore trusts .trashinfo (S4) | ✅ Fixed (WS-B) | Was open at `dataforge/modules/recovery.py:225-250`; `_is_safe_restore_path` now confines destinations and blocks `..` traversal |
 | Surrounding paths `modules/cleaner.py`, `core/actions/filters.py`, `core/provider.py` (lines 207-209) | ⚠️ **Stale** | Actual paths are `dataforge/modules/cleaner.py`, `dataforge/core/actions/filters.py`, `dataforge/core/provider.py` |
 | Line 89: "adapter around `modules/`" | ⚠️ **Stale** | Should be `dataforge/modules/` |
 
@@ -283,14 +284,14 @@ the full verified status of all 13 security findings from
 
 | # | Action | Effort | Status |
 |---|--------|--------|--------|
-| 2.1 | Fix S2 — add `html.escape()` to forensic HTML report | 30 min | ✅ Done |
-| 2.2 | Fix S4 — confine trash-restore paths, block `..` traversal | 30 min | ⏳ Open (WS-B) |
-| 2.3 | Fix S7 — add minimum-age filter for /tmp, skip sockets/FIFOs | 30 min | ⏳ Open (WS-B) |
-| 2.4 | Fix S5 — plugin trust model (opt-in flag, load logging) | 15 min | ⏳ Open (WS-B) |
-| 2.5 | Fix S6 — rename to "best-effort overwrite", remove trash fallback | 15 min | ⏳ Open (WS-B) |
-| 2.6 | Fix S8 — write hash files with `0o600` | 10 min | ⏳ Open (WS-B) |
-| 2.7 | Fix S9 — switch to `defusedxml` | 10 min | ⏳ Open (WS-B) |
-| 2.8 | Fix S10 — validate config types/ranges/enums on load | 30 min | ⏳ Open (WS-B) |
+| 2.1 | Fix S2 — add `html.escape()` to forensic HTML report | 30 min | ✅ Done (WS-A) |
+| 2.2 | Fix S4 — confine trash-restore paths, block `..` traversal | 30 min | ✅ Done (WS-B) |
+| 2.3 | Fix S7 — add minimum-age filter for /tmp, skip sockets/FIFOs | 30 min | ✅ Done (WS-B) |
+| 2.4 | Fix S5 — plugin trust model (opt-in flag, load logging) | 15 min | ✅ Done (WS-B) |
+| 2.5 | Fix S6 — rename to "best-effort overwrite", remove trash fallback | 15 min | ✅ Done (WS-B) |
+| 2.6 | Fix S8 — write hash files with `0o600` | 10 min | ✅ Done (WS-B) |
+| 2.7 | Fix S9 — switch to `defusedxml` | 10 min | ✅ Done (WS-B) |
+| 2.8 | Fix S10 — validate config types/ranges/enums on load | 30 min | ✅ Done (WS-B) |
 
 ### Priority 3 — Structural improvements
 
