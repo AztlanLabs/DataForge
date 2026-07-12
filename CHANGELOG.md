@@ -10,13 +10,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Commit convention enforcement via `.githooks/commit-msg`
 - Documentation maintenance rules in CONTRIBUTING.md
+- GitHub Actions CI (`.github/workflows/ci.yml`): pytest + coverage, ruff, mypy, and pip-audit on every push/PR to `develop`/`main`
+- `.pre-commit-config.yaml`: trailing-whitespace/EOF/merge-conflict checks plus `ruff --fix`
+- `.github/dependabot.yml`: weekly pip + GitHub Actions update PRs
+- ruff, black, mypy, and coverage configuration in `pyproject.toml`
+- Regression test guarding the forensic HTML report against `<script>`-tag filenames
 
 ### Changed
 - Updated all documentation cross-references after review restructure
+- Migrated package metadata (name, version, dependencies, `fm` entry point) from `setup.py` into `pyproject.toml` (PEP 621); `setup.py` is now a thin `setup()` shim
+- Pinned lower-bound versions for previously-unconstrained runtime dependencies (click, rich, tqdm, pandas, send2trash, pypdf, pymupdf, opencv-python-headless)
 
 ### Fixed
 - Broken links in ARCHITECTURE.md and TECHNICAL_SOURCE_OF_TRUTH.md
 - Stale path prefixes (missing `dataforge/` prefix)
+- Removed unused imports, dead variable assignments, and ambiguous single-letter loop variables flagged by ruff across `dataforge/` and `tests/`
+- `fm devices` used a backslash escape sequence inside f-string braces, which is a `SyntaxError` on Python <3.12 despite the documented Python 3.10+ minimum
+
+### Security
+- **S2 (Fixed)**: Forensic HTML report was vulnerable to stored HTML/JS injection — every interpolated value is now passed through `html.escape()`
 
 ## [0.1.0] - 2026-07-11
 
