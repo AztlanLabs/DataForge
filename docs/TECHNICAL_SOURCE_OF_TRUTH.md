@@ -23,7 +23,7 @@ It is intended to answer four questions for a new maintainer:
 
 This document is based on the current source files in the repository, not on intended behavior.
 
-The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5** and several new modules were added after this document was written. Some GUI/file-by-file sections may not be fully re-audited. A complete review of correctness, security, and staleness is maintained in [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md). Key points: 254 tests pass, integrity defaults to SHA-256 (not MD5), the scanner no longer follows symlinks, and the SQLite cache is thread-safe. Open findings include forensic-report HTML injection (S2), trash-restore path traversal (S4), and System Cleanup over-classification (S7).
+The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5** and several new modules were added after this document was written. Some GUI/file-by-file sections may not be fully re-audited. A complete review of correctness, security, and staleness is maintained in [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md). Key points: 255 tests pass, integrity defaults to SHA-256 (not MD5), the scanner no longer follows symlinks, and the SQLite cache is thread-safe. Open findings include forensic-report HTML injection (S2), trash-restore path traversal (S4), and System Cleanup over-classification (S7).
 
 ## Scope
 
@@ -852,7 +852,7 @@ Integration and cross-layer tests:
 
 #### `tests/test_comprehensive.py`
 
-This module now imports and passes — `rename_with_regex` was restored in `dataforge/core/operations/files.py`. The whole suite collects and runs green (254 tests). The coverage list below is accurate. See [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) for verification details.
+This module now imports and passes — `rename_with_regex` was restored in `dataforge/core/operations/files.py`. The whole suite collects and runs green (255 tests). The coverage list below is accurate. See [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) for verification details.
 
 Comprehensive unit and functional test suite covering every layer:
 

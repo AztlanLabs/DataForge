@@ -23,7 +23,7 @@ The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5**, and new modules (ha
 | **🔍 Go deep into data** | Forensic file carving, GPS metadata stripping, disk SMART health, password strength analysis, trash recovery — extract what's hidden |
 | **⚡ Unified interface** | Terminal and desktop — choose your workflow. Same features, same results, same safety standards — no tool switching |
 | **🧩 Extensible** | Action Builder pipeline for custom multi-step workflows; plugin system for custom views; scriptable CLI — build your own workflows |
-| **🛡️ Production-ready** | 254 passing tests, thread-safe batch operations, dry-run previews, cancellation support, detailed logging — trust the tool |
+| **🛡️ Production-ready** | 255 passing tests, thread-safe batch operations, dry-run previews, cancellation support, detailed logging — trust the tool |
 | **🚀 Automation at scale** | Parallel hashing, batch operations on thousands of files, configurable worker threads, progress tracking, cancellation — process like a pro |
 | **🔐 Enterprise features** | Role-based experience levels (Basic/Advanced/Expert), audit logging, integrity verification, forensic reports — audit-ready |
 
@@ -76,8 +76,8 @@ The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5**, and new modules (ha
 | **Cache** | `~/.dataforge/cache.db` (SQLite hash cache, thread-safe with WAL, parallel hashing) |
 | **Logging** | `~/.dataforge/app.log` (rotating, 5 MB / 3 backups, full audit trail) |
 | **Architecture** | Layered: core primitives → operations → service layer → modules → GUI/CLI orchestration (shared logic, zero duplication) |
-| **Tests** | 254 passing (`pytest`, full coverage across all feature layers, production-grade quality) |
-| **Build** | `setup.py` (CLI/core), `build_exe.py` (PyInstaller → standalone desktop bundles, one-file release mode) |
+| **Tests** | 255 passing (`pytest`, full coverage across all feature layers, production-grade quality) |
+| **Build** | `pyproject.toml` (CLI/core packaging), `build_exe.py` (PyInstaller → standalone desktop bundles, one-file release mode) |
 
 ## Quick Start
 
@@ -118,10 +118,10 @@ PYTHONPATH=. python -m dataforge.cli --help
 ### Verify the Build
 
 ```bash
-PYTHONPATH=. pytest -q  # 254 tests pass
+PYTHONPATH=. pytest -q  # 255 tests pass
 ```
 
-Full test suite passes — 254 tests. All correctness fixes are verified. See [`docs/reviews/AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md) and [`docs/reviews/NOTES_REVIEW.md`](./docs/reviews/NOTES_REVIEW.md) for the full audit.
+Full test suite passes — 255 tests. All correctness fixes are verified. See [`docs/reviews/AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md) and [`docs/reviews/NOTES_REVIEW.md`](./docs/reviews/NOTES_REVIEW.md) for the full audit.
 
 ### Build desktop executables
 
@@ -185,7 +185,7 @@ A comprehensive engineering, security, and UX audit lives under [`docs/reviews/`
 | **`dataforge/ui/`** | PyQt5 desktop shell, 14 built-in views, widget library, plugin loader, design-token module (`theme_tokens.py`) |
 | **`dataforge/ui/views/`** | Dashboard, Search, Duplicates, Action Builder, Tools, Media, System Cleanup, Performance, Recovery, Metadata, Hardware, Forensics, Settings, About |
 | **`dataforge/ui/plugins/`** | Plugin system; bundled example: Metadata Cleaner plugin |
-| **`tests/`** | 254 passing tests: comprehensive, integration, contract, new-modules suites, token-regression guard |
+| **`tests/`** | 255 passing tests: comprehensive, integration, contract, new-modules suites, token-regression guard |
 | **`docs/`** | Architecture, CLI reference, GUI workflows, development guide, audit reviews |
 | **`build/`, `dist/`** | Generated build artifacts (output only, not maintained source) |
 
@@ -230,17 +230,17 @@ The **two user interfaces are thin adapters** — all the real superpowers live 
 
 ### ✅ Fixed in the 2026-07-10 Audit Pass
 
-- **Correctness** — 254 tests pass. All correctness bugs fixed: MD5→SHA-256 defaults, symlink-loop scope escape, thread-safe cache, JSON error handling, SHA-512 crash, etc.
+- **Correctness** — 255 tests pass. All correctness bugs fixed: MD5→SHA-256 defaults, symlink-loop scope escape, thread-safe cache, JSON error handling, SHA-512 crash, etc.
 - **UI/UX overhaul** — Phase 2a/2b shipped: surface brightness fix, themed checkboxes/combos, design-token module (`ui/theme_tokens.py`) with AA-validated colours replacing three legacy colour vocabularies, type-scale constants, per-widget colour migration.
 - **Security findings** — classified and tracked (open security items in audit report; fixable at identified seams)
 - **Documentation** — ARCHITECTURE, CLI_REFERENCE, GUI_WORKFLOWS, DEVELOPMENT_GUIDE all verified against current PyQt5 source
-- **Packaging** — setup.py and build_exe.py verified; release bundle working
+- **Packaging** — pyproject.toml and build_exe.py verified; release bundle working
 
 ### 🔄 Open / Future
 
 - **CI** — The tree is under git, but tests don't run in CI yet. Wiring CI is the highest-leverage next step (Phase 0 in audit roadmap).
 - **Device Manager GUI** — CLI has `fm devices`; no dedicated GUI view yet (lower priority, works via CLI).
-- **Numbered release** — No public release number yet. `setup.py` has internal version `0.1.0` (development marker).
+- **Numbered release** — No public release number yet. `pyproject.toml` has internal version `0.1.0` (development marker).
 - **Debug build artifacts** — `build/debug` and `dist/debug` predate the PyQt5 migration; `build/release` is current. Run `python build_exe.py debug` to refresh.
 
 ### 📋 Security & Audit
@@ -255,7 +255,7 @@ See [`docs/reviews/AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md) for sev
 ## Developer & Deployment Notes
 
 - **Repo layout** — The Python package lives in `dataforge/` at the repository root. Run commands from the repo root.
-- **Dependency split** — `setup.py` = CLI + core only. `requirements.txt` = full stack (GUI/media). Install both for development.
+- **Dependency split** — `pyproject.toml` = CLI + core only. `requirements.txt` = full stack (GUI/media). Install both for development.
 - **User data** — `~/.dataforge/config.json`, cache.db, app.log — all created on first run, no migration needed.
 - **Build artifacts** — `build/` and `dist/` are generated; don't maintain them. `release` profile is current; refresh `debug` via `python build_exe.py debug`.
 - **Next milestone** — Put under version control + wire CI/CD (see [`docs/reviews/IMPROVEMENT_PLAN.md`](./docs/reviews/IMPROVEMENT_PLAN.md), Phase 0).

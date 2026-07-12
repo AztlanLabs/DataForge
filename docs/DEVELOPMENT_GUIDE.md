@@ -28,7 +28,7 @@ pip install -e .
 ### Why both commands matter
 
 - `requirements.txt` contains the runtime stack (CLI + GUI/media). `requirements-dev.txt` adds build/test tooling (`pytest`, `pyinstaller`) via `-r requirements.txt`.
-- `setup.py` installs the package and the `fm` console script.
+- `pyproject.toml` defines the package metadata and the `fm` console script; `setup.py` is a thin shim so `pip install -e .` and `python setup.py sdist` still work.
 
 If you skip the editable install, use `PYTHONPATH=. python -m dataforge.cli ...` instead of `fm ...`.
 
@@ -54,13 +54,13 @@ PYTHONPATH=. pytest -q
 
 The nested project layout means plain `pytest -q` may not resolve `dataforge` unless the package is installed or the project root is placed on `PYTHONPATH`.
 
-The full suite passes — 254 tests. The earlier collection failure (a stale `rename_with_regex` import) has been fixed. See [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) for verification details.
+The full suite passes — 255 tests. The earlier collection failure (a stale `rename_with_regex` import) has been fixed. See [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) for verification details.
 
 ## Packaging and distribution
 
 ### Python package
 
-- `setup.py` defines the package name `dataforge`
+- `pyproject.toml` defines the package name `dataforge`
 - console script: `fm=dataforge.cli:main`
 
 ### Executable builds
@@ -165,7 +165,7 @@ New top-level screens and plugins should inherit from `BaseView` and use its sha
 - **CI is not yet wired.** Tests do not run automatically on push. Setting up CI/CD is the highest-leverage next step — see [`reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md), Phase 0.
 - The plugin loader registers every discovered `BaseView` subclass in `dataforge/ui/plugins/`; plugin import failures are now logged (via `logger.error`) and skipped. Plugins are arbitrary code executed with full app privileges — only add plugins you trust (see `reviews/02`, S5).
 - The stray empty `26.1.2` file has been removed and a root `.gitignore` added (the tree still needs to be put under version control).
-- The current dependency story is split: `setup.py` is enough for the core package/CLI entrypoint; `requirements.txt` provisions the full GUI/media runtime, and `requirements-dev.txt` adds the build/test tooling.
+- The current dependency story is split: `pyproject.toml` is enough for the core package/CLI entrypoint; `requirements.txt` provisions the full GUI/media runtime, and `requirements-dev.txt` adds the build/test tooling.
 - Settings are saved immediately through `ConfigManager.set()`, so UI changes often persist at the moment a control is saved rather than on app shutdown.
 
 ## Recommended onboarding order

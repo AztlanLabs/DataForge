@@ -14,7 +14,7 @@
 | Before push | All tests pass; commit message matches convention |
 | Default branch | `develop` — all feature work merges here |
 | Stable branch | `main` — tagged releases only |
-| Version source | `setup.py` `version=` field |
+| Version source | `pyproject.toml` `[project] version` field |
 | Hook setup | `git config core.hooksPath .githooks` |
 | Changelog | [Keep a Changelog](https://keepachangelog.com/) format in `CHANGELOG.md` |
 
@@ -68,7 +68,8 @@ DataForge/
 ├── tests/                       # pytest test suite
 ├── docs/                        # Documentation
 ├── .githooks/                   # Commit-msg hook
-├── setup.py                     # Package definition + version
+├── pyproject.toml               # Package metadata + version, tool config (ruff/black/mypy/coverage)
+├── setup.py                     # Thin `setup()` shim (metadata lives in pyproject.toml)
 ├── requirements.txt             # Runtime dependencies
 ├── requirements-dev.txt         # Dev dependencies (pytest, pyinstaller)
 ├── build_exe.py                 # PyInstaller build script
@@ -142,7 +143,7 @@ type(scope): short description
 | `modules` | Feature modules (search, duplicates, forensics, hardware, etc.) |
 | `actions` | Action Builder pipeline engine |
 | `design` | Theme tokens, QSS, palette, type scale, visual design |
-| `build` | setup.py, build_exe.py, PyInstaller specs, requirements |
+| `build` | pyproject.toml, setup.py, build_exe.py, PyInstaller specs, requirements |
 | `docs` | Everything under docs/ and root README |
 | `tests` | Test suite |
 | `repo` | .gitignore, CI config, git hooks, repo structure |
@@ -270,7 +271,7 @@ DataForge follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH
 
 ### Version Lifecycle
 
-| Stage | Branch | `setup.py` version | Git tag |
+| Stage | Branch | `pyproject.toml` version | Git tag |
 | --- | --- | --- | --- |
 | Development | `develop` | `0.1.0` or `0.1.0.dev` | — |
 | Alpha | `develop` | `0.1.0-alpha.N` | `v0.1.0-alpha.N` |
@@ -296,8 +297,8 @@ git push origin develop --tags
 # Beta/RC/GA on main
 git checkout main
 git merge develop --no-ff
-# bump version in setup.py
-git add setup.py && git commit -m "chore(release): bump to 0.1.0-beta.1"
+# bump version in pyproject.toml
+git add pyproject.toml && git commit -m "chore(release): bump to 0.1.0-beta.1"
 git tag v0.1.0-beta.1
 git push origin main --tags
 ```
@@ -309,7 +310,7 @@ git push origin main --tags
 ### Before Merging `develop` → `main`
 
 - [ ] `PYTHONPATH=. pytest -q` — all tests pass
-- [ ] `setup.py version=` matches intended tag
+- [ ] `pyproject.toml` `[project] version` matches intended tag
 - [ ] `CHANGELOG.md` updated (move [Unreleased] entries under new version heading)
 - [ ] `docs/` cross-references verified (no broken links)
 - [ ] `python setup.py sdist` succeeds
@@ -321,7 +322,7 @@ git push origin main --tags
 
 ```bash
 git checkout develop && git merge main && git push origin develop
-# bump setup.py to next pre-release, e.g. 0.1.1.dev
+# bump pyproject.toml to next pre-release, e.g. 0.1.1.dev
 ```
 
 ---
@@ -360,7 +361,7 @@ record the evidence — do not assume an older review is still accurate.
 | `dataforge/ui/theme_tokens.py` | `docs/ARCHITECTURE.md` |
 | `dataforge/core/actions/` | `docs/ARCHITECTURE.md`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md`, `docs/GUI_WORKFLOWS.md` |
 | `tests/` | `docs/DEVELOPMENT_GUIDE.md`, `README.md` (test count) |
-| `setup.py`, `build_exe.py`, `requirements*.txt` | `docs/DEVELOPMENT_GUIDE.md`, `README.md` |
+| `pyproject.toml`, `setup.py`, `build_exe.py`, `requirements*.txt` | `docs/DEVELOPMENT_GUIDE.md`, `README.md` |
 | Any user-facing change | `CHANGELOG.md` |
 
 ### When You Change Docs
@@ -368,7 +369,7 @@ record the evidence — do not assume an older review is still accurate.
 | Changed | Update |
 | --- | --- |
 | Add/rename/delete `docs/` file | `README.md`, `docs/DEVELOPMENT_GUIDE.md`, all files linking to it |
-| `README.md` | Verify claims match `docs/CLI_REFERENCE.md`, `docs/DEVELOPMENT_GUIDE.md`, `setup.py` |
+| `README.md` | Verify claims match `docs/CLI_REFERENCE.md`, `docs/DEVELOPMENT_GUIDE.md`, `pyproject.toml` |
 | `docs/CONTRIBUTING.md` | `.githooks/commit-msg` (if format rules change) |
 | Test count changes | `README.md`, `docs/DEVELOPMENT_GUIDE.md`, this file (Quick Reference) |
 

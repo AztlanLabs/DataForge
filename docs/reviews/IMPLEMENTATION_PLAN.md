@@ -1,7 +1,7 @@
 # Implementation Plan — Sequenced Execution & Release Roadmap
 
 **Date:** 2026-07-11 · **Last verified:** 2026-07-11
-**Target release:** `v0.2.0` · **Current version:** `0.1.0` (`setup.py`)
+**Target release:** `v0.2.0` · **Current version:** `0.1.0` (`pyproject.toml`)
 
 ---
 
@@ -114,7 +114,7 @@ Open the `develop`→`main` PR **only when every work-stream (A–G) is merged**
 **Definition of releasable (mirrors CONTRIBUTING §7):**
 
 - [ ] `PYTHONPATH=. pytest -q` — all tests pass
-- [ ] `setup.py version=` bumped to `0.2.0`
+- [ ] `pyproject.toml` `[project] version` bumped to `0.2.0`
 - [ ] `CHANGELOG.md` — `[Unreleased]` entries moved under a `[0.2.0]` heading
 - [ ] `docs/` cross-references verified (no broken links)
 - [ ] `python setup.py sdist` succeeds
@@ -228,7 +228,7 @@ This is the "tackle any of them" master list.
 | Item | Title | Commit type | Ver | WS |
 | --- | --- | --- | --- | --- |
 | BR.1 | GitHub description + topics (forensics, automation, data-discovery) | — (repo settings) | — | G |
-| BR.2 | `setup.py` description updated with tagline | `chore(build)` | — | G |
+| BR.2 | `pyproject.toml` description updated with tagline | `chore(build)` | — | G |
 | BR.3 | GUI About shows "DataForge" + tagline | `feat(ui)` | MINOR | G |
 | BR.4 | Final Definition-of-Done sweep | `docs` | — | G |
 
@@ -423,18 +423,19 @@ refactor(modules): stream carving instead of buffering to memory
 
 ### WS-G — Brand & Release Polish → `v0.2.0-alpha.7`
 
-- **Where:** GitHub repo settings, `setup.py` description, GUI About dialog,
-  `EXECUTIVE_SUMMARY.md` Definition of Done. Items BR.1–BR.4.
+- **Where:** GitHub repo settings, `pyproject.toml` `[project] description`, GUI
+  About dialog, `EXECUTIVE_SUMMARY.md` Definition of Done. Items BR.1–BR.4.
 - **Why:** the brand tasks and DoD are the last open items on the healthy-project
   checklist; leaving them undone means the release ships with mismatched metadata and
   an unfinished DoD.
-- **How:** update the GitHub description/topics (repo setting, not a commit); update
-  the `setup.py` description with the tagline; show "DataForge" + tagline in About;
-  tick off the Definition of Done. Then open the release PR.
+- **How:** update the GitHub description/topics (repo setting, not a commit); add
+  a `description` field to `pyproject.toml`'s `[project]` table with the tagline;
+  show "DataForge" + tagline in About; tick off the Definition of Done. Then open
+  the release PR.
 
 **Representative commits:**
 ```
-chore(build): update setup.py description with the DataForge tagline
+chore(build): add DataForge tagline to pyproject.toml project description
 feat(ui): show DataForge name and tagline in the about dialog
 docs: tick off definition of done and open brand tasks
 ```
@@ -454,9 +455,9 @@ Once all seven alpha streams are merged and the §2.3 checklist passes
 # 1. Prep on develop
 git checkout develop
 PYTHONPATH=. pytest -q
-# bump setup.py version= to 0.2.0
+# bump pyproject.toml [project] version to 0.2.0
 # move CHANGELOG [Unreleased] entries under a new [0.2.0] - 2026-XX-XX heading
-git add setup.py CHANGELOG.md
+git add pyproject.toml CHANGELOG.md
 git commit -m "chore(release): bump to 0.2.0"
 
 # 2. Release PR develop -> main, then beta/rc/GA on main
@@ -470,7 +471,7 @@ git tag v0.2.0     && git push origin main --tags   # GA
 
 # 3. Back-merge and open next cycle
 git checkout develop && git merge main && git push origin develop
-# bump setup.py to 0.2.1.dev
+# bump pyproject.toml to 0.2.1.dev
 ```
 
 Pre-tag gate for every stable tag: `python setup.py sdist` and
