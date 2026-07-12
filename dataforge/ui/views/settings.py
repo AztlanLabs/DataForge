@@ -76,17 +76,19 @@ class SettingsView(BaseView):
 
         theme_layout = QHBoxLayout()
         theme_layout.addWidget(QLabel("Theme:", frame_theme))
-        self.cb_theme = QComboBox(frame_theme)
-        self.cb_theme.addItems(["Light (Cosmo)", "Dark (Darkly)"])
-        current_theme = config.get("theme", "cosmo")
-        if current_theme == "darkly":
-            self.cb_theme.setCurrentIndex(1)
-        else:
-            self.cb_theme.setCurrentIndex(0)
-        self.cb_theme.currentTextChanged.connect(self.change_theme)
-        theme_layout.addWidget(self.cb_theme)
+        self.lbl_theme = QLabel("", frame_theme)
+        self.lbl_theme.setProperty("variant", "primary")
+        theme_layout.addWidget(self.lbl_theme)
+        theme_hint = QLabel("  (change in the sidebar)", frame_theme)
+        theme_hint.setProperty("variant", "muted")
+        theme_layout.addWidget(theme_hint)
         theme_layout.addStretch()
         frame_theme_layout.addLayout(theme_layout)
+        if getattr(self, "app", None) and hasattr(self.app, "theme_chk"):
+            self.app.theme_chk.stateChanged.connect(self._sync_theme_label)
+            self._sync_theme_label(self.app.theme_chk.checkState())
+        else:
+            self.lbl_theme.setText("Light (Cosmo)")
 
         path_display_layout = QHBoxLayout()
         path_display_layout.addWidget(QLabel("Path Display:", frame_theme))
@@ -298,11 +300,18 @@ class SettingsView(BaseView):
         if getattr(self, "app", None) and hasattr(self.app, "update_sidebar_experience"):
             self.app.update_sidebar_experience()
 
-    def change_theme(self, text):
-        if "Dark" in text:
-            self.app.theme_chk.setChecked(True)
-        else:
-            self.app.theme_chk.setChecked(False)
+    def _sync_theme_label(self, _state=None):
+        """Mirror the sidebar Dark Mode checkbox as a read-only label.
+
+        The previous design had a second QComboBox here that also wrote to
+        config — when the user changed the theme, both the sidebar and the
+        Settings dropdown fought over the same key and the dropdown was
+        always one click out of sync. The sidebar checkbox is now the only
+        writable control; this label reflects its state for visibility."""
+        if not getattr(self, "lbl_theme", None):
+            return
+        is_dark = bool(self.app.theme_chk.isChecked()) if getattr(self, "app", None) else False
+        self.lbl_theme.setText("Dark (Darkly)" if is_dark else "Light (Cosmo)")
 
     def _autosave(self, key, value):
         """Persist a single setting and flash a transient 'Saved ✓' indicator.

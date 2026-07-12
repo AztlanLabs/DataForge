@@ -845,6 +845,27 @@ class ContractRegressionTests(unittest.TestCase):
             for key, value in snapshot.items():
                 dfconfig.set(key, value)
 
+    def test_settings_view_theme_label_mirrors_sidebar(self):
+        """The Settings theme control must mirror the sidebar Dark Mode
+        checkbox — only the sidebar is writable."""
+        from PyQt5.QtWidgets import QApplication
+        from PyQt5.QtCore import Qt
+
+        existing_app = QApplication.instance()
+        app = existing_app if existing_app is not None else QApplication([])
+
+        fake_app = MagicMock()
+        fake_app.theme_chk.isChecked.return_value = False
+        view = SettingsView(None, app=fake_app)
+        self.assertTrue(hasattr(view, "lbl_theme"))
+        self.assertFalse(hasattr(view, "cb_theme"))
+        view._sync_theme_label()
+        self.assertEqual(view.lbl_theme.text(), "Light (Cosmo)")
+
+        fake_app.theme_chk.isChecked.return_value = True
+        view._sync_theme_label()
+        self.assertEqual(view.lbl_theme.text(), "Dark (Darkly)")
+
     def test_cli_search_help_mentions_extension_sort_examples(self):
         runner = CliRunner()
 
