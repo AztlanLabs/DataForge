@@ -1013,6 +1013,44 @@ class ContractRegressionTests(unittest.TestCase):
                 + details
             )
 
+    def test_all_registered_views_smoke_mount(self):
+        """The 2d sidebar regrouping (and the 2d.2/2d.3/2d.4 view
+        changes) must keep every view mountable: instantiate each
+        registered view, give it a QApplication, and confirm it can be
+        added to a QStackedWidget without error. This is the WS-D
+        "smoke-mount every view" guard called out in IMPLEMENTATION_PLAN
+        §3 Testing gaps.
+        """
+        from PyQt5.QtWidgets import QApplication, QStackedWidget
+
+        _ = QApplication.instance() or QApplication([])
+
+        # Mirror the registration order in DataForgeApp.__init__.
+        candidates = [
+            ("Dashboard", "dataforge.ui.views.dashboard", "DashboardView"),
+            ("Search", "dataforge.ui.views.search", "SearchView"),
+            ("Duplicate Finder", "dataforge.ui.views.duplicates", "DuplicatesView"),
+            ("Automations", "dataforge.ui.views.automations", "AutomationsView"),
+            ("Media Tools", "dataforge.ui.views.media", "MediaView"),
+            ("Clean Up Space", "dataforge.ui.views.system_cleanup", "SystemCleanupView"),
+            ("Performance", "dataforge.ui.views.performance_view", "PerformanceView"),
+            ("File Recovery", "dataforge.ui.views.recovery_view", "RecoveryView"),
+            ("Metadata & EXIF", "dataforge.ui.views.metadata_view", "MetadataView"),
+            ("Hardware Info", "dataforge.ui.views.hardware_view", "HardwareView"),
+            ("Forensics", "dataforge.ui.views.forensics_view", "ForensicsView"),
+            ("Storage & Devices", "dataforge.ui.views.storage_devices", "StorageDevicesView"),
+            ("Settings", "dataforge.ui.views.settings", "SettingsView"),
+            ("About & Help", "dataforge.ui.views.about", "AboutView"),
+        ]
+        import importlib
+        stack = QStackedWidget()
+        for expected_title, module_name, class_name in candidates:
+            mod = importlib.import_module(module_name)
+            view_cls = getattr(mod, class_name)
+            view = view_cls(stack, app=MagicMock())
+            self.assertEqual(view.get_title(), expected_title)
+            self.assertIsNotNone(view.parent())
+
     def test_view_titles_use_task_oriented_names(self):
         """Sidebar labels were renamed to user-facing names
         (IMPROVEMENT_PLAN §2.3): Search & Organize → Search,
