@@ -32,7 +32,7 @@ The **architecture is genuinely good**: filesystem mutation is centralised throu
 
 2. **✅ CI now runs.** `.github/workflows/ci.yml` runs pytest + coverage, ruff (blocking), mypy (advisory), and pip-audit on every push/PR to `develop`/`main`.
 
-3. **◑ Security controls undercut the product's promises.** Integrity now uses SHA-256 (was MD5), symlinks no longer followed, and forensic-report XSS (S2) is fixed. Still open: trash-restore path traversal (S4), System Cleanup over-classification (S7). See **[`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md)**.
+3. **✅ Point-security backlog closed.** Integrity now uses SHA-256 (was MD5), symlinks no longer followed, and the full S1–S13 backlog is fixed across WS-A/WS-B (trash-restore confinement S4, System Cleanup safeguards S7, plugin-loader hardening S5, `0600` reports/credentials, `defusedxml`, config validation, executable-open confirm, decompression-bomb caps). The next tranche is **forensic-soundness architecture** (chain-of-custody, Evidence Mode, provenance), tracked as F1–F21 in **[`FORENSIC_SECURITY_REVIEW.md`](./FORENSIC_SECURITY_REVIEW.md)**. See **[`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md)**.
 
 4. **◑ UX is organised around developer modules, not user tasks.** Duplicate-sounding destinations, a Yes/No/Cancel file-vs-folder picker, inconsistent settings persistence, and experience-tier gating that hides features. The visual layer has been overhauled (token-driven QSS, type scale, per-widget colour migration). The interaction layer (7 fixes) and IA restructure are the open work in **[`IMPROVEMENT_PLAN.md`](./IMPROVEMENT_PLAN.md)**.
 
@@ -104,7 +104,7 @@ The **architecture is genuinely good**: filesystem mutation is centralised throu
 
 - [x] Under git with `.gitignore`. — [ ] Protected main branch and CI (pytest + ruff + mypy) green.
 - [x] `pytest` collects and passes all 255 tests. — [ ] Coverage tracked.
-- [ ] No crash on documented flags (done); hostile input still open for trash-restore (S4) and forensic reports (S2).
+- [x] No crash on documented flags; hostile-input backlog closed (S2 report XSS, S4 trash-restore, S9 XML, S13 bombs all fixed). Deeper parser-process isolation is future work (F13).
 - [x] SHA-256 is the default; integrity snapshots are self-describing; destructive dedup is collision-safe.
 - [ ] One consistent settings-persistence model and one product name across CLI/GUI/package.
 - [ ] Every CLI capability has a GUI path or documented reason it doesn't.

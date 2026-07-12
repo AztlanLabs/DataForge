@@ -13,11 +13,14 @@ and consolidated here as the single source of truth for these review notes.
 > staleness-caveat review (§4, Priority 3) are all done, tracked in
 > [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) WS-A. Priority 2's
 > S2 (§4) is also fixed — see [`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md).
-> Remaining Priority 2 items (S4–S10) are security fixes, not doc defects;
-> they carry forward to WS-B. The tables below (§1–§3) are kept as-is as
-> the frozen record of what the audit found and verified at the time -
-> including the original "224"/`docs/reviews/01` quotes in §2, which are
-> evidence of the defect, not a live claim.
+> Remaining Priority 2 items (S4–S10) were security fixes, not doc defects;
+> they carried forward to WS-B, **which is now closed — S4–S13 are all fixed**
+> (re-verified 2026-07-12; see [`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md) and
+> [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md)). The tables below
+> (§1–§3) are kept as-is as the frozen record of what the audit found and
+> verified at the time — including the original "224"/`docs/reviews/01`
+> quotes in §2 and the "still open (WS-B)" markers for S4–S10, which are
+> evidence of the state at audit time, not a live claim.
 
 ---
 
