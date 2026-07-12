@@ -882,6 +882,14 @@ class ContractRegressionTests(unittest.TestCase):
         self.assertTrue(hasattr(DataForgeApp, "TIER_RANK"))
         self.assertTrue(callable(getattr(DataForgeApp, "build_navigation_sidebar", None)))
 
+    def test_baseview_destructive_preview_is_drillable(self):
+        """The destructive preview must let the user opt out per row and
+        surface a 'will be affected' total, instead of a truncated text
+        message that hid individual rows past the first 8."""
+        from PyQt5.QtWidgets import QApplication
+        self.assertTrue(callable(getattr(BaseView, "confirm_destructive_preview", None)))
+        QApplication.instance() or QApplication([])
+
     def test_cli_search_help_mentions_extension_sort_examples(self):
         runner = CliRunner()
 

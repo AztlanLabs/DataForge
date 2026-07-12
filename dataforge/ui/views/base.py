@@ -1,8 +1,14 @@
-from PyQt5.QtWidgets import QWidget, QMessageBox, QTextEdit, QVBoxLayout, QPushButton, QDialog
+from PyQt5.QtWidgets import (
+    QWidget, QMessageBox, QTextEdit, QVBoxLayout, QHBoxLayout, QPushButton, QDialog,
+    QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QLabel, QDialogButtonBox
+)
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
 from abc import ABCMeta, abstractmethod
 import re
 
 from .. import dialogs
+from ...core.utils import format_size
 
 class QWidgetABCMeta(type(QWidget), ABCMeta):
     pass
@@ -85,6 +91,128 @@ class BaseView(QWidget, metaclass=QWidgetABCMeta):
             QMessageBox.No
         )
         return reply == QMessageBox.Yes
+
+    def confirm_destructive_preview(
+        self,
+        title,
+        summary,
+        items,
+        action_label="Proceed",
+        empty_message="No items to act on.",
+    ):
+        """Show a scrollable, per-row opt-out preview of a destructive op.
+
+        Each entry in ``items`` is a dict with optional keys:
+            - ``label`` (str, required) — the row's primary text
+            - ``detail`` (str) — secondary text shown right-aligned
+            - ``size_bytes`` (int) — included in the running total
+
+        Returns the list of items the user kept checked, in original order.
+        An empty list means the user cancelled or unchecked everything.
+
+        Replaces the previous QMessageBox with the first 8 lines + "… and
+        N more", which truncated destructive previews so the user could
+        not review individual rows."""
+        if not items:
+            QMessageBox.information(self, title, empty_message)
+            return []
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.resize(720, 480)
+        dialog.setModal(True)
+        layout = QVBoxLayout(dialog)
+
+        summary_label = QLabel(summary, dialog)
+        summary_label.setWordWrap(True)
+        summary_label.setProperty("variant", "warning")
+        layout.addWidget(summary_label)
+
+        toggle_row = QHBoxLayout()
+        toggle_row.setContentsMargins(0, 0, 0, 0)
+        toggle_label = QLabel("Untick a row to skip it:", dialog)
+        toggle_row.addWidget(toggle_label)
+        toggle_row.addStretch()
+        layout.addLayout(toggle_row)
+
+        table = QTableWidget(len(items), 3, dialog)
+        table.setHorizontalHeaderLabels(["", "Item", "Detail"])
+        table.verticalHeader().setVisible(False)
+        table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        table.setAlternatingRowColors(True)
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+
+        for row, item in enumerate(items):
+            chk = QTableWidgetItem()
+            chk.setFlags(chk.flags() | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            chk.setCheckState(Qt.Checked)
+            table.setItem(row, 0, chk)
+
+            label_item = QTableWidgetItem(str(item.get("label", "")))
+            label_font = QFont()
+            label_font.setBold(False)
+            label_item.setFont(label_font)
+            table.setItem(row, 1, label_item)
+
+            detail_text = str(item.get("detail", ""))
+            if "size_bytes" in item and item["size_bytes"] is not None:
+                size_text = format_size(int(item["size_bytes"]))
+                detail_text = f"{detail_text}  ·  {size_text}" if detail_text else size_text
+            table.setItem(row, 2, QTableWidgetItem(detail_text))
+
+        layout.addWidget(table, 1)
+
+        total_label = QLabel("", dialog)
+        total_label.setProperty("variant", "danger")
+        total_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        total_row = QHBoxLayout()
+        total_row.addStretch()
+        total_row.addWidget(total_label)
+        layout.addLayout(total_row)
+
+        def _refresh_total():
+            checked = 0
+            total_bytes = 0
+            for row, item in enumerate(items):
+                if table.item(row, 0).checkState() == Qt.Checked:
+                    checked += 1
+                    size = item.get("size_bytes")
+                    if size is not None:
+                        total_bytes += int(size)
+            if total_bytes:
+                total_label.setText(
+                    f"{checked} of {len(items)} items selected · {format_size(total_bytes)} will be affected"
+                )
+            else:
+                total_label.setText(f"{checked} of {len(items)} items selected")
+
+        _refresh_total()
+        table.itemChanged.connect(lambda _item: _refresh_total())
+
+        button_box = QDialogButtonBox(dialog)
+        cancel_btn = button_box.addButton("Cancel", QDialogButtonBox.RejectRole)
+        cancel_btn.setDefault(True)
+        cancel_btn.setAutoDefault(True)
+        proceed_btn = button_box.addButton(action_label, QDialogButtonBox.AcceptRole)
+        proceed_btn.setProperty("variant", "danger")
+        proceed_btn.setAutoDefault(False)
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+
+        result = dialog.exec_()
+        if result != QDialog.Accepted:
+            return []
+
+        kept = []
+        for row, item in enumerate(items):
+            if table.item(row, 0).checkState() == Qt.Checked:
+                kept.append(item)
+        return kept
 
     @staticmethod
     def summarize_completion(action_label, attempted, succeeded, failed=0, skipped=0, created=None):
