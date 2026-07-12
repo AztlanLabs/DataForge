@@ -329,6 +329,22 @@ git checkout develop && git merge main && git push origin develop
 
 Every code change must update the docs that reference it. Code and docs stay in lockstep.
 
+### Where / Why / How — the standard for every documented issue
+
+Any finding, task, or work-item in the docs (reviews, plans, source-of-truth) must
+answer three questions. A row that skips one is not done:
+
+| Question | Means | Example |
+| --- | --- | --- |
+| **Where** | Exact location — `path:line`, component, or doc section | `dataforge/modules/forensics.py:581-625` |
+| **Why** | The impact if left unfixed — the risk, defect, or user cost | Stored XSS in examiner context; disqualifying for court use |
+| **How** | The concrete fix, the seam it lands at, and the test that proves it | `html.escape()` every interpolated value + `<script>`-filename regression test |
+
+Never justify work with "the review says so." State the impact. This standard
+applies to `docs/reviews/`, `docs/TECHNICAL_SOURCE_OF_TRUTH.md`, and any new plan.
+Before citing a finding as still open, **verify it against the current code** and
+record the evidence — do not assume an older review is still accurate.
+
 ### When You Change Code
 
 | Changed | Update |
@@ -422,6 +438,12 @@ Verify:
 
 ### Rules
 
+- **Commit as soon as a logical task is complete** — do not batch several tasks
+  into one commit, and never leave finished work uncommitted. A completed task is
+  the commit boundary.
+- **Close a work-stream by tagging** — when a plan's work-stream is finished and
+  `PYTHONPATH=. pytest -q` is green, cut its `vX.Y.Z-alpha.N` tag on `develop`
+  before starting the next stream (see `docs/reviews/IMPLEMENTATION_PLAN.md` §2.2).
 - One commit per logical change
 - Sequential commits for the same feature (don't interleave)
 - Test commits after implementation (unless TDD)
@@ -476,3 +498,4 @@ Your task: [describe the task]
 | [`docs/reviews/EXECUTIVE_SUMMARY.md`](./reviews/EXECUTIVE_SUMMARY.md) | Audit status and backlog |
 | [`docs/reviews/AUDIT_FINDINGS.md`](./reviews/AUDIT_FINDINGS.md) | Bug and security tracker |
 | [`docs/reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md) | UX roadmap and phased plan |
+| [`docs/reviews/IMPLEMENTATION_PLAN.md`](./reviews/IMPLEMENTATION_PLAN.md) | Sequenced execution plan and `v0.2.0` release roadmap |
