@@ -47,7 +47,7 @@ The **architecture is genuinely good**: filesystem mutation is centralised throu
 | Item | Status |
 | --- | --- |
 | Stray `26.1.2` deleted; `.gitignore` added; repo under git | ✅ Done |
-| Test suite unbroken — 276 tests pass | ✅ Done |
+| Test suite unbroken — 301 tests pass | ✅ Done |
 | `sha512` added; `JSONDecodeError` caught on snapshot load | ✅ Done |
 | Surface brightness fix (light `#ffffff`→`#f7f7f8`, dark elevated `#26262c`) | ✅ Done |
 | Design-token module (`ui/theme_tokens.py`) — AA-validated, template-driven QSS/palette | ✅ Done |

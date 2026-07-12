@@ -3,9 +3,13 @@
 **Date:** 2026-07-10 · **Updated:** 2026-07-12 · **Last verified:** 2026-07-12
 **Consolidates** the old `03_UIUX_REVIEW.md` + `04_IMPROVEMENTS_AND_ROADMAP.md` + `05_VISUAL_DESIGN_SYSTEM.md` + `06_UIUX_IMPLEMENTATION_PLAN.md` + cross-cutting quality observations from `01_CODE_REVIEW_AND_BUGS.md`. No information was removed — this is a merge, not a rewrite.
 
-> **2026-07-12 update:** WS-C (Interaction Correctness), WS-D (IA, Naming & Parity), and now **WS-E (Motion, Empty/Error, A11y — items 2e.1–2e.7)** are all **shipped**. The next open phase is **WS-F** (architecture consolidation, items ARCH.1–ARCH.6). The test count is **301** (was 276 at the start of WS-E; +25 over seven 2e.x commits).
-
-> **2026-07-12 update:** Phases 2c (Interaction Correctness) and 2d (IA, Naming & Parity) are now **shipped** — see §6 below and [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) WS-C/WS-D. The test count is now **276** (was 255 at the start of WS-C). 2e (Motion, Empty/Error, A11y) is the next open phase.
+> **2026-07-12 update:** WS-C, WS-D, and WS-E are all **shipped**. The
+> 2c (Interaction Correctness), 2d (IA, Naming & Parity), and 2e (Motion,
+> Empty/Error, A11y) phases all landed — see §6 below and
+> [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) WS-C/WS-D/WS-E for
+> the per-item Where/Why/How. The next open phase is **WS-F** (architecture
+> consolidation, items ARCH.1–ARCH.6). The test count is **301** (was 255
+> at the start of WS-C; +46 over the three phases).
 
 ---
 
@@ -84,18 +88,18 @@ Issues: "Tools & Workflows" vs "Action Builder" both sound like multi-step build
 ### 2.5 Accessibility
 
 | Area | Gap | Status |
-| --- | --- | --- | --- |
+| --- | --- | --- |
 | Contrast | Two colours failed WCAG AA (`#5bc0de` 2.09:1, `#ffc107` 1.63:1) | ✅ Fixed — replaced by AA-validated token table |
-| Keyboard focus | `outline: 0` suppression removed; no focus-ring token rule yet | ⏳ Partly done (suppression gone; ring not yet styled) |
-| Screen readers | No `setAccessibleName`/`setAccessibleDescription` calls; status not announced | ⏳ Open |
-| Colour-only meaning | Group identity conveyed by colour alone | ⏳ Open (icons + text channel planned) |
-| Motion | Continuous spinner; no reduce-motion preference | ⏳ Open |
+| Keyboard focus | `outline: 0` suppression removed; no focus-ring token rule yet | ✅ Fixed — `focus_ring` token + 2px pre-allocated `:focus` QSS on buttons, inputs, lists, trees, tabs, checkbox indicator (2e.4) |
+| Screen readers | No `setAccessibleName`/`setAccessibleDescription` calls; status not announced | ✅ Fixed — sidebar buttons, status bar, and destructive Proceed button carry explicit `accessibleName` / `accessibleDescription` (2e.6) |
+| Colour-only meaning | Group identity conveyed by colour alone | ✅ Fixed — 18-icon monochrome SVG sidebar set + ⚠ colour-blind glyph on destructive Proceed (2e.6 / 2e.7) |
+| Motion | Continuous spinner; no reduce-motion preference | ✅ Fixed — `ui_reduce_motion` config + Settings checkbox gates both animations (2e.2 / 2e.3) |
 
-### 2.6 Empty & Error States
+### 2.6 Empty & Error States (✅)
 
-- Default empty message is generic: "No matching items were available for this action." → Each view needs a purposeful empty state with an example and primary action.
-- Errors surface as raw `str(error)` via `show_workflow_error` → route through friendly messages.
-- Windows-only no-ops (e.g. Recycle Bin scan) should state "Not supported on this platform yet."
+- ✅ **Purposeful empty states (2e.5):** the generic "No matching items were available for this action." has been replaced with `EmptyState` (`dataforge/ui/views/base.py`) — a `QFrame` with icon, title, body, and an optional action button. Wired into `SearchView` (toggles the tree on a 0-match result) and `DuplicatesView` (toggles the tree when a scan finds no duplicate groups); the body copy is updated per view so the user sees a context-specific next-step message.
+- ✅ **Friendly error messages (2e.5):** `friendly_error_message` maps the common Python exception types (`PermissionError`, `FileNotFoundError`, `IsADirectoryError`, `NotADirectoryError`, `OSError`, `ValueError`, `TimeoutError`, `KeyboardInterrupt`, `MemoryError`, `RecursionError`) to one-line user-readable summaries that end with a hint about the most likely cause; unknown types fall back to `str(error)`. `DataForgeApp.show_workflow_error` runs the exception through this helper and shows the friendly summary above the raw detail line; the status bar shows just the first line so the persistent message stays compact.
+- ⏳ **Windows-only no-ops** (e.g. Recycle Bin scan) should state "Not supported on this platform yet." — deferred to WS-I/WS-J.
 
 ---
 
@@ -127,18 +131,18 @@ Named scale constants in `theme_tokens.py` — `caption 11 / body 13 / subheadin
 | --- | --- |
 | Checkbox checkmark SVG glyph | ✅ Done |
 | QComboBox dropdown arrow (themed SVG) | ✅ Done |
-| Sidebar icon set (16–20 monochrome SVGs) | ⏳ Open — `ui/resources/icons/` doesn't exist yet |
-| Destructive-action icons paired with `danger` token | ⏳ Open |
+| Sidebar icon set (16–20 monochrome SVGs) | ✅ Done — 18 stroke-only SVGs in `dataforge/ui/resources/icons.py`, attached to every sidebar view + the expand/collapse chevrons + the sun/moon theme toggle, with the icon tone regenerated on every theme change (2e.7) |
+| Destructive-action icons paired with `danger` token | ✅ Done — destructive Proceed button is prefixed with a `⚠` glyph for the colour-blind channel when the caller's `action_label` is not already a destructive verb (2e.6) |
 
-### 3.4 Motion & Animation
+### 3.4 Motion & Animation (✅)
 
 | Item | Status |
 | --- | --- |
-| Sidebar group expand/collapse animation (QPropertyAnimation) | ⏳ Open — import exists but never instantiated |
-| View-switch crossfade (QGraphicsOpacityEffect) | ⏳ Open |
-| Braille-character spinner replaced by QProgressBar indeterminate | ⏳ Open — `spinner_chars` hack still active at `app.py:220-234` |
-| "Reduce motion" preference setting | ⏳ Open |
-| Focus-ring token + :focus outline rules | ⏳ Open — `outline: 0` is gone, but no replacement rule yet |
+| Sidebar group expand/collapse animation (`QPropertyAnimation`) | ✅ Done — per-group container widget with `setMaximumHeight` driven by `QPropertyAnimation`, 180ms OutCubic easing (2e.1) |
+| View-switch crossfade (`QGraphicsOpacityEffect`) | ✅ Done — every view gets a `QGraphicsOpacityEffect`; `switch_view` fades the new view in from 0 → 1 over 160ms (2e.1) |
+| Braille-character spinner replaced by `QProgressBar` indeterminate | ✅ Done — the `spinner_chars` / `spinner_label` / `spinner_timer` / `_animate_spinner` state is gone; `run_background` puts the native `QProgressBar` in indeterminate mode (`setRange(0, 0)`), and `update_progress` flips it to determinate when a known `total` arrives (2e.2) |
+| "Reduce motion" preference setting | ✅ Done — `ui_reduce_motion` config key + Settings → General → Appearance checkbox; `DataForgeApp.apply_motion_preference()` updates `self._reduce_motion` at runtime so the next animation zeroes its duration (2e.3) |
+| Focus-ring token + `:focus` outline rules | ✅ Done — `focus_ring` colour token, 2px pre-allocated transparent borders on buttons / inputs / lists / trees / tabs / checkbox indicator so toggling focus only changes the border colour without shifting the content (2e.4) |
 
 ---
 
@@ -174,12 +178,12 @@ Named scale constants in `theme_tokens.py` — `caption 11 / body 13 / subheadin
 - ✅ Corrupt/empty integrity snapshot → structured error — guards M2.
 - ✅ Symlink loop & out-of-tree symlink — guards M3/S3.
 - ✅ Token-regression suite (`tests/test_theme_tokens.py` — 30 tests) — guards 2b.1.
-- ⏳ Malicious `.trashinfo` with absolute/`..` Path → restore confined — guards S4.
+- ✅ Malicious `.trashinfo` with absolute/`..` Path → restore confined — guards S4 (`test_restore_from_trash_confines_*`, 2 tests).
 - ✅ Forensic HTML report with `<script>` in filename → output escaped — guards S2.
-- ⏳ System cleanup never flags user-supplied folder as blanket junk — guards S7.
-- ⏳ Config with out-of-range/unknown keys → clamped/ignored — guards S10.
-- ⏳ GUI smoke test (pytest-qt) — constructs each view and mounts/unmounts it.
-- ⏳ Settings persistence round-trip test — guards 2c.2.
+- ✅ System cleanup never flags user-supplied folder as blanket junk — guards S7 (`test_junk_scan_never_blanket_classifies_user_supplied_path`).
+- ✅ Config with out-of-range/unknown keys → clamped/ignored — guards S10 (`test_config_merge_validates_and_clamps_bad_values`).
+- ✅ GUI smoke test (pytest-qt) — constructs each view and mounts/unmounts it (`test_all_registered_views_smoke_mount` in WS-D).
+- ✅ Settings persistence round-trip test — guards 2c.2 (`test_settings_autosave_persists_on_change` in WS-C).
 
 ---
 

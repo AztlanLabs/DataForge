@@ -56,7 +56,7 @@ PYTHONPATH=. pytest -q
 
 The nested project layout means plain `pytest -q` may not resolve `dataforge` unless the package is installed or the project root is placed on `PYTHONPATH`.
 
-The full suite passes — 276 tests. The earlier collection failure (a stale `rename_with_regex` import) has been fixed. See [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) for verification details.
+The full suite passes — 301 tests. The earlier collection failure (a stale `rename_with_regex` import) has been fixed. See [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) for verification details.
 
 ## Packaging and distribution
 

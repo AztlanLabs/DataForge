@@ -886,7 +886,7 @@ Integration and cross-layer tests:
 
 #### `tests/test_comprehensive.py`
 
-This module now imports and passes — `rename_with_regex` was restored in `dataforge/core/operations/files.py`. The whole suite collects and runs green (276 tests). The coverage list below is accurate. See [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) for verification details.
+This module now imports and passes — `rename_with_regex` was restored in `dataforge/core/operations/files.py`. The whole suite collects and runs green (301 tests). The coverage list below is accurate. See [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) for verification details.
 
 Comprehensive unit and functional test suite covering every layer:
 

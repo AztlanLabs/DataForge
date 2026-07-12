@@ -121,7 +121,7 @@ PYTHONPATH=. python -m dataforge.cli --help
 PYTHONPATH=. pytest -q  # 301 tests pass
 ```
 
-Full test suite passes — 276 tests. All correctness fixes are verified. See [`docs/reviews/AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md) and [`docs/reviews/NOTES_REVIEW.md`](./docs/reviews/NOTES_REVIEW.md) for the full audit.
+Full test suite passes — 301 tests. All correctness fixes are verified. See [`docs/reviews/AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md) and [`docs/reviews/NOTES_REVIEW.md`](./docs/reviews/NOTES_REVIEW.md) for the full audit.
 
 ### Build desktop executables
 
@@ -185,6 +185,7 @@ A comprehensive engineering, security, and UX audit lives under [`docs/reviews/`
 | **`dataforge/modules/`** | Feature implementations (search, duplicates, organizer, cleaner, integrity, usage, reporting, forensics, hardware, recovery, metadata, performance, system_cleanup, password_tools, device_manager, file_signatures) |
 | **`dataforge/ui/`** | PyQt5 desktop shell, 14 built-in views, widget library, plugin loader, design-token module (`theme_tokens.py`) |
 | **`dataforge/ui/views/`** | Dashboard, Search, Duplicates, Media Tools, Metadata & EXIF, Automations (Action Builder + Tools), Clean Up Space, Storage & Devices, Performance, File Recovery, Forensics, Hardware Info, Settings, About & Help |
+| **`dataforge/ui/resources/icons.py`** | 18 stroke-only monochrome SVGs (sidebar icons, expand/collapse chevrons, sun/moon theme toggle) — 2e.7 |
 | **`dataforge/ui/plugins/`** | Plugin system; bundled example: Metadata Cleaner plugin |
 | **`tests/`** | 301 passing tests: comprehensive, integration, contract, new-modules suites, token-regression guard |
 | **`docs/`** | Architecture, CLI reference, GUI workflows, development guide, audit reviews |
