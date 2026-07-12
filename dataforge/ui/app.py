@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
     QLabel, QCheckBox, QStackedWidget, QProgressBar,
     QStatusBar, QMessageBox, QScrollArea, QFrame, QGraphicsOpacityEffect
 )
-from PyQt5.QtCore import QThread, pyqtSignal, Qt, QTimer, QPropertyAnimation, QEasingCurve
+from PyQt5.QtCore import QThread, pyqtSignal, Qt, QPropertyAnimation, QEasingCurve
 
 from .views.base import BaseView
 from .views.dashboard import DashboardView
@@ -231,26 +231,22 @@ class DataForgeApp(QMainWindow):
         self.status_label = QLabel("Ready", self)
         self.status_bar.addWidget(self.status_label, 1)
 
+        # 2e.2: the busy indicator is now a Qt-native ``QProgressBar``
+        # in indeterminate mode (``setRange(0, 0)``). Replaces the
+        # previous Braille-character label that was cycled by a manual
+        # QTimer — that hack was inaccessible (screen readers ignored
+        # the label, the character was font-dependent, and it did not
+        # share the AA-validated token colours of the rest of the bar).
         self.progress_bar = QProgressBar(self)
-        self.progress_bar.setMaximum(100)
+        self.progress_bar.setRange(0, 100)
         self.progress_bar.setVisible(False)
         self.status_bar.addWidget(self.progress_bar, 2)
-
-        self.spinner_chars = "\u280B\u2819\u2839\u2838\u283C\u2834\u2826\u2827\u2807\u280F"
-        self.spinner_idx = 0
-        self.spinner_label = QLabel("  ", self)
-        self.spinner_label.setStyleSheet(f"font-family: Consolas; font-size: {TYPE_SCALE['subheading']}px;")
-        self.status_bar.addPermanentWidget(self.spinner_label)
 
         self.cancel_btn = QPushButton("STOP", self)
         self.cancel_btn.setObjectName("stopBtn")
         self.cancel_btn.setVisible(False)
         self.cancel_btn.clicked.connect(self.cancel_action)
         self.status_bar.addPermanentWidget(self.cancel_btn)
-
-        # Spinner Animation Timer
-        self.spinner_timer = QTimer(self)
-        self.spinner_timer.timeout.connect(self._animate_spinner)
 
         # Sidebar navigation buttons state
         self.nav_buttons = []
@@ -323,14 +319,6 @@ class DataForgeApp(QMainWindow):
         if self.is_busy:
             self.cancel_event.set()
             self.update_status("Cancelling...")
-
-    def _animate_spinner(self):
-        if self.is_busy:
-            char = self.spinner_chars[self.spinner_idx % len(self.spinner_chars)]
-            self.spinner_label.setText(char)
-            self.spinner_idx += 1
-        else:
-            self.spinner_label.setText("  ")
 
     def add_view(self, view_cls: Type[BaseView]):
         view_instance = view_cls(self.content_stack, app=self)
@@ -583,24 +571,30 @@ class DataForgeApp(QMainWindow):
 
     def reset_status(self):
         self.update_status("Ready")
-        self.progress_bar.setVisible(False)
+        self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
+        self.progress_bar.setVisible(False)
         self.cancel_btn.setVisible(False)
-        self.spinner_label.setText("  ")
 
     def start_progress(self, message: str = "Working..."):
-        self.progress_bar.setVisible(True)
+        # Indeterminate until the first progress callback arrives with
+        # a known total; the bar switches to determinate at that point
+        # via ``update_progress``.
+        self.progress_bar.setRange(0, 0)
         self.progress_bar.setValue(0)
+        self.progress_bar.setVisible(True)
         self.update_status(message)
 
     def update_progress(self, current: int, total: int, step_name: str = ""):
         self.progress_bar.setVisible(True)
         if total > 0:
+            # ``setRange`` flips the bar from indeterminate to determinate.
+            self.progress_bar.setRange(0, total)
+            self.progress_bar.setValue(current)
             pct = int((current / total) * 100)
-            self.progress_bar.setValue(pct)
             txt = f"{step_name}: {current}/{total} ({pct}%)"
         else:
-            self.progress_bar.setValue(0)
+            self.progress_bar.setRange(0, 0)
             txt = f"{step_name}: {current}..."
         self.update_status(txt)
 
@@ -702,7 +696,13 @@ class DataForgeApp(QMainWindow):
 
         self.is_busy = True
         self.cancel_event.clear()
-        self.spinner_timer.start(100)
+        # 2e.2: indeterminate progress bar replaces the Braille spinner.
+        # The bar stays indeterminate until the first progress callback
+        # arrives with a known total — at that point ``update_progress``
+        # flips it to determinate via ``setRange``.
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setVisible(True)
         self.cancel_btn.setVisible(True)
         if show_progress:
             self.start_progress()
@@ -729,9 +729,12 @@ class DataForgeApp(QMainWindow):
 
     def _on_worker_finished(self):
         self.is_busy = False
-        self.spinner_timer.stop()
-        self.spinner_label.setText("  ")
         self.cancel_btn.setVisible(False)
+        # Reset the bar back to a determinate 0..100 range so the next
+        # ``run_background`` does not inherit the indeterminate animation
+        # after a quick second job.
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
         self.progress_bar.setVisible(False)
         self.current_worker = None
         self._current_task_name = None

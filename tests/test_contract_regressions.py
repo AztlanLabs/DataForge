@@ -1277,6 +1277,138 @@ class ContractRegressionTests(unittest.TestCase):
         self.assertEqual(last_anim.propertyName(), b"maximumHeight")
         self.assertGreater(last_anim.endValue(), 0)
 
+    def test_braille_spinner_is_replaced_by_indeterminate_progress_bar(self):
+        """2e.2 — The status-bar busy indicator used to be a Unicode
+        Braille character cycled by a manual ``QTimer`` (a font hack
+        that was inaccessible to screen readers and did not share the
+        AA-validated token colours of the rest of the bar). The
+        indicator is now a ``QProgressBar`` in indeterminate mode
+        (``setRange(0, 0)``); all the spinner-related state and the
+        legacy ``_animate_spinner`` method are gone."""
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.ui.app import DataForgeApp
+        from dataforge.ui.views import dashboard as _dashboard
+        from unittest.mock import patch as _patch
+
+        _ = QApplication.instance() or QApplication([])
+
+        with _patch.object(_dashboard.DashboardView, "mount", lambda self: None), \
+             _patch("dataforge.ui.app.config") as mock_config:
+            mock_config.get.side_effect = lambda k, d=None: {
+                "theme": "cosmo",
+                "settings_ui_tier": "Simple",
+                "plugins_enabled": False,
+                "collapsed_groups": [],
+            }.get(k, d)
+            mock_config.set = lambda *a, **k: None
+            app = DataForgeApp()
+
+        # Spinner infrastructure is gone.
+        self.assertFalse(hasattr(app, "spinner_label"))
+        self.assertFalse(hasattr(app, "spinner_chars"))
+        self.assertFalse(hasattr(app, "spinner_idx"))
+        self.assertFalse(hasattr(app, "spinner_timer"))
+        self.assertFalse(hasattr(app, "_animate_spinner"))
+
+        # The progress bar exists and is the new busy indicator.
+        self.assertIsNotNone(app.progress_bar)
+        # The default range at idle is determinate 0..100.
+        self.assertEqual(app.progress_bar.minimum(), 0)
+        self.assertEqual(app.progress_bar.maximum(), 100)
+
+    def test_run_background_shows_indeterminate_progress_bar(self):
+        """2e.2 — ``run_background`` must put the progress bar in
+        indeterminate mode (``setRange(0, 0)``) and show it as soon as
+        a task starts, even before any progress callback fires."""
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.ui.app import DataForgeApp
+        from dataforge.ui.views import dashboard as _dashboard
+        from unittest.mock import patch as _patch
+
+        _ = QApplication.instance() or QApplication([])
+
+        # Dashboard's mount kicks off a background stat scan; stub it
+        # to a no-op so we can start ``run_background`` ourselves on a
+        # quiescent app.
+        with _patch.object(_dashboard.DashboardView, "mount", lambda self: None), \
+             _patch("dataforge.ui.app.config") as mock_config:
+            mock_config.get.side_effect = lambda k, d=None: {
+                "theme": "cosmo",
+                "settings_ui_tier": "Simple",
+                "plugins_enabled": False,
+                "collapsed_groups": [],
+            }.get(k, d)
+            mock_config.set = lambda *a, **k: None
+            app = DataForgeApp()
+
+        def instant_done(*_a, **_k):
+            return "ok"
+
+        app.run_background(instant_done, lambda *_: None)
+        try:
+            # Indeterminate = range (0, 0).
+            self.assertEqual(app.progress_bar.minimum(), 0)
+            self.assertEqual(app.progress_bar.maximum(), 0)
+            # ``isVisible()`` requires the parent to be shown; the bar
+            # is configured to be visible — use ``isHidden()`` to
+            # confirm ``setVisible(True)`` was called.
+            self.assertFalse(app.progress_bar.isHidden())
+            # And the cancel button is also configured visible.
+            self.assertFalse(app.cancel_btn.isHidden())
+        finally:
+            # Tear the worker down so we don't leak threads.
+            if app.current_worker is not None:
+                app.current_worker.wait(2000)
+            app._on_worker_finished()
+
+        # After the worker is done, the bar is hidden and the range is
+        # reset back to determinate 0..100 for the next run.
+        self.assertTrue(app.progress_bar.isHidden())
+        self.assertEqual(app.progress_bar.maximum(), 100)
+        self.assertEqual(app.progress_bar.value(), 0)
+        self.assertTrue(app.cancel_btn.isHidden())
+
+    def test_update_progress_switches_bar_to_determinate(self):
+        """2e.2 — When a progress callback arrives with a known total,
+        ``update_progress`` must flip the bar from indeterminate to
+        determinate via ``setRange(0, total)`` and set the value."""
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.ui.app import DataForgeApp
+        from dataforge.ui.views import dashboard as _dashboard
+        from unittest.mock import patch as _patch
+
+        _ = QApplication.instance() or QApplication([])
+
+        with _patch.object(_dashboard.DashboardView, "mount", lambda self: None), \
+             _patch("dataforge.ui.app.config") as mock_config:
+            mock_config.get.side_effect = lambda k, d=None: {
+                "theme": "cosmo",
+                "settings_ui_tier": "Simple",
+                "plugins_enabled": False,
+                "collapsed_groups": [],
+            }.get(k, d)
+            mock_config.set = lambda *a, **k: None
+            app = DataForgeApp()
+
+        # Start indeterminate.
+        app.start_progress("Working")
+        self.assertEqual(app.progress_bar.maximum(), 0)
+
+        # First progress callback with total=4.
+        app.update_progress(1, 4, "scanning")
+        self.assertEqual(app.progress_bar.minimum(), 0)
+        self.assertEqual(app.progress_bar.maximum(), 4)
+        self.assertEqual(app.progress_bar.value(), 1)
+
+        # Halfway through.
+        app.update_progress(2, 4, "scanning")
+        self.assertEqual(app.progress_bar.value(), 2)
+
+        # A zero total falls back to indeterminate so the bar keeps
+        # animating while we wait for the next non-zero total.
+        app.update_progress(3, 0, "scanning")
+        self.assertEqual(app.progress_bar.maximum(), 0)
+
     def test_storage_devices_view_surfaces_fm_devices_in_gui(self):
         """``fm devices`` had no GUI path; the new ``Storage & Devices``
         view wires the same ``device_manager.list_storage_devices`` API
