@@ -6,7 +6,7 @@
 click>=8.4.2
 rich>=15.0.0
 tqdm>=4.68.4
-pandas>=3.0.3
+pandas>=2.2.3
 PyQt5>=5.15.0
 send2trash>=2.1.0
 Pillow>=10.0.0
