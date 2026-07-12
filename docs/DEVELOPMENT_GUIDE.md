@@ -161,7 +161,7 @@ New top-level screens and plugins should inherit from `BaseView` and use its sha
 ## Practical maintenance notes
 
 - The repository mixes application source with generated build output. Be deliberate about which files are source of truth.
-- The repository is under Git version control on `develop` and `main` branches. Follow [`docs/COMMIT_CONVENTION.md`](./COMMIT_CONVENTION.md) for commit messages and see [`docs/VERSIONING.md`](./VERSIONING.md) for the semver release process. A `commit-msg` hook in `.githooks/` validates every commit; install it with `git config core.hooksPath .githooks`.
+- The repository is under Git version control on `develop` and `main` branches. Follow [`docs/CONTRIBUTING.md`](./CONTRIBUTING.md) for the complete development workflow — commit conventions, versioning, release process, and implementation plan format. A `commit-msg` hook in `.githooks/` validates every commit; install it with `git config core.hooksPath .githooks`.
 - **CI is not yet wired.** Tests do not run automatically on push. Setting up CI/CD is the highest-leverage next step — see [`reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md), Phase 0.
 - The plugin loader registers every discovered `BaseView` subclass in `dataforge/ui/plugins/`; plugin import failures are now logged (via `logger.error`) and skipped. Plugins are arbitrary code executed with full app privileges — only add plugins you trust (see `reviews/02`, S5).
 - The stray empty `26.1.2` file has been removed and a root `.gitignore` added (the tree still needs to be put under version control).
@@ -174,5 +174,5 @@ New top-level screens and plugins should inherit from `BaseView` and use its sha
 2. Read [`./ARCHITECTURE.md`](./ARCHITECTURE.md)
 3. Read [`./GUI_WORKFLOWS.md`](./GUI_WORKFLOWS.md) or [`./CLI_REFERENCE.md`](./CLI_REFERENCE.md), depending on your work area
 4. Use [`./TECHNICAL_SOURCE_OF_TRUTH.md`](./TECHNICAL_SOURCE_OF_TRUTH.md) when you need file-by-file depth
-5. Read [`./COMMIT_CONVENTION.md`](./COMMIT_CONVENTION.md) and [`./VERSIONING.md`](./VERSIONING.md) before your first commit; [`./RELEASE_PROCESS.md`](./RELEASE_PROCESS.md) for the PR-to-main workflow
+5. Read [`./CONTRIBUTING.md`](./CONTRIBUTING.md) for commit conventions, versioning, and implementation plan format — required before your first commit
 6. Skim [`./reviews/EXECUTIVE_SUMMARY.md`](./reviews/EXECUTIVE_SUMMARY.md) for the current bug/security/UX backlog before picking up work

@@ -157,9 +157,7 @@ python build_exe.py debug
 - [`docs/TECHNICAL_SOURCE_OF_TRUTH.md`](./docs/TECHNICAL_SOURCE_OF_TRUTH.md) - authoritative file-by-file source map for maintainers
 
 **Contributing:**
-- [`docs/COMMIT_CONVENTION.md`](./docs/COMMIT_CONVENTION.md) - standardized commit message format and enforcement hook
-- [`docs/VERSIONING.md`](./docs/VERSIONING.md) - semantic versioning rules, dev vs main lifecycle, version matrix
-- [`docs/RELEASE_PROCESS.md`](./docs/RELEASE_PROCESS.md) - when to PR to main, gate criteria, release checklist
+- [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md) — complete development workflow: commit convention, versioning, release process, implementation plan guidance for AI and developers
 
 ### Project Review & Audit (2026-07-10)
 
