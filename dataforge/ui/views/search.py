@@ -23,7 +23,7 @@ class SearchView(BaseView):
     }
 
     def get_title(self):
-        return "Search & Organize"
+        return "Search"
 
     def get_help_text(self):
         return """

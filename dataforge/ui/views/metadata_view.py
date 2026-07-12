@@ -36,7 +36,7 @@ class MetadataView(BaseView):
     }
 
     def get_title(self):
-        return "Metadata Studio"
+        return "Metadata & EXIF"
 
     def __init__(self, master, app=None):
         super().__init__(master, app)

@@ -41,7 +41,7 @@ class SystemCleanupView(BaseView):
     }
 
     def get_title(self):
-        return "System Cleanup"
+        return "Clean Up Space"
 
     def __init__(self, master, app=None):
         super().__init__(master, app)

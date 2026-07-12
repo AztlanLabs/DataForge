@@ -131,13 +131,13 @@ class DataForgeApp(QMainWindow):
     post_signal = pyqtSignal(object, tuple, dict)
 
     # The sidebar used to hide groups above the user's current Experience
-    # Level (Basic → no System Maintenance/Advanced Analysis; Advanced → no
-    # Advanced Analysis; Expert → everything). That created a
-    # discoverability cliff: a user on Basic could not see that Forensics
+    # Level (Simple → no System Maintenance/Advanced Analysis; Standard → no
+    # Advanced Analysis; Everything → everything). That created a
+    # discoverability cliff: a user on Simple could not see that Forensics
     # Lab existed. The rail now shows every group and the tier only filters
     # in-view complexity, so the navigation is stable while advanced
     # controls stay hidden behind "More options" expanders per view.
-    TIER_RANK = {"Basic": 0, "Advanced": 1, "Expert": 2}
+    TIER_RANK = {"Simple": 0, "Standard": 1, "Everything": 2}
 
     def __init__(self, on_progress: Callable[[int, int, str], None] | None = None):
         super().__init__()
@@ -265,16 +265,16 @@ class DataForgeApp(QMainWindow):
         # progress instead of faking a bar animation.
         view_classes = [
             (DashboardView, "Dashboard"),
-            (SearchView, "Search & Organize"),
+            (SearchView, "Search"),
             (DuplicatesView, "Duplicate Finder"),
             (AutomationsView, "Automations"),
             (MediaView, "Media Tools"),
-            (SystemCleanupView, "System Cleanup"),
+            (SystemCleanupView, "Clean Up Space"),
             (PerformanceView, "Performance"),
             (RecoveryView, "File Recovery"),
-            (MetadataView, "Metadata Studio"),
-            (HardwareView, "Hardware Diagnostics"),
-            (ForensicsView, "Forensics Lab"),
+            (MetadataView, "Metadata & EXIF"),
+            (HardwareView, "Hardware Info"),
+            (ForensicsView, "Forensics"),
             (StorageDevicesView, "Storage & Devices"),
             (SettingsView, "Settings"),
             (AboutView, "About & Help"),
@@ -338,23 +338,23 @@ class DataForgeApp(QMainWindow):
         groups = {
             "Home": ["Dashboard"],
             "Find & Organize": [
-                "Search & Organize",
+                "Search",
                 "Duplicate Finder",
                 "Media Tools",
-                "Metadata Studio",
+                "Metadata & EXIF",
                 "Automations",
             ],
             "Clean & Optimize": [
-                "System Cleanup",
+                "Clean Up Space",
                 "Storage & Devices",
                 "Performance",
             ],
             "Recover & Investigate": [
                 "File Recovery",
-                "Forensics Lab",
+                "Forensics",
             ],
             "System": [
-                "Hardware Diagnostics",
+                "Hardware Info",
                 "Settings",
                 "About & Help",
             ],
@@ -373,7 +373,7 @@ class DataForgeApp(QMainWindow):
         # Apply Experience Level gating from Settings before rendering.
         # The tier is kept as a hint for in-view expanders but the sidebar
         # itself is no longer filtered by it; every group is rendered.
-        tier_name = config.get("settings_ui_tier", "Basic")
+        tier_name = config.get("settings_ui_tier", "Simple")
         tier_rank = self.TIER_RANK.get(tier_name, 0)
         self._current_tier_rank = tier_rank
 
@@ -457,7 +457,7 @@ class DataForgeApp(QMainWindow):
         so its in-view complexity (e.g. advanced expanders) can update."""
         self.build_navigation_sidebar()
         if self.current_view and hasattr(self.current_view, "apply_tier"):
-            tier_name = config.get("settings_ui_tier", "Basic")
+            tier_name = config.get("settings_ui_tier", "Simple")
             self.current_view.apply_tier(tier_name)
 
     def switch_view(self, title):

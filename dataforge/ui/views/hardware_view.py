@@ -32,7 +32,7 @@ class HardwareView(BaseView):
     }
 
     def get_title(self):
-        return "Hardware Diagnostics"
+        return "Hardware Info"
 
     def __init__(self, master, app=None):
         super().__init__(master, app)

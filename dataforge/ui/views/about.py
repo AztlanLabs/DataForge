@@ -115,45 +115,45 @@ class AboutView(BaseView):
              "It lists active internal and external partitions, shows disk utilization, "
              "and displays quick shortcuts to launch optimization and forensics workflows."),
             
-            ("Search & Organize", 
+            ("Search",
              "A high-speed, multithreaded directory scanner. Supports literal and regex search patterns. "
              "Once matching files are found, you can apply bulk operations such as copying, moving, "
              "renaming, deleting, or archiving them. Uses a dual-pane preview splitter to inspect "
              "text/image contents before applying changes."),
-            
-            ("Duplicate Finder", 
+
+            ("Duplicate Finder",
              "Locate space-consuming duplicate files across drives using quick size checks or deep cryptographic hashes "
              "(MD5, SHA-1, or SHA-256). Spacing controls and alignment improvements keep options readable. "
              "Supports group-level file deletion, automated parent directories filtering, and content previews."),
-            
-            ("System Cleanup & Browser Privacy", 
+
+            ("Clean Up Space",
              "Reclaim gigabytes of drive space by sweeping temporary folders, system logs, thumbnails, and package caches. "
              "The Browser Privacy tab scans Chrome, Firefox, Brave, Edge, and other browser configurations for "
              "tracking cookies, browsing histories, and session databases. Both features feature horizontal split-pane "
              "file preview panels to view files before erasing them."),
-            
-            ("System Performance Monitor", 
+
+            ("System Performance Monitor",
              "A real-time systems monitor displaying CPU utilization, RAM usage, and active swap spaces. "
              "Features a sortable process table to kill resource-heavy apps, a startup configuration editor "
              "to adjust autostart applications, and a S.M.A.R.T. storage health diagnostics viewer."),
-            
-            ("File Recovery & Carving", 
+
+            ("File Recovery & Carving",
              "Allows you to quickly undelete files from trash bins, or perform raw block-level carving "
              "from physical device blocks when partition tables are corrupted. Built-in carving matches "
              "common headers/footers (JPEG, PNG, ZIP, PDF). Also integrates photorec/testdisk command-line tool. "
              "Both trash and deep carving results feature integrated file previews."),
-            
-            ("Metadata Studio", 
+
+            ("Metadata & EXIF",
              "A unified metadata reader and writer. It parses EXIF, tags, modifications, GPS positions, and timestamps. "
              "Uses PyExifTool (if installed) or Pillow/mutagen pure-Python fallbacks. Features selective EXIF stripping "
              "to anonymize images, XMP edit history timeline plots, and batch field writing."),
-            
-            ("Hardware Diagnostics", 
+
+            ("Hardware Info",
              "Reads hardware details (motherboard, chipset, BIOS, CPU architecture, RAM, and network speeds) "
              "to compile a comprehensive system report. Includes an Upgrade Advisor that identifies potential bottle-necks "
              "and suggests hardware component upgrades."),
-            
-            ("Forensics Lab", 
+
+            ("Forensics",
              "Contains advanced digital forensics workflows including cryptographic hash calculations, SAM/shadow password "
              "hash extractions, and OS artifact parsing (WTMP logins, cron jobs, etc.). Also supports mounting and "
              "fully ingesting raw disk images.")

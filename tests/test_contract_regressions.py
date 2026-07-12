@@ -977,6 +977,52 @@ class ContractRegressionTests(unittest.TestCase):
         # are owned by the embedded ToolsView, not the outer notebook.
         self.assertEqual(view.tools.notebook.count(), 4)
 
+    def test_view_titles_use_task_oriented_names(self):
+        """Sidebar labels were renamed to user-facing names
+        (IMPROVEMENT_PLAN §2.3): Search & Organize → Search,
+        Metadata Studio → Metadata & EXIF, Forensics Lab → Forensics,
+        Hardware Diagnostics → Hardware Info, System Cleanup → Clean Up Space.
+        Tools & Workflows + Action Builder were merged into Automations
+        (covered separately) and the Settings "Experience Level" was
+        renamed to "Detail level" with values Simple / Standard /
+        Everything.
+        """
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.ui.app import DataForgeApp
+        from dataforge.ui.views.search import SearchView
+        from dataforge.ui.views.metadata_view import MetadataView
+        from dataforge.ui.views.forensics_view import ForensicsView
+        from dataforge.ui.views.hardware_view import HardwareView
+        from dataforge.ui.views.system_cleanup import SystemCleanupView
+        from dataforge.ui.views.settings import SettingsView
+
+        _ = QApplication.instance() or QApplication([])
+
+        self.assertEqual(SearchView(None, app=MagicMock()).get_title(), "Search")
+        self.assertEqual(MetadataView(None, app=MagicMock()).get_title(), "Metadata & EXIF")
+        self.assertEqual(ForensicsView(None, app=MagicMock()).get_title(), "Forensics")
+        self.assertEqual(HardwareView(None, app=MagicMock()).get_title(), "Hardware Info")
+        self.assertEqual(SystemCleanupView(None, app=MagicMock()).get_title(), "Clean Up Space")
+
+        view = SettingsView(None, app=MagicMock())
+        self.assertEqual(view.TIER_ORDER, ["Simple", "Standard", "Everything"])
+        self.assertEqual(view.cb_tier.currentText(), "Simple")
+
+        # The sidebar groups dict must reference the new names, not the
+        # old "Metadata Studio" / "Forensics Lab" / etc. The dict is built
+        # locally inside build_navigation_sidebar; verify via the header
+        # colour map plus the TIER_RANK tier names.
+        from dataforge.ui.app import HEADER_COLORS
+        for name in ("Home", "Find & Organize", "Clean & Optimize",
+                     "Recover & Investigate", "System"):
+            self.assertIn(name, HEADER_COLORS["light"])
+            self.assertIn(name, HEADER_COLORS["dark"])
+        # And the TIER_RANK in DataForgeApp uses the new tier names.
+        self.assertEqual(
+            DataForgeApp.TIER_RANK,
+            {"Simple": 0, "Standard": 1, "Everything": 2},
+        )
+
     def test_storage_devices_view_surfaces_fm_devices_in_gui(self):
         """``fm devices`` had no GUI path; the new ``Storage & Devices``
         view wires the same ``device_manager.list_storage_devices`` API

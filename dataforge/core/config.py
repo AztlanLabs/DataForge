@@ -7,7 +7,7 @@ _VALID_HASH_ALGORITHMS = {"md5", "sha1", "sha256", "sha512", "blake2b"}
 _VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 _VALID_SIZE_UNITS = {"Auto", "Bytes", "KB", "MB", "GB"}
 _VALID_PATH_MODES = {"full", "relative"}
-_VALID_TIERS = {"Basic", "Advanced", "Expert"}
+_VALID_TIERS = {"Simple", "Standard", "Everything"}
 
 
 class ConfigManager:
@@ -25,7 +25,7 @@ class ConfigManager:
         "size_unit": "Auto",
         "path_display_mode": "full",
         "dashboard_paths": [os.path.join(os.path.expanduser("~"), "Documents")],
-        "settings_ui_tier": "Basic",
+        "settings_ui_tier": "Simple",
         "duplicate_default_keep_strategy": "first path",
         "plugins_enabled": False,
     }

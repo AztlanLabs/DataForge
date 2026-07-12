@@ -62,7 +62,7 @@ class ForensicsView(BaseView):
     }
 
     def get_title(self):
-        return "Forensics Lab"
+        return "Forensics"
 
     def __init__(self, master, app=None):
         super().__init__(master, app)
@@ -72,7 +72,7 @@ class ForensicsView(BaseView):
 
         # Warning banner
         warning = QLabel(
-            "⚠️ Forensics Lab — Use responsibly. Some features require elevated "
+            "⚠️ Forensics — Use responsibly. Some features require elevated "
             "privileges and carry legal implications. Never analyze data you don't "
             "have authorization to examine.",
             self,

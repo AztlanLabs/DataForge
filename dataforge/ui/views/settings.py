@@ -12,10 +12,10 @@ from ...modules.duplicates import KEEP_STRATEGIES
 from ..widgets import attach_tooltips
 
 class SettingsView(BaseView):
-    TIER_ORDER = ["Basic", "Advanced", "Expert"]
+    TIER_ORDER = ["Simple", "Standard", "Everything"]
 
     TOOLTIP_TEXTS = {
-        "settings_tier": "Choose how much of the UI you see. Basic hides rarely-needed options AND the System Maintenance / Advanced Analysis sidebar groups; Advanced unlocks System Maintenance; Expert reveals everything (incl. Metadata Studio, Hardware Diagnostics, Forensics Lab).",
+        "settings_tier": "Choose how much of the UI you see. Simple keeps only the most common controls; Standard unlocks additional performance and search settings; Everything reveals every advanced control and panel (incl. hardware diagnostics, full metadata, and forensic options).",
         "duplicate_default_keep_strategy": "The keep strategy pre-selected for new duplicate scans and the Action Builder's Duplicate filter.",
         "hash_algorithm": "Choose the digest used by duplicate detection and cached hashes. Stronger hashes trade speed for collision safety.",
         "max_threads": "Controls parallel hashing/batch work (duplicate scanning, forensic hash manifests, integrity snapshots, metadata batch reads). Set to 1 to run this work single-threaded; raise it for faster disks/CPUs.",
@@ -49,10 +49,10 @@ class SettingsView(BaseView):
         tier_row = QWidget(self)
         tier_layout = QHBoxLayout(tier_row)
         tier_layout.setContentsMargins(0, 0, 0, 5)
-        tier_layout.addWidget(QLabel("Experience Level:", tier_row))
+        tier_layout.addWidget(QLabel("Detail level:", tier_row))
         self.cb_tier = QComboBox(tier_row)
         self.cb_tier.addItems(self.TIER_ORDER)
-        self.cb_tier.setCurrentText(config.get("settings_ui_tier", "Basic"))
+        self.cb_tier.setCurrentText(config.get("settings_ui_tier", "Simple"))
         self.cb_tier.currentTextChanged.connect(self.apply_tier)
         tier_layout.addWidget(self.cb_tier)
         tier_layout.addStretch()
@@ -126,7 +126,7 @@ class SettingsView(BaseView):
         r2_layout.addStretch()
 
         safe_layout.addWidget(r2)
-        self.register_tiered(r2, "Advanced")
+        self.register_tiered(r2, "Standard")
         gen_layout.addWidget(frame_safe)
 
         # Defaults
@@ -179,7 +179,7 @@ class SettingsView(BaseView):
         row_unit_layout.addWidget(self.cb_unit)
         row_unit_layout.addStretch()
         perf_layout.addWidget(row_unit)
-        self.register_tiered(row_unit, "Advanced")
+        self.register_tiered(row_unit, "Standard")
 
         row_threads = QWidget(self.tab_perf)
         row_threads_layout = QHBoxLayout(row_threads)
@@ -194,7 +194,7 @@ class SettingsView(BaseView):
         row_threads_layout.addWidget(self.max_threads_spinbox)
         row_threads_layout.addStretch()
         perf_layout.addWidget(row_threads)
-        self.register_tiered(row_threads, "Advanced")
+        self.register_tiered(row_threads, "Standard")
 
         row_search_threads = QWidget(self.tab_perf)
         row_search_threads_layout = QHBoxLayout(row_search_threads)
@@ -209,7 +209,7 @@ class SettingsView(BaseView):
         row_search_threads_layout.addWidget(self.search_threads_spinbox)
         row_search_threads_layout.addStretch()
         perf_layout.addWidget(row_search_threads)
-        self.register_tiered(row_search_threads, "Advanced")
+        self.register_tiered(row_search_threads, "Standard")
 
         row_cache = QWidget(self.tab_perf)
         row_cache_layout = QHBoxLayout(row_cache)
@@ -220,7 +220,7 @@ class SettingsView(BaseView):
         row_cache_layout.addWidget(self.btn_clear_cache)
         row_cache_layout.addStretch()
         perf_layout.addWidget(row_cache)
-        self.register_tiered(row_cache, "Expert")
+        self.register_tiered(row_cache, "Everything")
 
         perf_layout.addStretch(1)
 
@@ -292,7 +292,7 @@ class SettingsView(BaseView):
         for widget, min_tier in self._tiered_widgets:
             widget.setVisible(self.TIER_ORDER.index(min_tier) <= rank)
         if hasattr(self, "_excl_tab_index"):
-            self.nb.setTabVisible(self._excl_tab_index, rank >= self.TIER_ORDER.index("Advanced"))
+            self.nb.setTabVisible(self._excl_tab_index, rank >= self.TIER_ORDER.index("Standard"))
         config.set("settings_ui_tier", tier_name)
         # Tier now controls in-view complexity (advanced controls stay
         # hidden behind tiered rows and the Exclusions tab), NOT the
