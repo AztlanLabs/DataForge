@@ -909,9 +909,15 @@ def detect_steganography(path, threshold_ratio=0.05):
 # ---------------------------------------------------------------------------
 
 def secure_delete(path, passes=3, cancel_token=None):
-    """Overwrite a file with random data `passes` times and then unlink it.
-    Falls back to send2trash if available so it can be recovered if the
-    user realises they got the wrong file."""
+    """Best-effort overwrite a file with random data ``passes`` times and then
+    unlink it.
+
+    .. warning::
+       On SSDs, flash media, copy-on-write filesystems (btrfs, ZFS), and
+       journaled filesystems the overwrite may not reach the physical media.
+       This function does **not** guarantee data destruction on those
+       platforms.
+    """
     if not os.path.isfile(path):
         return {"success": False, "message": "not a regular file"}
     size = os.path.getsize(path)
@@ -936,12 +942,19 @@ def secure_delete(path, passes=3, cancel_token=None):
     try:
         os.unlink(path)
     except OSError as exc:
-        try:
-            from send2trash import send2trash  # type: ignore
-            send2trash(path)
-        except Exception:
-            return {"success": False, "message": str(exc), "path": path}
-    return {"success": True, "path": path, "message": f"securely deleted ({passes} passes, {size} bytes)"}
+        return {
+            "success": False,
+            "message": f"overwrite complete but unlink failed: {exc}",
+            "path": path,
+        }
+    return {
+        "success": True,
+        "path": path,
+        "message": (
+            f"best-effort overwrite complete ({passes} passes, {size} bytes). "
+            "Note: on SSDs/flash/CoW filesystems physical data may persist."
+        ),
+    }
 
 
 # ---------------------------------------------------------------------------
