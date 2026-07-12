@@ -550,15 +550,17 @@ def devices(mount_point):
     """List connected storage devices and their usage."""
     from .modules.device_manager import list_storage_devices, get_device_info
 
+    em_dash = "\u2014"
+
     if mount_point:
         details = get_device_info(mount_point)
         if not details:
             click.echo(f"Error: '{mount_point}' is not a valid or accessible mount point.", err=True)
             return
         click.echo(f"Mount point: {details.get('mountpoint')}")
-        click.echo(f"Device: {details.get('device', '\u2014')}")
-        click.echo(f"Type: {details.get('type', '\u2014')}")
-        click.echo(f"Filesystem: {details.get('fstype', '\u2014')}")
+        click.echo(f"Device: {details.get('device', em_dash)}")
+        click.echo(f"Type: {details.get('type', em_dash)}")
+        click.echo(f"Filesystem: {details.get('fstype', em_dash)}")
         if 'formatted_total' in details:
             click.echo(f"Usage: {details.get('formatted_used')} used / {details.get('formatted_total')} total ({details.get('percent_used', 0)}%)")
         if 'error' in details:
@@ -572,9 +574,12 @@ def devices(mount_point):
 
     click.echo(f"{'Mountpoint':<25}{'Type':<18}{'Filesystem':<12}{'Used':<12}{'Total':<12}")
     for dev in devices_list:
-        used = dev.get('formatted_used', '\u2014')
-        total = dev.get('formatted_total', '\u2014')
-        click.echo(f"{dev.get('mountpoint', '\u2014')[:24]:<25}{dev.get('type', '\u2014'):<18}{dev.get('fstype', '\u2014'):<12}{used:<12}{total:<12}")
+        mountpoint = dev.get('mountpoint', em_dash)[:24]
+        dev_type = dev.get('type', em_dash)
+        fstype = dev.get('fstype', em_dash)
+        used = dev.get('formatted_used', em_dash)
+        total = dev.get('formatted_total', em_dash)
+        click.echo(f"{mountpoint:<25}{dev_type:<18}{fstype:<12}{used:<12}{total:<12}")
 
 @main.command('hash-calc')
 @click.argument('paths', type=click.Path(exists=True), nargs=-1, required=True)
