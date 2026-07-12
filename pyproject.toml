@@ -27,3 +27,9 @@ target-version = ["py310"]
 ignore_missing_imports = true
 warn_unused_ignores = true
 exclude = ["^build/", "^dist/", "^buildspec/"]
+
+[tool.coverage.run]
+source = ["dataforge"]
+
+[tool.coverage.report]
+show_missing = true
