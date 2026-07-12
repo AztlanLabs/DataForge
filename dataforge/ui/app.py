@@ -9,7 +9,8 @@ from PyQt5.QtWidgets import (
     QLabel, QCheckBox, QStackedWidget, QProgressBar,
     QStatusBar, QMessageBox, QScrollArea, QFrame, QGraphicsOpacityEffect
 )
-from PyQt5.QtCore import QThread, pyqtSignal, Qt, QPropertyAnimation, QEasingCurve
+from PyQt5.QtCore import QThread, pyqtSignal, Qt, QPropertyAnimation, QEasingCurve, QSize
+from PyQt5.QtGui import QIcon
 
 from .views.base import BaseView
 from .views.dashboard import DashboardView
@@ -28,6 +29,7 @@ from .views.automations import AutomationsView
 from .views.about import AboutView
 from .plugin_loader import PluginLoader
 from .theme_tokens import generate_qss, generate_palette, TYPE_SCALE
+from .resources.icons import build_icons, TONE_LIGHT, TONE_DARK
 from ..core.config import config
 
 HEADER_COLORS = {
@@ -51,6 +53,29 @@ HEADER_COLORS = {
 
 BackgroundArgs: TypeAlias = tuple[Any, ...]
 BackgroundKwargs: TypeAlias = dict[str, Any]
+
+
+# 2e.7 — sidebar icon key for each registered view title. New
+# sidebar entries must appear here as well as in the ``groups``
+# dict inside ``build_navigation_sidebar``; the build-time
+# mapping is the contract every commit updates in lockstep with
+# the view registry above.
+SIDEBAR_ICON_KEYS: Dict[str, str] = {
+    "Dashboard":         "dashboard",
+    "Search":            "search",
+    "Duplicate Finder":  "duplicates",
+    "Automations":       "automations",
+    "Media Tools":       "media",
+    "Clean Up Space":    "cleanup",
+    "Performance":       "performance",
+    "File Recovery":     "recovery",
+    "Metadata & EXIF":   "metadata",
+    "Hardware Info":     "hardware",
+    "Forensics":         "forensics",
+    "Storage & Devices": "storage",
+    "Settings":          "settings",
+    "About & Help":      "about",
+}
 
 
 def _humanize_callable_name(target) -> str:
@@ -187,12 +212,15 @@ class DataForgeApp(QMainWindow):
         # Theme Toggle row: an icon label + the Dark Mode checkbox.
         # The icon swaps between a sun (light) and a moon (dark) so the
         # toggle is recognizable at a glance, not just a colored box.
+        # The icon is the 2e.7 monochrome SVG (sun / moon) and is
+        # regenerated in ``apply_theme`` so it follows the palette.
         self.theme_row = QWidget(self.nav_frame)
         theme_row_layout = QHBoxLayout(self.theme_row)
         theme_row_layout.setContentsMargins(16, 5, 0, 0)
         theme_row_layout.setSpacing(8)
-        self.theme_icon_lbl = QLabel("☀", self.theme_row)
-        self.theme_icon_lbl.setStyleSheet(f"font-size: {TYPE_SCALE['heading']}px;")
+        self.theme_icon_lbl = QLabel(self.theme_row)
+        self.theme_icon_lbl.setFixedSize(18, 18)
+        self.theme_icon_lbl.setAlignment(Qt.AlignCenter)
         theme_row_layout.addWidget(self.theme_icon_lbl)
         self.theme_chk = QCheckBox("Dark Mode", self.theme_row)
         self.theme_chk.stateChanged.connect(self.toggle_theme)
@@ -417,6 +445,12 @@ class DataForgeApp(QMainWindow):
         collapsed_groups = config.get("collapsed_groups", [])
         is_dark = self.theme_chk.isChecked()
         theme_key = "dark" if is_dark else "light"
+        # 2e.7 — regenerate the icon data URLs for the current theme
+        # so the sidebar buttons (and the theme toggle) pick up the
+        # right monochrome tone. The icons themselves are
+        # ``data:image/svg+xml;base64,...`` URLs and the QPushButton
+        # ``setIcon`` API renders them at the button's icon size.
+        self._icons = build_icons(TONE_DARK if is_dark else TONE_LIGHT)
 
         # Populate grouped layout
         for group_name, titles in groups.items():
@@ -433,6 +467,16 @@ class DataForgeApp(QMainWindow):
             header_btn.setObjectName("groupHeader")
             color = HEADER_COLORS[theme_key].get(group_name, "#6b7280")
             header_btn.setStyleSheet(f"color: {color};")
+            # 2e.7 — chevron icon for the group header. The collapse
+            # toggle swaps between expand/collapse icons in
+            # ``toggle_sidebar_group``.
+            header_key = "collapse" if not is_collapsed else "expand"
+            self._apply_button_icon(header_btn, header_key)
+            header_btn.setAccessibleName(f"{group_name} group, "
+                                          f"{'collapse' if not is_collapsed else 'expand'}")
+            header_btn.setAccessibleDescription(
+                f"Toggles the {group_name} sidebar group's expanded state."
+            )
 
             header_btn.setCheckable(False)
             header_btn.clicked.connect(
@@ -444,7 +488,7 @@ class DataForgeApp(QMainWindow):
             self.group_buttons[group_name] = []
 
             # Per-group container (2e.1) — the buttons live inside a
-            # dedicated QWidget so we can animate its ``maximumHeight``
+            # dedicated ``QWidget`` so we can animate its ``maximumHeight``
             # for the collapse/expand transition. A flat layout of all
             # buttons cannot be height-animated as a unit.
             group_container = QWidget(self.nav_btn_widget)
@@ -457,6 +501,13 @@ class DataForgeApp(QMainWindow):
             for title in available:
                 btn = QPushButton(title, group_container)
                 btn.setCheckable(True)
+                # 2e.7 — attach the per-view monochrome icon to the
+                # sidebar button. The icon key is the registered
+                # title mapped via ``SIDEBAR_ICON_KEYS``; an unknown
+                # title (e.g. a plugin view) simply has no icon.
+                icon_key = SIDEBAR_ICON_KEYS.get(title)
+                if icon_key:
+                    self._apply_button_icon(btn, icon_key)
                 # 2e.6 — accessible name + description for the
                 # sidebar. Screen readers announce the bare title
                 # ("Search") as a button name; pairing it with an
@@ -499,6 +550,12 @@ class DataForgeApp(QMainWindow):
         color = HEADER_COLORS[theme_key].get(group_name, "#6b7280")
         header_button.setText(f"{'▶' if is_collapsed else '▼'}  {group_name.upper()}")
         header_button.setStyleSheet(f"color: {color};")
+        # 2e.7 — swap the chevron icon to match the new state.
+        self._apply_button_icon(header_button, "expand" if is_collapsed else "collapse")
+        # 2e.6 — refresh the accessible name to match the new state.
+        header_button.setAccessibleName(
+            f"{group_name} group, {'collapse' if not is_collapsed else 'expand'}"
+        )
 
         container = self.group_containers.get(group_name)
         if container is not None:
@@ -815,10 +872,69 @@ class DataForgeApp(QMainWindow):
         config.set("theme", "darkly" if is_dark else "cosmo")
         self.update_sidebar_header_colors()
         self._update_theme_icon(is_dark)
+        # 2e.7 — refresh every sidebar button icon so it picks up the
+        # new theme tone. The previous tone was baked into the SVG
+        # at build time; a theme change requires a rebuild.
+        self._refresh_sidebar_icons(is_dark)
+
+    def _refresh_sidebar_icons(self, is_dark: bool) -> None:
+        """Re-apply every sidebar button's icon for the given theme.
+
+        ``build_icons`` generates a fresh data URL per call, so the
+        per-button ``setIcon`` calls are what swap the rendered tone.
+        Header chevrons are also refreshed so the expand/collapse
+        icons stay in the new theme's tone."""
+        self._icons = build_icons(TONE_DARK if is_dark else TONE_LIGHT)
+        for btn, title in self.nav_buttons:
+            icon_key = SIDEBAR_ICON_KEYS.get(title)
+            if icon_key:
+                self._apply_button_icon(btn, icon_key)
+        # Refresh header chevrons — the current state is read off the
+        # stored collapsed-groups list so the icon matches the text.
+        collapsed_groups = config.get("collapsed_groups", [])
+        for group_name, header_btn in self.group_headers.items():
+            is_collapsed = group_name in collapsed_groups
+            self._apply_button_icon(
+                header_btn, "expand" if is_collapsed else "collapse",
+            )
 
     def _update_theme_icon(self, is_dark: bool):
-        if hasattr(self, "theme_icon_lbl"):
-            self.theme_icon_lbl.setText("🌙" if is_dark else "☀")
+        # 2e.7 — the theme icon is the 2e.7 monochrome SVG (sun for
+        # light, moon for dark) loaded into a QLabel via QPixmap so it
+        # recolors with the palette. The label is a fixed 18x18 box
+        # so the icon does not jump when the user toggles.
+        if not hasattr(self, "theme_icon_lbl"):
+            return
+        icons = build_icons(TONE_DARK if is_dark else TONE_LIGHT)
+        from PyQt5.QtGui import QPixmap
+        from PyQt5.QtCore import QSize
+        data_url = icons["moon" if is_dark else "sun"]
+        pixmap = QPixmap()
+        pixmap.loadFromData(self._data_url_to_bytes(data_url), "SVG+XML")
+        self.theme_icon_lbl.setPixmap(pixmap)
+        self.theme_icon_lbl.setFixedSize(QSize(18, 18))
+
+    def _data_url_to_bytes(self, data_url: str) -> bytes:
+        """Decode a ``data:image/svg+xml;base64,...`` URL to raw bytes."""
+        import base64 as _b64
+        if "," not in data_url:
+            return b""
+        return _b64.b64decode(data_url.split(",", 1)[1])
+
+    def _apply_button_icon(self, btn, icon_key: str) -> None:
+        """Attach the 2e.7 monochrome SVG for *icon_key* to *btn*.
+
+        Looks the data URL up in the dict ``build_navigation_sidebar``
+        populated in ``self._icons``; missing keys are silently ignored
+        so plugin views without a curated icon do not error out."""
+        icons = getattr(self, "_icons", None)
+        if not icons or icon_key not in icons:
+            return
+        btn.setIcon(QIcon(icons[icon_key]))
+        # The icon size matches the button's font height (in device
+        # pixels) so the glyph sits flush with the text label.
+        size = btn.fontMetrics().height()
+        btn.setIconSize(QSize(size, size))
 
     def apply_theme(self, is_dark: bool):
         """

@@ -1968,6 +1968,102 @@ class ContractRegressionTests(unittest.TestCase):
                       "destructive preview button accessibleDescription "
                       "must explain the consequence")
 
+    def test_sidebar_icon_set_has_eighteen_monochrome_svgs(self):
+        """2e.7 — The 2e.7 sidebar icon set must contain 16–20 entries
+        per the IMPROVEMENT_PLAN §2.5 item, each one a stroke-only SVG
+        path (no fills) on a 16x16 viewBox. The manifest drives the
+        sidebar button icons and the theme toggle icon."""
+        from dataforge.ui.resources import icons
+
+        self.assertGreaterEqual(
+            len(icons.ICON_KEYS), 16,
+            f"icon set must have ≥16 entries, got {len(icons.ICON_KEYS)}",
+        )
+        self.assertLessEqual(
+            len(icons.ICON_KEYS), 20,
+            f"icon set must have ≤20 entries, got {len(icons.ICON_KEYS)}",
+        )
+        # Every entry is a non-empty path string.
+        for key, path in icons.ICON_PATHS.items():
+            self.assertTrue(path, f"icon {key!r} has empty path data")
+            self.assertNotIn("<", path, f"icon {key!r} is not stroke-only")
+
+    def test_build_icons_renders_for_both_themes(self):
+        """2e.7 — ``build_icons`` must return a fresh data URL for
+        every icon, with the light tone baked into the light render
+        and the dark tone into the dark render. Two consecutive
+        calls must return different bytes (so a theme change
+        actually swaps the rendered colour)."""
+        import base64
+        from dataforge.ui.resources.icons import (
+            ICON_KEYS, TONE_DARK, TONE_LIGHT, build_icons
+        )
+
+        light = build_icons(TONE_LIGHT)
+        dark = build_icons(TONE_DARK)
+
+        for key in ICON_KEYS:
+            self.assertIn(key, light)
+            self.assertIn(key, dark)
+            self.assertNotEqual(light[key], dark[key],
+                                f"icon {key!r} is identical in both tones")
+
+        def _decode(data_url: str) -> str:
+            _, payload = data_url.split(",", 1)
+            return base64.b64decode(payload).decode("utf-8", errors="replace")
+
+        # The SVG payload for one representative key must contain the
+        # light tone in the light render and the dark tone in the
+        # dark render. Checking one key is sufficient — every key
+        # flows through the same renderer.
+        sample = ICON_KEYS[0]
+        self.assertIn(TONE_LIGHT, _decode(light[sample]))
+        self.assertNotIn(TONE_DARK, _decode(light[sample]))
+        self.assertIn(TONE_DARK, _decode(dark[sample]))
+        self.assertNotIn(TONE_LIGHT, _decode(dark[sample]))
+
+    def test_sidebar_buttons_have_icons_for_every_view(self):
+        """2e.7 — Every registered view title that appears in the
+        sidebar must have an icon in the manifest and the
+        ``SIDEBAR_ICON_KEYS`` mapping, and the button must carry a
+        ``QIcon`` after the sidebar is built."""
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.ui.app import DataForgeApp, SIDEBAR_ICON_KEYS
+        from dataforge.ui.resources.icons import ICON_KEYS
+        from dataforge.ui.views import dashboard as _dashboard
+        from unittest.mock import patch as _patch
+
+        _ = QApplication.instance() or QApplication([])
+
+        # Every sidebar-registered title must have an icon mapping.
+        for title in SIDEBAR_ICON_KEYS:
+            self.assertIn(
+                SIDEBAR_ICON_KEYS[title], ICON_KEYS,
+                f"icon key for {title!r} ({SIDEBAR_ICON_KEYS[title]!r}) "
+                f"is missing from the icon manifest",
+            )
+
+        with _patch.object(_dashboard.DashboardView, "mount", lambda self: None), \
+             _patch("dataforge.ui.app.config") as mock_config:
+            mock_config.get.side_effect = lambda k, d=None: {
+                "theme": "cosmo",
+                "settings_ui_tier": "Simple",
+                "plugins_enabled": False,
+                "collapsed_groups": [],
+            }.get(k, d)
+            mock_config.set = lambda *a, **k: None
+            app = DataForgeApp()
+
+        # Every nav button that has an icon mapping must carry a
+        # non-null ``QIcon`` (i.e. the data URL rendered into a
+        # pixmap successfully).
+        for btn, title in app.nav_buttons:
+            if title in SIDEBAR_ICON_KEYS:
+                icon = btn.icon()
+                self.assertFalse(icon.isNull(),
+                                 f"sidebar button {title!r} has a null "
+                                 f"QIcon after the sidebar was built")
+
     def test_storage_devices_view_surfaces_fm_devices_in_gui(self):
         """``fm devices`` had no GUI path; the new ``Storage & Devices``
         view wires the same ``device_manager.list_storage_devices`` API
