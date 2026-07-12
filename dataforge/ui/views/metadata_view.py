@@ -63,9 +63,12 @@ class MetadataView(BaseView):
         self.entry_path = QLineEdit(path_frame)
         self.entry_path.setPlaceholderText("/path/to/files or a single file")
         path_layout.addWidget(self.entry_path)
-        self.btn_browse = QPushButton("Browse", path_frame)
-        self.btn_browse.clicked.connect(self._browse)
-        path_layout.addWidget(self.btn_browse)
+        self.btn_browse_file = QPushButton("Browse File…", path_frame)
+        self.btn_browse_file.clicked.connect(self.browse_file)
+        path_layout.addWidget(self.btn_browse_file)
+        self.btn_browse_folder = QPushButton("Browse Folder…", path_frame)
+        self.btn_browse_folder.clicked.connect(self.browse_folder)
+        path_layout.addWidget(self.btn_browse_folder)
         c_layout.addWidget(path_frame)
 
         # Options row
@@ -255,13 +258,18 @@ class MetadataView(BaseView):
     # Scanning
     # ------------------------------------------------------------------
 
-    def _browse(self):
-        path = self.choose_file_or_directory(
-            file_title="Select File for Metadata",
-            directory_title="Select Folder to Scan",
-        )
+    def browse_file(self):
+        path = self.choose_file(title="Select File for Metadata")
         if path:
             self.entry_path.setText(path)
+
+    def browse_folder(self):
+        path = self.choose_directory(title="Select Folder to Scan")
+        if path:
+            self.entry_path.setText(path)
+
+    def _browse(self):
+        self.browse_folder()
 
     def _start_scan(self):
         path = self.entry_path.text().strip()

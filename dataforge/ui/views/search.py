@@ -65,9 +65,12 @@ Once files are found, use the 'Bulk Actions' card to:
         path_layout.addWidget(QLabel("Path:"))
         self.entry_path = QLineEdit(frame_path)
         path_layout.addWidget(self.entry_path)
-        self.btn_browse = QPushButton("Browse", frame_path)
-        self.btn_browse.clicked.connect(self.browse_path)
-        path_layout.addWidget(self.btn_browse)
+        self.btn_browse_file = QPushButton("Browse File…", frame_path)
+        self.btn_browse_file.clicked.connect(self.browse_file)
+        path_layout.addWidget(self.btn_browse_file)
+        self.btn_browse_folder = QPushButton("Browse Folder…", frame_path)
+        self.btn_browse_folder.clicked.connect(self.browse_folder)
+        path_layout.addWidget(self.btn_browse_folder)
         ctrl_layout.addWidget(frame_path)
         
         # Row 2: Name, Regex, Ext, Depth
@@ -299,14 +302,21 @@ Once files are found, use the 'Bulk Actions' card to:
         
         self._init_slice_tooltips()
 
-    def browse_path(self):
-        path = self.choose_file_or_directory(
-            file_title="Select File to Search",
-            directory_title="Select Folder to Search",
+    def browse_file(self):
+        path = self.choose_file(
+            title="Select File to Search",
             filetypes=[("All Files", "*.*")],
         )
         if path:
             self.entry_path.setText(path)
+
+    def browse_folder(self):
+        path = self.choose_directory(title="Select Folder to Search")
+        if path:
+            self.entry_path.setText(path)
+
+    def browse_path(self):
+        self.browse_folder()
             
     def on_preview_select(self):
         sel = self.tree.selection()

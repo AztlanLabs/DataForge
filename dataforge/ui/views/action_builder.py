@@ -88,10 +88,14 @@ Operations to perform on the filtered files.
         src_layout.addWidget(QLabel("Path:"))
         self.entry_path = QLineEdit(src_frame)
         src_layout.addWidget(self.entry_path)
-        
-        self.btn_browse = QPushButton("Browse", src_frame)
-        self.btn_browse.clicked.connect(self.browse_path)
-        src_layout.addWidget(self.btn_browse)
+
+        self.btn_browse_file = QPushButton("Browse File…", src_frame)
+        self.btn_browse_file.clicked.connect(self.browse_file)
+        src_layout.addWidget(self.btn_browse_file)
+
+        self.btn_browse_folder = QPushButton("Browse Folder…", src_frame)
+        self.btn_browse_folder.clicked.connect(self.browse_folder)
+        src_layout.addWidget(self.btn_browse_folder)
         
         self.chk_recursive = QCheckBox("Recursive", src_frame)
         self.chk_recursive.setChecked(True)
@@ -238,14 +242,21 @@ Operations to perform on the filtered files.
             (self.btn_execute, self.TOOLTIP_TEXTS["execute"]),
         ])
 
-    def browse_path(self):
-        p = self.choose_file_or_directory(
-            file_title="Select File for Pipeline",
-            directory_title="Select Folder for Pipeline",
+    def browse_file(self):
+        p = self.choose_file(
+            title="Select File for Pipeline",
             filetypes=[("All Files", "*.*")],
         )
         if p:
             self.entry_path.setText(p)
+
+    def browse_folder(self):
+        p = self.choose_directory(title="Select Folder for Pipeline")
+        if p:
+            self.entry_path.setText(p)
+
+    def browse_path(self):
+        self.browse_folder()
 
     def add_step(self, step_class):
         step = step_class()

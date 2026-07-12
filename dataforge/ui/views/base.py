@@ -240,22 +240,27 @@ class BaseView(QWidget, metaclass=QWidgetABCMeta):
 
         return True
 
+    def choose_file(self, title="Select File", filetypes=None, directory=""):
+        """Open a single-file picker. Returns the chosen path or an empty
+        string if the user cancelled. The Yes/No/Cancel
+        ``choose_file_or_directory`` message-box riddle is gone; callers
+        that need to support both files and folders must expose two
+        separate buttons that call ``choose_file`` and
+        ``choose_directory`` respectively."""
+        filter_str = ";;".join(f"{label} ({pattern})" for label, pattern in (filetypes or [])) or ""
+        path, _ = dialogs.get_open_file_name(self, title, directory=directory, filter=filter_str)
+        return path or ""
+
+    def choose_directory(self, title="Select Folder", directory=""):
+        """Open a directory picker. Returns the chosen path or an empty
+        string if the user cancelled."""
+        path = dialogs.get_existing_directory(self, title, directory=directory)
+        return path or ""
+
     def choose_file_or_directory(self, file_title="Select File", directory_title="Select Folder", filetypes=None):
-        msg_box = QMessageBox(self)
-        msg_box.setWindowTitle("Browse Path")
-        msg_box.setText("Select a file?\n\nChoose Yes for a file, No for a folder, or Cancel to keep the current path.")
-        yes_btn = msg_box.addButton(QMessageBox.Yes)
-        no_btn = msg_box.addButton(QMessageBox.No)
-        msg_box.addButton(QMessageBox.Cancel)
-        msg_box.setDefaultButton(QMessageBox.Cancel)
-        
-        msg_box.exec_()
-        clicked = msg_box.clickedButton()
-        
-        if clicked == yes_btn:
-            path, _ = dialogs.get_open_file_name(self, file_title)
-            return path
-        elif clicked == no_btn:
-            path = dialogs.get_existing_directory(self, directory_title)
-            return path
+        """Deprecated. The Yes/No/Cancel riddle that forced the user to
+        decide between picking a file or a folder before the picker
+        opened has been removed. This stub remains only so the contract
+        test can verify the deprecation; all in-app call sites now use
+        ``choose_file`` or ``choose_directory`` directly."""
         return ""

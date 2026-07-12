@@ -87,13 +87,18 @@ class ToolsView(BaseView):
         f1_layout.addWidget(QLabel("Path:", f1), 0, 0)
         self.snap_folder = QLineEdit(f1)
         f1_layout.addWidget(self.snap_folder, 0, 1)
-        self.snap_browse_button = QPushButton("Browse", f1)
+        self.snap_browse_button = QPushButton("File…", f1)
         self.snap_browse_button.clicked.connect(lambda: self.browse_path(
             self.snap_folder,
-            file_title="Select File to Snapshot",
-            directory_title="Select Folder to Snapshot"
+            file_title="Select File to Snapshot"
         ))
         f1_layout.addWidget(self.snap_browse_button, 0, 2)
+        self.snap_browse_dir_button = QPushButton("Folder…", f1)
+        self.snap_browse_dir_button.clicked.connect(lambda: self.browse_folder(
+            self.snap_folder,
+            title="Select Folder to Snapshot"
+        ))
+        f1_layout.addWidget(self.snap_browse_dir_button, 0, 3)
         
         f1_layout.addWidget(QLabel("Output (.json):", f1), 1, 0)
         self.snap_out = QLineEdit(f1)
@@ -121,13 +126,18 @@ class ToolsView(BaseView):
         f2_layout.addWidget(QLabel("Target Path:", f2), 0, 0)
         self.verify_folder = QLineEdit(f2)
         f2_layout.addWidget(self.verify_folder, 0, 1)
-        self.verify_browse_button = QPushButton("Browse", f2)
+        self.verify_browse_button = QPushButton("File…", f2)
         self.verify_browse_button.clicked.connect(lambda: self.browse_path(
             self.verify_folder,
-            file_title="Select File to Verify",
-            directory_title="Select Folder to Verify"
+            file_title="Select File to Verify"
         ))
         f2_layout.addWidget(self.verify_browse_button, 0, 2)
+        self.verify_browse_dir_button = QPushButton("Folder…", f2)
+        self.verify_browse_dir_button.clicked.connect(lambda: self.browse_folder(
+            self.verify_folder,
+            title="Select Folder to Verify"
+        ))
+        f2_layout.addWidget(self.verify_browse_dir_button, 0, 3)
         
         f2_layout.addWidget(QLabel("Snapshot File:", f2), 1, 0)
         self.verify_file = QLineEdit(f2)
@@ -157,11 +167,12 @@ class ToolsView(BaseView):
             entry.setText(p)
 
     def browse_path(self, entry, file_title="Select File", directory_title="Select Folder", filetypes=None):
-        p = self.choose_file_or_directory(
-            file_title=file_title,
-            directory_title=directory_title,
-            filetypes=filetypes,
-        )
+        p = self.choose_file(title=file_title, filetypes=filetypes)
+        if p:
+            entry.setText(p)
+
+    def browse_folder(self, entry, title="Select Folder"):
+        p = self.choose_directory(title=title)
         if p:
             entry.setText(p)
 
@@ -263,13 +274,18 @@ class ToolsView(BaseView):
         s_body_layout.addWidget(QLabel("Path:", s_body), 0, 0)
         self.cleaner_path_entry = QLineEdit(s_body)
         s_body_layout.addWidget(self.cleaner_path_entry, 0, 1)
-        self.cleaner_browse_button = QPushButton("Browse", s_body)
+        self.cleaner_browse_button = QPushButton("File…", s_body)
         self.cleaner_browse_button.clicked.connect(lambda: self.browse_path(
             self.cleaner_path_entry,
-            file_title="Select File to Scan",
-            directory_title="Select Folder to Scan"
+            file_title="Select File to Scan"
         ))
         s_body_layout.addWidget(self.cleaner_browse_button, 0, 2)
+        self.cleaner_browse_dir_button = QPushButton("Folder…", s_body)
+        self.cleaner_browse_dir_button.clicked.connect(lambda: self.browse_folder(
+            self.cleaner_path_entry,
+            title="Select Folder to Scan"
+        ))
+        s_body_layout.addWidget(self.cleaner_browse_dir_button, 0, 3)
         
         s_body_layout.addWidget(QLabel("Extensions (comma sep):", s_body), 1, 0)
         self.cleaner_exts_entry = QLineEdit(s_body)

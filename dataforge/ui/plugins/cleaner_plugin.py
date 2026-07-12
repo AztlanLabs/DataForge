@@ -26,9 +26,12 @@ class MetadataCleanerPlugin(BaseView):
         ctrl_layout.addWidget(QLabel("Path:", ctrl_frame), 0, 0)
         self.path_entry = QLineEdit(ctrl_frame)
         ctrl_layout.addWidget(self.path_entry, 0, 1)
-        self.btn_browse = QPushButton("Browse", ctrl_frame)
-        self.btn_browse.clicked.connect(self.browse)
-        ctrl_layout.addWidget(self.btn_browse, 0, 2)
+        self.btn_browse_file = QPushButton("File…", ctrl_frame)
+        self.btn_browse_file.clicked.connect(self.browse_file)
+        ctrl_layout.addWidget(self.btn_browse_file, 0, 2)
+        self.btn_browse_folder = QPushButton("Folder…", ctrl_frame)
+        self.btn_browse_folder.clicked.connect(self.browse_folder)
+        ctrl_layout.addWidget(self.btn_browse_folder, 0, 3)
         
         ctrl_layout.addWidget(QLabel("Depth:", ctrl_frame), 0, 3)
         self.depth_spin = QSpinBox(ctrl_frame)
@@ -91,14 +94,21 @@ class MetadataCleanerPlugin(BaseView):
         
         self.scan_results = []
 
-    def browse(self):
-        p = self.choose_file_or_directory(
-            file_title="Select File to Scan",
-            directory_title="Select Folder to Scan",
+    def browse_file(self):
+        p = self.choose_file(
+            title="Select File to Scan",
             filetypes=[("Supported Files", "*.jpg *.jpeg *.png *.pdf"), ("All Files", "*.*")],
         )
         if p:
             self.path_entry.setText(p)
+
+    def browse_folder(self):
+        p = self.choose_directory(title="Select Folder to Scan")
+        if p:
+            self.path_entry.setText(p)
+
+    def browse(self):
+        self.browse_folder()
 
     def start_scan(self):
         path = self.path_entry.text()

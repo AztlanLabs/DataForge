@@ -29,28 +29,62 @@ class ContractRegressionTests(unittest.TestCase):
     def test_cli_smoke_import(self):
         self.assertIsNotNone(main)
 
-    def test_browse_helper_supports_file_and_folder_selection(self):
+    def test_choose_file_returns_picked_path(self):
+        with patch(
+            "dataforge.ui.views.base.dialogs.get_open_file_name",
+            return_value=("C:/tmp/file.txt", ""),
+        ) as open_file:
+            dummy_self = MagicMock()
+            self.assertEqual(
+                BaseView.choose_file(dummy_self, filetypes=[("All Files", "*.*")]),
+                "C:/tmp/file.txt",
+            )
+        open_file.assert_called_once()
+
+    def test_choose_file_returns_empty_string_on_cancel(self):
+        with patch(
+            "dataforge.ui.views.base.dialogs.get_open_file_name",
+            return_value=("", ""),
+        ) as open_file:
+            dummy_self = MagicMock()
+            self.assertEqual(BaseView.choose_file(dummy_self), "")
+        open_file.assert_called_once()
+
+    def test_choose_directory_returns_picked_path(self):
+        with patch(
+            "dataforge.ui.views.base.dialogs.get_existing_directory",
+            return_value="C:/tmp/folder",
+        ) as open_dir:
+            dummy_self = MagicMock()
+            self.assertEqual(
+                BaseView.choose_directory(dummy_self, title="Select Folder"),
+                "C:/tmp/folder",
+            )
+        open_dir.assert_called_once()
+
+    def test_choose_directory_returns_empty_string_on_cancel(self):
+        with patch(
+            "dataforge.ui.views.base.dialogs.get_existing_directory",
+            return_value="",
+        ) as open_dir:
+            dummy_self = MagicMock()
+            self.assertEqual(BaseView.choose_directory(dummy_self), "")
+        open_dir.assert_called_once()
+
+    def test_choose_file_or_directory_riddle_is_removed(self):
+        """The Yes/No/Cancel message-box riddle is gone; the legacy entry
+        point must no longer pop a question before opening the picker."""
         with patch("dataforge.ui.views.base.QMessageBox") as MockQMessageBox, \
-             patch("dataforge.ui.views.base.dialogs.get_open_file_name", return_value=("C:/tmp/file.txt", "")) as open_file, \
-             patch("dataforge.ui.views.base.dialogs.get_existing_directory", return_value="C:/tmp/folder") as open_dir:
-            
-            mock_box = MockQMessageBox.return_value
-            yes_btn = object()
-            no_btn = object()
-            cancel_btn = object()
-            mock_box.addButton.side_effect = [yes_btn, no_btn, cancel_btn] * 3
-            mock_box.clickedButton.side_effect = [yes_btn, no_btn, cancel_btn]
-            
+             patch("dataforge.ui.views.base.dialogs.get_open_file_name", return_value=("", "")) as open_file, \
+             patch("dataforge.ui.views.base.dialogs.get_existing_directory", return_value="") as open_dir:
             dummy_self = MagicMock()
             self.assertEqual(
                 BaseView.choose_file_or_directory(dummy_self, filetypes=[("All Files", "*.*")]),
-                "C:/tmp/file.txt",
+                "",
             )
-            self.assertEqual(BaseView.choose_file_or_directory(dummy_self), "C:/tmp/folder")
-            self.assertEqual(BaseView.choose_file_or_directory(dummy_self), "")
-
-        open_file.assert_called_once()
-        open_dir.assert_called_once()
+        MockQMessageBox.assert_not_called()
+        open_file.assert_not_called()
+        open_dir.assert_not_called()
 
     def test_cli_search_accepts_single_file_path(self):
         runner = CliRunner()
