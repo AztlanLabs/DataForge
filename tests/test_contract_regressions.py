@@ -925,6 +925,33 @@ class ContractRegressionTests(unittest.TestCase):
         self.assertTrue(callable(getattr(BaseView, "show_help", None)))
         self.assertTrue(callable(getattr(BaseView, "whats_this_for", None)))
 
+    def test_sidebar_uses_task_oriented_groups(self):
+        """The sidebar must group views by user task (Home / Find & Organize
+        / Clean & Optimize / Recover & Investigate / System), not by the
+        internal module boundaries. The regrouping lives in
+        ``DataForgeApp.build_navigation_sidebar`` (called once at start).
+        """
+        from dataforge.ui.app import HEADER_COLORS, DataForgeApp
+
+        expected_groups = [
+            "Home",
+            "Find & Organize",
+            "Clean & Optimize",
+            "Recover & Investigate",
+            "System",
+        ]
+        for name in expected_groups:
+            self.assertIn(name, HEADER_COLORS["light"])
+            self.assertIn(name, HEADER_COLORS["dark"])
+
+        self.assertNotIn("Overview", HEADER_COLORS["light"])
+        self.assertNotIn("File Utilities", HEADER_COLORS["light"])
+        self.assertNotIn("System Maintenance", HEADER_COLORS["light"])
+        self.assertNotIn("Advanced Analysis", HEADER_COLORS["light"])
+        self.assertNotIn("Application", HEADER_COLORS["light"])
+
+        self.assertTrue(callable(getattr(DataForgeApp, "build_navigation_sidebar", None)))
+
     def test_cli_search_help_mentions_extension_sort_examples(self):
         runner = CliRunner()
 

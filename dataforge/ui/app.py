@@ -32,20 +32,20 @@ from ..core.config import config
 
 HEADER_COLORS = {
     "light": {
-        "Overview": "#2563eb",         # blue
-        "File Utilities": "#d97706",    # amber
-        "System Maintenance": "#059669", # emerald
-        "Advanced Analysis": "#7c3aed",  # purple
-        "Application": "#db2777",        # pink
-        "Plugins": "#4b5563"             # slate
+        "Home": "#2563eb",                # blue
+        "Find & Organize": "#d97706",     # amber
+        "Clean & Optimize": "#059669",    # emerald
+        "Recover & Investigate": "#7c3aed", # purple
+        "System": "#db2777",              # pink
+        "Plugins": "#4b5563",             # slate
     },
     "dark": {
-        "Overview": "#60a5fa",         # blue
-        "File Utilities": "#fbbf24",    # amber
-        "System Maintenance": "#34d399", # emerald
-        "Advanced Analysis": "#a78bfa",  # purple
-        "Application": "#f472b6",        # pink
-        "Plugins": "#9ca3af"             # slate
+        "Home": "#60a5fa",                # blue
+        "Find & Organize": "#fbbf24",     # amber
+        "Clean & Optimize": "#34d399",    # emerald
+        "Recover & Investigate": "#a78bfa", # purple
+        "System": "#f472b6",              # pink
+        "Plugins": "#9ca3af",             # slate
     }
 }
 
@@ -331,13 +331,33 @@ class DataForgeApp(QMainWindow):
         self.group_headers = {}
         self.group_buttons = {}
 
-        # Group definitions
+        # Group definitions — task-oriented sidebar (IMPROVEMENT_PLAN §2.2).
+        # The labels are stable across the rename in 2d.3 and the view merge
+        # in 2d.2/2d.4; the build-time list is the contract every commit
+        # updates in lockstep with the registered view titles.
         groups = {
-            "Overview": ["Dashboard"],
-            "File Utilities": ["Search & Organize", "Duplicate Finder", "Media Tools", "Action Builder", "Tools & Workflows"],
-            "System Maintenance": ["System Cleanup", "Performance", "File Recovery"],
-            "Advanced Analysis": ["Metadata Studio", "Hardware Diagnostics", "Forensics Lab"],
-            "Application": ["Settings", "About & Help"]
+            "Home": ["Dashboard"],
+            "Find & Organize": [
+                "Search & Organize",
+                "Duplicate Finder",
+                "Media Tools",
+                "Metadata Studio",
+                "Action Builder",
+                "Tools & Workflows",
+            ],
+            "Clean & Optimize": [
+                "System Cleanup",
+                "Performance",
+            ],
+            "Recover & Investigate": [
+                "File Recovery",
+                "Forensics Lab",
+            ],
+            "System": [
+                "Hardware Diagnostics",
+                "Settings",
+                "About & Help",
+            ],
         }
 
         # Collect unregistered/plugin views
