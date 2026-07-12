@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+COMMIT_MSG_FILE="$1"
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+if [[ "$COMMIT_MSG" =~ ^Merge|^Revert|^Squashed ]]; then
+    exit 0
+fi
+
+PATTERN='^(feat|fix|docs|refactor|test|chore|style|perf|revert)(\([a-z-]+\))?!?: .{1,72}$'
+
+if ! echo "$COMMIT_MSG" | head -1 | grep -qE "$PATTERN"; then
+    echo "ERROR: Commit message does not follow Conventional Commits format."
+    echo ""
+    echo "Required format: type[(scope)]: description"
+    echo "  type: feat | fix | docs | refactor | test | chore | style | perf | revert"
+    echo "  scope (optional): core | cli | ui | modules | actions | design | build | docs | tests | repo"
+    echo "  max length: 72 characters"
+    echo ""
+    echo "Examples:"
+    echo "  feat(design): add AA-validated design-token system"
+    echo "  fix(core): prevent symlink recursion in scanner"
+    echo "  docs: restructure review documentation"
+    echo ""
+    echo "See docs/COMMIT_CONVENTION.md for the full standard."
+    exit 1
+fi
+
+exit 0
