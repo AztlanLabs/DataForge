@@ -925,7 +925,7 @@ class ContractRegressionTests(unittest.TestCase):
         repo_root = Path(__file__).resolve().parents[1]
         plugin_dir = repo_root / "dataforge" / "ui" / "plugins"
 
-        loader = PluginLoader(str(plugin_dir))
+        loader = PluginLoader(str(plugin_dir), enabled=True)
         plugin_names = {plugin_cls.__name__ for plugin_cls in loader.load_plugins()}
 
         self.assertIn("MetadataCleanerPlugin", plugin_names)

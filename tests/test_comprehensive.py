@@ -1524,16 +1524,24 @@ class TestPluginLoader(unittest.TestCase):
         from dataforge.ui.plugin_loader import PluginLoader
         repo_root = Path(__file__).resolve().parents[1]
         plugin_dir = str(repo_root / "dataforge" / "ui" / "plugins")
-        loader = PluginLoader(plugin_dir)
+        loader = PluginLoader(plugin_dir, enabled=True)
         plugins = loader.load_plugins()
         self.assertIsInstance(plugins, list)
         self.assertGreater(len(plugins), 0)
 
     def test_loader_nonexistent_dir(self):
         from dataforge.ui.plugin_loader import PluginLoader
-        loader = PluginLoader("/nonexistent/path")
+        loader = PluginLoader("/nonexistent/path", enabled=True)
         plugins = loader.load_plugins()
         self.assertEqual(len(plugins), 0)
+
+    def test_loader_disabled_by_default_loads_nothing(self):
+        from dataforge.ui.plugin_loader import PluginLoader
+        repo_root = Path(__file__).resolve().parents[1]
+        plugin_dir = str(repo_root / "dataforge" / "ui" / "plugins")
+        loader = PluginLoader(plugin_dir)
+        plugins = loader.load_plugins()
+        self.assertEqual(plugins, [])
 
 
 if __name__ == "__main__":

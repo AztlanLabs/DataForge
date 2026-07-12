@@ -276,7 +276,8 @@ class DataForgeApp(QMainWindow):
         # Load Plugins
         report(len(view_classes) + 1, "Loading plugins...")
         plugin_dir = os.path.join(os.path.dirname(__file__), 'plugins')
-        loader = PluginLoader(plugin_dir)
+        plugins_enabled = config.get("plugins_enabled", False)
+        loader = PluginLoader(plugin_dir, enabled=plugins_enabled)
         for plugin_cls in loader.load_plugins():
             self.add_view(plugin_cls)
 
