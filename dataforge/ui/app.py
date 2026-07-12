@@ -25,6 +25,7 @@ from .views.recovery_view import RecoveryView
 from .views.metadata_view import MetadataView
 from .views.hardware_view import HardwareView
 from .views.forensics_view import ForensicsView
+from .views.storage_devices import StorageDevicesView
 from .views.about import AboutView
 from .plugin_loader import PluginLoader
 from .theme_tokens import generate_qss, generate_palette, TYPE_SCALE
@@ -276,6 +277,7 @@ class DataForgeApp(QMainWindow):
             (MetadataView, "Metadata Studio"),
             (HardwareView, "Hardware Diagnostics"),
             (ForensicsView, "Forensics Lab"),
+            (StorageDevicesView, "Storage & Devices"),
             (SettingsView, "Settings"),
             (AboutView, "About & Help"),
         ]
@@ -347,6 +349,7 @@ class DataForgeApp(QMainWindow):
             ],
             "Clean & Optimize": [
                 "System Cleanup",
+                "Storage & Devices",
                 "Performance",
             ],
             "Recover & Investigate": [

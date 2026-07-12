@@ -952,6 +952,25 @@ class ContractRegressionTests(unittest.TestCase):
 
         self.assertTrue(callable(getattr(DataForgeApp, "build_navigation_sidebar", None)))
 
+    def test_storage_devices_view_surfaces_fm_devices_in_gui(self):
+        """``fm devices`` had no GUI path; the new ``Storage & Devices``
+        view wires the same ``device_manager.list_storage_devices`` API
+        into a QTableWidget so the data is discoverable in-app."""
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.ui.views.storage_devices import StorageDevicesView
+
+        _ = QApplication.instance() or QApplication([])
+
+        view = StorageDevicesView(None, app=MagicMock())
+        self.assertEqual(view.get_title(), "Storage & Devices")
+        self.assertEqual(view.table.columnCount(), 5)
+        self.assertEqual(
+            [view.table.horizontalHeaderItem(i).text() for i in range(5)],
+            ["Mount point", "Type", "Filesystem", "Used", "Total"],
+        )
+        self.assertIn("refresh", view.TOOLTIP_TEXTS)
+        self.assertIn("details", view.TOOLTIP_TEXTS)
+
     def test_cli_search_help_mentions_extension_sort_examples(self):
         runner = CliRunner()
 
