@@ -2,7 +2,7 @@
 
 *File System Management with Steroids and Superpowers*
 
-**Last verified:** 2026-07-11
+**Last verified:** 2026-07-12
 
 ## Effective Project Root
 
@@ -56,7 +56,7 @@ PYTHONPATH=. pytest -q
 
 The nested project layout means plain `pytest -q` may not resolve `dataforge` unless the package is installed or the project root is placed on `PYTHONPATH`.
 
-The full suite passes — 255 tests. The earlier collection failure (a stale `rename_with_regex` import) has been fixed. See [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) for verification details.
+The full suite passes — 276 tests. The earlier collection failure (a stale `rename_with_regex` import) has been fixed. See [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) for verification details.
 
 ## Packaging and distribution
 
@@ -156,7 +156,7 @@ New top-level screens and plugins should inherit from `BaseView` and use its sha
 | --- | --- | --- |
 | `tests/test_comprehensive.py` | wide feature coverage across core modules, services, media, and actions | passes (147) |
 | `tests/test_integration.py` | end-to-end workflows and packaging/plugin paths | passes (18) |
-| `tests/test_contract_regressions.py` | CLI and GUI-facing contract expectations | passes (50) |
+| `tests/test_contract_regressions.py` | CLI and GUI-facing contract expectations | passes (~110 — including 21 added in WS-C/WS-D) |
 | `tests/test_new_modules.py` | newer modules (hardware, forensics, recovery, metadata, etc.) | passes (9) |
 | `tests/verify_scenarios.py` | scenario-style validation helpers | standalone script |
 
@@ -164,11 +164,11 @@ New top-level screens and plugins should inherit from `BaseView` and use its sha
 
 - The repository mixes application source with generated build output. Be deliberate about which files are source of truth.
 - The repository is under Git version control on `develop` and `main` branches. Follow [`docs/CONTRIBUTING.md`](./CONTRIBUTING.md) for the complete development workflow — commit conventions, versioning, release process, and implementation plan format. A `commit-msg` hook in `.githooks/` validates every commit; install it with `git config core.hooksPath .githooks`.
-- **CI is not yet wired.** Tests do not run automatically on push. Setting up CI/CD is the highest-leverage next step — see [`reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md), Phase 0.
-- The plugin loader registers every discovered `BaseView` subclass in `dataforge/ui/plugins/`; plugin import failures are now logged (via `logger.error`) and skipped. Plugins are arbitrary code executed with full app privileges — only add plugins you trust (see `reviews/02`, S5).
-- The stray empty `26.1.2` file has been removed and a root `.gitignore` added (the tree still needs to be put under version control).
+- **CI runs on every push/PR.** `.github/workflows/ci.yml` runs pytest + coverage, ruff (blocking), mypy (advisory), and pip-audit on push/PR to `develop`/`main`. See [`reviews/IMPLEMENTATION_PLAN.md`](./reviews/IMPLEMENTATION_PLAN.md) WS-A.
+- The plugin loader registers every discovered `BaseView` subclass in `dataforge/ui/plugins/`; plugin import failures are now logged (via `logger.error`) and skipped. Loading is **opt-in** behind `config["plugins_enabled"]` (default off) and the loader refuses plugins in group/world-writable directories or files owned by another user. Only add plugins you trust (S5, fixed in WS-B).
+- The stray empty `26.1.2` file has been removed and a root `.gitignore` added.
 - The current dependency story is split: `pyproject.toml` is enough for the core package/CLI entrypoint; `requirements.txt` provisions the full GUI/media runtime, and `requirements-dev.txt` adds the build/test tooling.
-- Settings are saved immediately through `ConfigManager.set()`, so UI changes often persist at the moment a control is saved rather than on app shutdown.
+- Settings **autosave** on every change through `ConfigManager.set()` (no Save button) and flash a transient "Saved ✓" indicator — see `BaseView._autosave` / `_saved_indicator` in `dataforge/ui/views/settings.py` (2c.2).
 
 ## Recommended onboarding order
 

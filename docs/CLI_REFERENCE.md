@@ -2,7 +2,7 @@
 
 *File System Management with Steroids and Superpowers*
 
-**Last verified:** 2026-07-11
+**Last verified:** 2026-07-12
 
 ## Entry Point — CLI Superpowers
 

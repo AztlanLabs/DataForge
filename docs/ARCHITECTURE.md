@@ -2,7 +2,7 @@
 
 *File System Management with Steroids and Superpowers*
 
-**Last verified:** 2026-07-11
+**Last verified:** 2026-07-12
 
 ## System Summary
 
@@ -139,7 +139,7 @@ This is important for extension because new pipeline steps fit naturally here wi
 
 | Artifact | Location | Purpose |
 | --- | --- | --- |
-| Config | `~/.dataforge/config.json` | theme, safe mode, exclusions, hash algorithm, two separate worker budgets (`max_thread_workers` for hashing/batch work, `search_thread_workers` for search/keyword scanning), size unit, path display mode, experience tier, dashboard paths |
+| Config | `~/.dataforge/config.json` | theme, safe mode, exclusions, hash algorithm, two separate worker budgets (`max_thread_workers` for hashing/batch work, `search_thread_workers` for search/keyword scanning), size unit, path display mode, detail level (`Simple` / `Standard` / `Everything`), dashboard paths |
 | Hash cache | `~/.dataforge/cache.db` | cached content hashes keyed by path, size, mtime, and algorithm |
 | Log file | `~/.dataforge/app.log` | rotating application log |
 

@@ -1,6 +1,6 @@
 # Technical Source of Truth
 
-**Last verified:** 2026-07-11
+**Last verified:** 2026-07-12
 
 > This is the deepest technical map in the repository.
 >
@@ -25,7 +25,7 @@ It is intended to answer four questions for a new maintainer:
 
 This document is based on the current source files in the repository, not on intended behavior.
 
-The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5** and several new modules were added after this document was written. Path references have been audited and corrected (all `core/`/`modules/` mentions now carry the `dataforge/` prefix; the old dead `docs/reviews/01/` links are gone) - see [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) A5/D4/D5. Some GUI/file-by-file *content* (as opposed to paths) may still not be fully re-audited against the newest modules. Key points: 255 tests pass, integrity defaults to SHA-256 (not MD5), the scanner no longer follows symlinks, the SQLite cache is thread-safe, and the forensic-report HTML injection (S2) is fixed. Open findings include trash-restore path traversal (S4) and System Cleanup over-classification (S7).
+The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5** and several new modules were added after this document was written. Path references have been audited and corrected (all `core/`/`modules/` mentions now carry the `dataforge/` prefix; the old dead `docs/reviews/01/` links are gone) - see [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) A5/D4/D5. The 2c (Interaction Correctness) and 2d (IA/Naming/Parity) work has been re-audited against the new source: 276 tests pass, integrity defaults to SHA-256 (not MD5), the scanner no longer follows symlinks, the SQLite cache is thread-safe, the forensic-report HTML injection (S2) is fixed, and the rest of the S1–S13 backlog (trash-restore path confinement S4, System Cleanup safeguards S7, plugin-loader hardening S5, `0600` reports/credentials, `defusedxml`, config validation, executable-open confirm, decompression-bomb caps) is also fixed.
 
 ## Scope
 
@@ -551,7 +551,7 @@ Main GUI controller and shell.
 
 Constants:
 
-- `HEADER_COLORS` — light/dark color maps for sidebar group header labels (Overview, File Utilities, System Maintenance, Advanced Analysis, Application, Plugins).
+- `HEADER_COLORS` — light/dark color maps for sidebar group header labels (Home, Find & Organize, Clean & Optimize, Recover & Investigate, System, Plugins).
 - `LIGHT_STYLE`, `DARK_STYLE` — full Qt stylesheets (now generated from `ui/theme_tokens.py::generate_qss()`; the old hand-written blocks have been replaced by a single token-driven template).
 
 Types:
@@ -565,7 +565,7 @@ Layout:
 
 - Root window: `resize(1100, 750)`, `setMinimumSize(700, 450)`.
 - `QHBoxLayout` central layout — fixed-width nav `QFrame` (`setFixedWidth(230)`, non-collapsible) + `QStackedWidget` content area (stretch factor 1).
-- Nav frame: title label, dark-mode `QCheckBox`, separator, then a scrollable (`QScrollArea`) list of collapsible group headers (Overview, File Utilities, System Maintenance, Advanced Analysis, Application, and Plugins when present) each containing plain-text `QPushButton`s (no icons).
+- Nav frame: title label, dark-mode `QCheckBox`, separator, then a scrollable (`QScrollArea`) list of collapsible group headers (Home, Find & Organize, Clean & Optimize, Recover & Investigate, System, and Plugins when present) each containing plain-text `QPushButton`s (no icons). The group labels are task-oriented (2d.1) and every group is always shown regardless of the user's Detail Level.
 - Status bar: cancel button, spinner label, progress bar, status label.
 
 Key methods:
@@ -787,13 +787,13 @@ GUI editor for persisted configuration. Title: "Settings".
 
 - `SettingsView(BaseView)` — `QTabWidget` with 4 tabs and `TOOLTIP_TEXTS`.
 
-**Tab 1: General** — theme dropdown (bound to live theme change), safe mode checkbox, log level combobox.
+**Tab 1: General** — read-only theme label that mirrors the sidebar Dark Mode checkbox (sidebar is the single source of truth; the previous `QComboBox` was removed in 2c.3), safe mode checkbox, log level combobox.
 
-**Tab 2: Performance** — hash algorithm combobox, size unit combobox, max threads spinbox. Save Performance button. Clear Cache DB button (confirms before clearing `file_cache`).
+**Tab 2: Performance** — hash algorithm combobox, size unit combobox, max threads spinbox. All fields autosave on change (no Save button — 2c.2). Clear Cache DB button (confirms before clearing `file_cache`).
 
-**Tab 3: Exclusions** — comma-separated excluded folders and extensions text entries. Save Exclusions button.
+**Tab 3: Exclusions** — comma-separated excluded folders and extensions text entries. Autosave on change (2c.2).
 
-**Tab 4: Dashboard** — listbox of dashboard scan paths with Add Folder / Remove Selected / Save Dashboard controls.
+**Tab 4: Dashboard** — listbox of dashboard scan paths with Add Folder / Remove Selected controls. Autosave on change (2c.2).
 
 #### `dataforge/ui/views/media.py`
 
@@ -854,7 +854,7 @@ Integration and cross-layer tests:
 
 #### `tests/test_comprehensive.py`
 
-This module now imports and passes — `rename_with_regex` was restored in `dataforge/core/operations/files.py`. The whole suite collects and runs green (255 tests). The coverage list below is accurate. See [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) for verification details.
+This module now imports and passes — `rename_with_regex` was restored in `dataforge/core/operations/files.py`. The whole suite collects and runs green (276 tests). The coverage list below is accurate. See [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) for verification details.
 
 Comprehensive unit and functional test suite covering every layer:
 

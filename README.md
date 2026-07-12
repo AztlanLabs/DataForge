@@ -23,9 +23,9 @@ The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5**, and new modules (ha
 | **🔍 Go deep into data** | Forensic file carving, GPS metadata stripping, disk SMART health, password strength analysis, trash recovery — extract what's hidden |
 | **⚡ Unified interface** | Terminal and desktop — choose your workflow. Same features, same results, same safety standards — no tool switching |
 | **🧩 Extensible** | Action Builder pipeline for custom multi-step workflows; plugin system for custom views; scriptable CLI — build your own workflows |
-| **🛡️ Production-ready** | 255 passing tests, thread-safe batch operations, dry-run previews, cancellation support, detailed logging — trust the tool |
+| **🛡️ Production-ready** | 276 passing tests, thread-safe batch operations, dry-run previews, cancellation support, detailed logging — trust the tool |
 | **🚀 Automation at scale** | Parallel hashing, batch operations on thousands of files, configurable worker threads, progress tracking, cancellation — process like a pro |
-| **🔐 Enterprise features** | Role-based experience levels (Basic/Advanced/Expert), audit logging, integrity verification, forensic reports — audit-ready |
+| **🔐 Enterprise features** | Detail level (Simple/Standard/Everything), audit logging, integrity verification, forensic reports — audit-ready |
 
 ## What DataForge Does (The Arsenal)
 
@@ -58,7 +58,7 @@ The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5**, and new modules (ha
 - **File signatures** — identify file types by magic bytes across 40+ categories — **know what you're looking at**
 - **Hardware diagnostics** — CPU, RAM, motherboard, storage, GPU profiles; SMART disk health; upgrade recommendations — **assess your machine**
 - **System performance** — top processes by memory, startup items, disk health status — **optimize and monitor**
-- **Device manager** — list connected storage (internal, USB, network, optical) with per-device usage — **track all your storage**
+- **Device manager** — list connected storage (internal, USB, network, optical) with per-device usage — **track all your storage** (also surfaced in the GUI as the **Storage & Devices** view, 2d.4)
 
 ### 🚀 Automation & Extensibility (Power User Paradise)
 - **Action Builder** — compose reusable multi-step pipelines (filter → rename → move → archive) with drag-reorder UI — **automate complex workflows**
@@ -71,12 +71,12 @@ The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5**, and new modules (ha
 | --- | --- |
 | **Product** | 🔨 **DataForge** — File system management with steroids and superpowers (code: `dataforge/`) |
 | **CLI** | `fm` command → `dataforge.cli:main` (17 commands, all powers available) |
-| **GUI** | `python run_ui.py` → `dataforge.ui.app.DataForgeApp` (PyQt5, 14 views, drag-reorder pipeline) |
-| **Config** | `~/.dataforge/config.json` (theme, performance, exclusions, dashboard paths, experience levels) |
+| **GUI** | `python run_ui.py` → `dataforge.ui.app.DataForgeApp` (PyQt5, 14 views, task-oriented sidebar) |
+| **Config** | `~/.dataforge/config.json` (theme, performance, exclusions, dashboard paths, detail level) |
 | **Cache** | `~/.dataforge/cache.db` (SQLite hash cache, thread-safe with WAL, parallel hashing) |
 | **Logging** | `~/.dataforge/app.log` (rotating, 5 MB / 3 backups, full audit trail) |
 | **Architecture** | Layered: core primitives → operations → service layer → modules → GUI/CLI orchestration (shared logic, zero duplication) |
-| **Tests** | 255 passing (`pytest`, full coverage across all feature layers, production-grade quality) |
+| **Tests** | 276 passing (`pytest`, full coverage across all feature layers, production-grade quality) |
 | **Build** | `pyproject.toml` (CLI/core packaging), `build_exe.py` (PyInstaller → standalone desktop bundles, one-file release mode) |
 
 ## Quick Start
@@ -118,10 +118,10 @@ PYTHONPATH=. python -m dataforge.cli --help
 ### Verify the Build
 
 ```bash
-PYTHONPATH=. pytest -q  # 255 tests pass
+PYTHONPATH=. pytest -q  # 276 tests pass
 ```
 
-Full test suite passes — 255 tests. All correctness fixes are verified. See [`docs/reviews/AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md) and [`docs/reviews/NOTES_REVIEW.md`](./docs/reviews/NOTES_REVIEW.md) for the full audit.
+Full test suite passes — 276 tests. All correctness fixes are verified. See [`docs/reviews/AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md) and [`docs/reviews/NOTES_REVIEW.md`](./docs/reviews/NOTES_REVIEW.md) for the full audit.
 
 ### Build desktop executables
 
@@ -168,7 +168,7 @@ A comprehensive engineering, security, and UX audit lives under [`docs/reviews/`
 
 - **[`EXECUTIVE_SUMMARY.md`](./docs/reviews/EXECUTIVE_SUMMARY.md)** — start here: overview, findings index, remediation status, brand identity
 - **[`AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md)** — all code-correctness bugs (15 findings, all fixed) and security/forensic findings (13 findings, 3 fixed); forensic-soundness checklist, remediation order
-- **[`IMPROVEMENT_PLAN.md`](./docs/reviews/IMPROVEMENT_PLAN.md)** — UX/UI review, visual design system, engineering improvements, phased roadmap with per-item implementation status (Phase 2a+2b shipped; 2c/2d/2e open)
+- **[`IMPROVEMENT_PLAN.md`](./docs/reviews/IMPROVEMENT_PLAN.md)** — UX/UI review, visual design system, engineering improvements, phased roadmap with per-item implementation status (Phases 2a/2b/2c/2d shipped; 2e open)
 - **[`FORENSIC_SECURITY_REVIEW.md`](./docs/reviews/FORENSIC_SECURITY_REVIEW.md)** — forensic-soundness, security, and investigator-facing UX architectural review (F1–F19, U1–U11) evaluated against EnCase/FTK/AXIOM/FIM and ACPO/ISO 27037/NIST SP 800-86
 
 ## Directory Structure
@@ -184,9 +184,9 @@ A comprehensive engineering, security, and UX audit lives under [`docs/reviews/`
 | **`dataforge/core/actions/`** | Action Builder pipeline engine: filters, IO steps, transformations, media operations |
 | **`dataforge/modules/`** | Feature implementations (search, duplicates, organizer, cleaner, integrity, usage, reporting, forensics, hardware, recovery, metadata, performance, system_cleanup, password_tools, device_manager, file_signatures) |
 | **`dataforge/ui/`** | PyQt5 desktop shell, 14 built-in views, widget library, plugin loader, design-token module (`theme_tokens.py`) |
-| **`dataforge/ui/views/`** | Dashboard, Search, Duplicates, Action Builder, Tools, Media, System Cleanup, Performance, Recovery, Metadata, Hardware, Forensics, Settings, About |
+| **`dataforge/ui/views/`** | Dashboard, Search, Duplicates, Media Tools, Metadata & EXIF, Automations (Action Builder + Tools), Clean Up Space, Storage & Devices, Performance, File Recovery, Forensics, Hardware Info, Settings, About & Help |
 | **`dataforge/ui/plugins/`** | Plugin system; bundled example: Metadata Cleaner plugin |
-| **`tests/`** | 255 passing tests: comprehensive, integration, contract, new-modules suites, token-regression guard |
+| **`tests/`** | 276 passing tests: comprehensive, integration, contract, new-modules suites, token-regression guard |
 | **`docs/`** | Architecture, CLI reference, GUI workflows, development guide, audit reviews |
 | **`build/`, `dist/`** | Generated build artifacts (output only, not maintained source) |
 
@@ -231,28 +231,26 @@ The **two user interfaces are thin adapters** — all the real superpowers live 
 
 ### ✅ Fixed in the 2026-07-10 Audit Pass
 
-- **Correctness** — 255 tests pass. All correctness bugs fixed: MD5→SHA-256 defaults, symlink-loop scope escape, thread-safe cache, JSON error handling, SHA-512 crash, etc.
-- **UI/UX overhaul** — Phase 2a/2b shipped: surface brightness fix, themed checkboxes/combos, design-token module (`ui/theme_tokens.py`) with AA-validated colours replacing three legacy colour vocabularies, type-scale constants, per-widget colour migration.
-- **Security findings** — classified and tracked (open security items in audit report; fixable at identified seams)
-- **Documentation** — ARCHITECTURE, CLI_REFERENCE, GUI_WORKFLOWS, DEVELOPMENT_GUIDE all verified against current PyQt5 source
-- **Packaging** — pyproject.toml and build_exe.py verified; release bundle working
+- **Correctness** — 276 tests pass. All correctness bugs fixed: MD5→SHA-256 defaults, symlink-loop scope escape, thread-safe cache, JSON error handling, SHA-512 crash, etc.
+- **UI/UX overhaul** — Phase 2a/2b/2c/2d shipped: surface brightness fix, themed checkboxes/combos, design-token module (`ui/theme_tokens.py`) with AA-validated colours replacing three legacy colour vocabularies, type-scale constants, per-widget colour migration, file-vs-folder riddle removed (2c.1), settings autosave (2c.2), dark-mode dedup (2c.3), progressive disclosure (2c.4), destructive checklist (2c.5), named busy task (2c.6), rich help (2c.7), task-oriented sidebar (2d.1), Automations merge (2d.2), label renames (2d.3), `fm devices` GUI (2d.4), stray-name sweep (2d.5).
+- **Security findings** — S1–S13 are all fixed. The residual forensic-soundness work (chain-of-custody, Evidence Mode, provenance, UTC timestamps) lives in [`FORENSIC_SECURITY_REVIEW.md`](./docs/reviews/FORENSIC_SECURITY_REVIEW.md) and is the v0.2.0 WS-H / v0.3.0 WS-I/WS-J backlog.
+- **Documentation** — ARCHITECTURE, CLI_REFERENCE, GUI_WORKFLOWS, DEVELOPMENT_GUIDE all verified against current PyQt5 source (2026-07-12 pass).
+- **Packaging** — pyproject.toml and build_exe.py verified; release bundle working.
 
 ### 🔄 Open / Future
 
 - **CI** — `.github/workflows/ci.yml` now runs pytest + coverage, ruff, mypy, and pip-audit on every push/PR.
-- **Device Manager GUI** — CLI has `fm devices`; no dedicated GUI view yet (lower priority, works via CLI).
-- **Numbered release** — No public release number yet. `pyproject.toml` has internal version `0.1.0` (development marker).
+- **Numbered release** — No public release number yet. `pyproject.toml` has internal version `0.1.0`; the v0.2.0 release PR opens after WS-A through WS-H are all closed (`v0.2.0-alpha.1` through `v0.2.0-alpha.8` are tagged on `develop`).
 - **Debug build artifacts** — `build/debug` and `dist/debug` predate the PyQt5 migration; `build/release` is current. Run `python build_exe.py debug` to refresh.
 
 ### 📋 Security & Audit
 
-Two key open security findings (all 10 remaining findings detailed in audit report with severity, fix strategy):
-- **S4** — Trash restore trusts attacker-controlled `.trashinfo` paths (path-traversal risk)
-- **S7** — System Cleanup blanket-classifies `/tmp` and cache trees as junk (data-loss risk under misuse)
+All 13 security findings (S1–S13) are **fixed** in the current source. Per-severity tally:
+- 🔴 High: **2/2** (S1 MD5 default, S2 forensic XSS)
+- 🟠 Medium: **7/7** (S3 symlink scope, S4 trash-restore, S5 plugin loader, S6 `secure_delete`, S7 cleanup, S8 secret hygiene, S13 decomposition bombs)
+- 🟡 Low: **4/4** (S9 XML, S10 config validation, S11 OS-handler, S12 forensic permissions)
 
-`S2` (forensic HTML report XSS) is fixed — every interpolated value is now `html.escape()`d.
-
-See [`docs/reviews/AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md) for severity, impact, and fixes.
+See [`docs/reviews/AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md) for severity, impact, and per-finding fix detail. The remaining forensic-soundness work (F1–F21 / U1–U11) is in [`FORENSIC_SECURITY_REVIEW.md`](./docs/reviews/FORENSIC_SECURITY_REVIEW.md).
 
 ## Developer & Deployment Notes
 
@@ -260,7 +258,7 @@ See [`docs/reviews/AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md) for sev
 - **Dependency split** — `pyproject.toml` = CLI + core only. `requirements.txt` = full stack (GUI/media). Install both for development.
 - **User data** — `~/.dataforge/config.json`, cache.db, app.log — all created on first run, no migration needed.
 - **Build artifacts** — `build/` and `dist/` are generated; don't maintain them. `release` profile is current; refresh `debug` via `python build_exe.py debug`.
-- **Next milestone** — Phase 0 (CI/CD, linting, packaging) is done; remaining work is the security backlog (WS-B onward) and the UX/IA phases in [`docs/reviews/IMPROVEMENT_PLAN.md`](./docs/reviews/IMPROVEMENT_PLAN.md).
+- **Next milestone** — WS-A through WS-D are all done (CI/CD, linting, packaging, S1–S13 security, design tokens, interaction correctness, IA/label/parity). Next is WS-E (motion, empty/error, a11y) followed by WS-F (architecture consolidation), WS-G (brand/release polish), and WS-H (forensic soundness) — the v0.2.0 release PR opens after WS-A through WS-H close. See [`docs/reviews/IMPLEMENTATION_PLAN.md`](./docs/reviews/IMPLEMENTATION_PLAN.md) and [`docs/reviews/IMPROVEMENT_PLAN.md`](./docs/reviews/IMPROVEMENT_PLAN.md).
 
 ---
 

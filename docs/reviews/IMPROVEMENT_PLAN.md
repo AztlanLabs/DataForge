@@ -1,7 +1,9 @@
 # Improvement Plan — UX, Engineering & Phased Roadmap
 
-**Date:** 2026-07-10 · **Updated:** 2026-07-11 · **Last verified:** 2026-07-11
+**Date:** 2026-07-10 · **Updated:** 2026-07-12 · **Last verified:** 2026-07-12
 **Consolidates** the old `03_UIUX_REVIEW.md` + `04_IMPROVEMENTS_AND_ROADMAP.md` + `05_VISUAL_DESIGN_SYSTEM.md` + `06_UIUX_IMPLEMENTATION_PLAN.md` + cross-cutting quality observations from `01_CODE_REVIEW_AND_BUGS.md`. No information was removed — this is a merge, not a rewrite.
+
+> **2026-07-12 update:** Phases 2c (Interaction Correctness) and 2d (IA, Naming & Parity) are now **shipped** — see §6 below and [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) WS-C/WS-D. The test count is now **276** (was 255 at the start of WS-C). 2e (Motion, Empty/Error, A11y) is the next open phase.
 
 ---
 
@@ -28,44 +30,44 @@
 
 ### 2.2 Information Architecture — current vs proposed
 
-**Current groups** (`app.py:322-328`): Overview, File Utilities, System Maintenance, Advanced Analysis, Application.
+**Old groups** (pre-2d.1, `app.py:322-328`): Overview, File Utilities, System Maintenance, Advanced Analysis, Application.
 
 Issues: "Tools & Workflows" vs "Action Builder" both sound like multi-step builders. "Media Tools" under File Utilities but "Metadata Studio" under Advanced Analysis. "Hardware Diagnostics" and "Performance" split across two groups. `fm devices` has no GUI.
 
-**Proposed task-oriented grouping:**
+**Shipped task-oriented grouping** (2d.1, `app.py:build_navigation_sidebar`):
 
 | Group | Views |
 | --- | --- |
 | **Home** | Dashboard |
-| **Find & Organize** | Search, Duplicates, Organize/Rename, Media, Metadata, **Automations** (merged Tools + Action Builder) |
-| **Clean & Optimize** | System Cleanup, **Storage & Devices** (new), Performance |
-| **Recover & Investigate** | File Recovery, Forensics, Integrity/Hashing |
-| **System** | Hardware, Settings, About & Help |
+| **Find & Organize** | Search, Duplicates, Media Tools, Metadata & EXIF, **Automations** (merged Tools + Action Builder) |
+| **Clean & Optimize** | Clean Up Space, **Storage & Devices** (new), Performance |
+| **Recover & Investigate** | File Recovery, Forensics, Integrity/Hashing (in Automations) |
+| **System** | Hardware Info, Settings, About & Help |
 
 ### 2.3 Naming & Labels
 
 | Current | Proposed | Status |
 | --- | --- | --- |
-| Metadata Studio | Metadata & EXIF | ⏳ |
-| Forensics Lab | Forensics | ⏳ |
-| Hardware Diagnostics | Hardware Info | ⏳ |
-| Tools & Workflows + Action Builder | Automations (with sub-tabs) | ⏳ |
-| Search & Organize | Search | ⏳ |
-| System Cleanup | Clean Up Space | ⏳ |
-| Experience Level: Basic/Advanced/Expert | Detail level: Simple / Standard / Everything | ⏳ |
+| Metadata Studio | Metadata & EXIF | ✅ Done (2d.3) |
+| Forensics Lab | Forensics | ✅ Done (2d.3) |
+| Hardware Diagnostics | Hardware Info | ✅ Done (2d.3) |
+| Tools & Workflows + Action Builder | Automations (with sub-tabs) | ✅ Done (2d.2 + 2d.3) |
+| Search & Organize | Search | ✅ Done (2d.3) |
+| System Cleanup | Clean Up Space | ✅ Done (2d.3) |
+| Experience Level: Basic/Advanced/Expert | Detail level: Simple / Standard / Everything | ✅ Done (2d.3) |
 | Product name (three different names) | DataForge | ✅ Resolved |
 
 ### 2.4 Interaction Problems (ranked by friction)
 
 | # | Problem | Risk | Status | Touch points |
 | --- | --- | --- | --- | --- |
-| 4.1 | File-vs-folder picker uses Yes/No/Cancel riddle | 🔴 | ⏳ | `views/base.py:244-262` |
-| 4.2 | Settings persistence inconsistent (some autosave, some need Save button) | 🔴 | ⏳ | `views/settings.py:199-214,237-240,270-273` |
-| 4.3 | Experience tier *hides* sidebar groups → discoverability cliff | 🔴 | ⏳ | `app.py:669-681,869-971` |
-| 4.4 | Two controls for dark mode (sidebar checkbox + Settings dropdown) | 🟠 | ⏳ | `app.py:731`, `settings.py:75-83` |
-| 4.5 | Help rendered as plain text; markdown shows literal `#`/`*` | 🟢 | ⏳ | `views/base.py:37-56` |
-| 4.6 | Destructive preview is a truncated text message, not a reviewable list | 🔴 | ⏳ | `views/base.py:58-88` |
-| 4.7 | Busy lock shows generic message without naming the running task | 🟠 | ⏳ | `app.py:562-563` |
+| 4.1 | File-vs-folder picker uses Yes/No/Cancel riddle | 🔴 | ✅ **Fixed (2c.1)** | `views/base.py:244-262` (replaced) |
+| 4.2 | Settings persistence inconsistent (some autosave, some need Save button) | 🔴 | ✅ **Fixed (2c.2)** | `views/settings.py:199-214,237-240,270-273` |
+| 4.3 | Experience tier *hides* sidebar groups → discoverability cliff | 🔴 | ✅ **Fixed (2c.4)** | `app.py:669-681,869-971` (no longer tier-hides) |
+| 4.4 | Two controls for dark mode (sidebar checkbox + Settings dropdown) | 🟠 | ✅ **Fixed (2c.3)** | `app.py:731`, `settings.py:75-83` (Settings is read-only label) |
+| 4.5 | Help rendered as plain text; markdown shows literal `#`/`*` | 🟢 | ✅ **Fixed (2c.7)** | `views/base.py:37-56` (now uses `setMarkdown`) |
+| 4.6 | Destructive preview is a truncated text message, not a reviewable list | 🔴 | ✅ **Fixed (2c.5)** | `views/base.py:58-88` (now `confirm_destructive_preview`) |
+| 4.7 | Busy lock shows generic message without naming the running task | 🟠 | ✅ **Fixed (2c.6)** | `app.py:562-563` (now names the running task) |
 
 **Fixes for each** (see §6 Implementation Status for the file-level backlog):
 
@@ -145,14 +147,14 @@ Named scale constants in `theme_tokens.py` — `caption 11 / body 13 / subheadin
 | Item | Status |
 | --- | --- |
 | Under version control (git + `.gitignore`) | ✅ Done |
-| Test suite green — 255 tests pass | ✅ Done |
-| CI (GitHub Actions) running pytest/lint/type-check on push | ⏳ Open |
-| Linting (ruff + black) | ⏳ Open |
-| Type checking (mypy/pyright) | ⏳ Open |
-| Pre-commit hooks | ⏳ Open |
-| Coverage reporting | ⏳ Open |
-| Migrate to `pyproject.toml` | ⏳ Open |
-| Pin security-relevant libs + `pip-audit`/Dependabot | ⏳ Open |
+| Test suite green — 276 tests pass | ✅ Done |
+| CI (GitHub Actions) running pytest/lint/type-check on push | ✅ Done |
+| Linting (ruff + black) | ✅ Done |
+| Type checking (mypy/pyright, advisory) | ✅ Done |
+| Pre-commit hooks | ✅ Done |
+| Coverage reporting | ✅ Done (34% baseline, no fail-under threshold yet) |
+| Migrate to `pyproject.toml` | ✅ Done |
+| Pin security-relevant libs + `pip-audit`/Dependabot | ✅ Done |
 
 ### 4.2 Architecture Improvements
 
@@ -189,15 +191,17 @@ Named scale constants in `theme_tokens.py` — `caption 11 / body 13 / subheadin
 ### Phase 1 — Trust & Safety (1–2 sprints) 🟠
 
 ✅ SHA-256 default + integrity algo stored · ✅ dedup byte-compare · ✅ symlink confinement in scanner.
-⏳ trash-restore confinement (S4) · ⏳ cleanup allow-listing (S7) · ⏳ secret hygiene (S8) · ⏳ config validation (S10) · ✅ regression test for S2 · ⏳ regression tests for S4/S7.
+✅ trash-restore confinement (S4) · ✅ cleanup allow-listing (S7) · ✅ secret hygiene (S8) · ✅ config validation (S10) · ✅ plugin loader hardening (S5) · ✅ XML defusedxml (S9) · ✅ executable-open confirm (S11) · ✅ forensic-output 0600 (S12) · ✅ decompression-bomb caps (S13) · ✅ regression test for S2 · ✅ regression tests for S4/S7/S10.
 
 ### Phase 2 — Coherence (2–3 sprints)
 
-✅ **Sprint A** — surface brightness, combo arrow, outline:0 removal, design-token module, type scale, per-widget colour migration. 255 tests green, zero legacy hex.
+✅ **Sprint A (2a+2b)** — surface brightness, combo arrow, outline:0 removal, design-token module, type scale, per-widget colour migration. Zero legacy hex in `ui/**/*.py`.
 
-⏳ **Sprint B (2c)** — 7 interaction fixes: path picker, settings persistence, dark-mode dedup, progressive disclosure, destructive checklist, named busy task, rich help.
+✅ **Sprint B (2c)** — 7 interaction fixes shipped in WS-C (`v0.2.0-alpha.3`): path picker, settings autosave, dark-mode dedup, progressive disclosure, destructive checklist, named busy task, rich help. 270 tests pass.
 
-⏳ **Sprint C (2d+2e)** — IA/naming, devices GUI, sidebar animation, Braille spinner replacement, reduce-motion, focus-ring, empty/error states, screen-reader support, icon set.
+✅ **Sprint C (2d)** — IA/naming shipped in WS-D (`v0.2.0-alpha.4`): task-oriented sidebar groups (Home / Find & Organize / Clean & Optimize / Recover & Investigate / System); Tools & Workflows + Action Builder merged into Automations; `fm devices` GUI surfaced as **Storage & Devices**; labels renamed to user-facing names (Search, Metadata & EXIF, Forensics, Hardware Info, Clean Up Space); the "Experience Level" setting is now **Detail level** (`Simple` / `Standard` / `Everything`). 276 tests pass.
+
+⏳ **Sprint D (2e)** — sidebar animation, Braille spinner replacement, reduce-motion, focus-ring, empty/error states, screen-reader support, icon set.
 
 ### Phase 3 — Grow (ongoing)
 
@@ -223,27 +227,27 @@ Task-first dashboard · scheduled cleanup/integrity · saved searches/automation
 | 2b.2 | ✅ | Per-widget colour migration to dynamic-property `variant` rules (zero legacy hex) | 🟠 |
 | 2b.3 | ✅ | Type-scale constants — all `font-size: Npx` literals mapped to `TYPE_SCALE` | 🟢 |
 
-### ⏳ Phase 2c — Interaction Correctness
+### ✅ Phase 2c — Interaction Correctness
 
 | # | Done | Item | Risk | Touch points |
 | --- | --- | --- | --- | --- |
-| 2c.1 | ⏳ | Kill file-vs-folder riddle (Yes/No/Cancel `QMessageBox`) | 🔴 | `views/base.py:244-262` |
-| 2c.2 | ⏳ | Unify settings persistence (autosave + "Saved ✓") | 🔴 | `views/settings.py:199-273` |
-| 2c.3 | ⏳ | De-duplicate dark-mode control (one writable, one reads state) | 🟠 | `app.py:731`, `settings.py:75-83` |
-| 2c.4 | ⏳ | Progressive disclosure instead of tier-hiding (show all groups) | 🔴 | `app.py:669-681,869-971` |
-| 2c.5 | ⏳ | Destructive preview as scrollable checklist (per-row opt-out) | 🔴 | `views/base.py` |
-| 2c.6 | ⏳ | Name the running task in the status bar | 🟠 | `app.py:562-563,1102-1146` |
-| 2c.7 | ⏳ | Rich-text help + inline "What's this?" | 🟢 | `views/base.py:37-56` |
+| 2c.1 | ✅ | Kill file-vs-folder riddle (Yes/No/Cancel `QMessageBox`) | 🔴 | `views/base.py:244-262` (replaced) |
+| 2c.2 | ✅ | Unify settings persistence (autosave + "Saved ✓") | 🔴 | `views/settings.py:199-273` |
+| 2c.3 | ✅ | De-duplicate dark-mode control (one writable, one reads state) | 🟠 | `app.py:731`, `settings.py:75-83` (Settings is read-only label) |
+| 2c.4 | ✅ | Progressive disclosure instead of tier-hiding (show all groups) | 🔴 | `app.py:669-681,869-971` (no longer tier-hides) |
+| 2c.5 | ✅ | Destructive preview as scrollable checklist (per-row opt-out) | 🔴 | `views/base.py` (`confirm_destructive_preview`) |
+| 2c.6 | ✅ | Name the running task in the status bar | 🟠 | `app.py:562-563,1102-1146` (names the running task) |
+| 2c.7 | ✅ | Rich-text help + inline "What's this?" | 🟢 | `views/base.py:37-56` (now uses `setMarkdown`) |
 
-### ⏳ Phase 2d — Information Architecture, Naming & Parity
+### ✅ Phase 2d — Information Architecture, Naming & Parity
 
 | # | Done | Item | Risk |
 | --- | --- | --- | --- |
-| 2d.1 | ⏳ | Rework sidebar grouping to task-oriented (Home / Find & Organize / Clean & Optimize / Recover & Investigate / System) | 🟠 |
-| 2d.2 | ⏳ | Merge Tools & Workflows + Action Builder → "Automations" with sub-tabs | 🟠 |
-| 2d.3 | ⏳ | Rename labels: Studio→"Metadata & EXIF", Lab→"Forensics", Diagnostics→"Hardware Info", Search & Organize→"Search", Cleanup→"Clean Up Space", Experience Level→"Detail level" | 🟢 |
-| 2d.4 | ⏳ | Surface `fm devices` in the GUI as "Storage & Devices" view | 🟠 |
-| 2d.5 | ⏳ | Stray-name consistency sweep (residual "File Manager"/"filemanager-utils") | 🟢 |
+| 2d.1 | ✅ | Rework sidebar grouping to task-oriented (Home / Find & Organize / Clean & Optimize / Recover & Investigate / System) | 🟠 |
+| 2d.2 | ✅ | Merge Tools & Workflows + Action Builder → "Automations" with sub-tabs | 🟠 |
+| 2d.3 | ✅ | Rename labels: Studio→"Metadata & EXIF", Lab→"Forensics", Diagnostics→"Hardware Info", Search & Organize→"Search", Cleanup→"Clean Up Space", Experience Level→"Detail level" | 🟢 |
+| 2d.4 | ✅ | Surface `fm devices` in the GUI as "Storage & Devices" view | 🟠 |
+| 2d.5 | ✅ | Stray-name consistency sweep (residual "File Manager"/"filemanager-utils") | 🟢 |
 
 ### ⏳ Phase 2e — Motion, Empty/Error States, Accessibility Polish
 
@@ -261,6 +265,6 @@ Task-first dashboard · scheduled cleanup/integrity · saved searches/automation
 
 ## Explicitly Out of Scope
 
-- Security items S4/S7 (trash-restore, cleanup over-classification) — tracked in [`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md). S2 (forensic XSS) is fixed.
+- Security items S1–S13 — all fixed across WS-A/WS-B; residual work is forensic-soundness (F1–F21), tracked in [`FORENSIC_SECURITY_REVIEW.md`](./FORENSIC_SECURITY_REVIEW.md) and scheduled for v0.2.0 WS-H / v0.3.0 WS-I/WS-J.
 - Custom webfont, general animation framework, logo-asset production — rejected as inappropriate for a file-management utility.
-- Product rename — already complete (DataForge). 2d.5 is only a consistency sweep.
+- Product rename — already complete (DataForge). 2d.5 was a consistency sweep and is also done.

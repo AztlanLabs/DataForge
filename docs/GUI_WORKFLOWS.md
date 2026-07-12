@@ -2,7 +2,7 @@
 
 *File System Management with Steroids and Superpowers*
 
-**Last verified:** 2026-07-11
+**Last verified:** 2026-07-12
 
 ## Desktop Shell — GUI Superpowers
 
@@ -15,7 +15,7 @@ python run_ui.py
 The shell is implemented by `dataforge.ui.app.DataForgeApp` (a `PyQt5.QtWidgets.QMainWindow`) and provides:
 
 - a fixed-width (230px) left navigation rail with **collapsible groups** (the rail itself is not collapsible; each group header toggles its items via `toggle_sidebar_group`, and the collapsed set is persisted in `config["collapsed_groups"]`)
-- a theme toggle (light/dark stylesheets) exposed both as a sidebar checkbox and a Settings dropdown
+- a theme toggle (light/dark stylesheets) exposed as a sidebar **Dark Mode** checkbox; the Settings view shows a read-only label that mirrors the checkbox (sidebar is the single source of truth, 2c.3)
 - contextual help for the active view
 - a shared status line
 - spinner/progress UI for long-running work
@@ -192,11 +192,11 @@ It allows the user to manage:
 - **two** worker-thread budgets: *Hashing/Batch Threads* (`max_thread_workers`) and *Search Threads* (`search_thread_workers`)
 - excluded folders and excluded extensions
 - dashboard watch paths
-- cache clearing (Expert tier)
+- cache clearing (Everything tier)
 
 These values persist through `ConfigManager` into `~/.dataforge/config.json`.
 
-> **Persistence is currently inconsistent:** theme, path display, and duplicate keep-strategy save immediately on change, whereas the Performance, Exclusions, and Dashboard tabs require an explicit *Save* button — unsaved edits in those tabs are lost on navigation. See [`reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md) §2.4.
+> **Persistence is uniform:** every setting **autosaves** the moment the user changes it, and a transient "Saved ✓" indicator flashes in the Settings header to confirm the write — no Save button, no hidden state. This was previously inconsistent (Performance / Exclusions / Dashboard had ad-hoc Save buttons); the unified behaviour is documented as 2c.2 in [`reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md).
 
 ## Plugin view: Metadata Cleaner
 

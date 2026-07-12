@@ -1,6 +1,6 @@
 # Notes Review — Consolidated Admonition-Block Audit
 
-**Date:** 2026-07-11 · **Last verified:** 2026-07-11
+**Date:** 2026-07-11 · **Last verified:** 2026-07-12
 **Scope:** Every `[!NOTE]`, `[!WARNING]`, and `[!IMPORTANT]` block across
 `README.md` and `docs/` — verified against the current codebase state.  
 **Result:** All admonition blocks have been removed from the source files

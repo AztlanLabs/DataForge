@@ -266,8 +266,8 @@ This is the "tackle any of them" master list.
 | Malicious `.trashinfo` (absolute/`..`) → restore confined | S4 | B | ✅ Done (`test_restore_from_trash_confines_*`, 2 tests) |
 | Cleanup never flags user folder as blanket junk | S7 | B | ✅ Done (`test_junk_scan_never_blanket_classifies_user_supplied_path`) |
 | Config out-of-range/unknown keys → clamped/ignored | S10 | B | ✅ Done (`test_config_merge_validates_and_clamps_bad_values`) |
-| Settings persistence round-trip | 2c.2 | C | ⏳ Open |
-| GUI smoke test (pytest-qt) mounts each view | 2d/2e | D/E | ⏳ Open |
+| Settings persistence round-trip | 2c.2 | C | ✅ Done (`test_settings_autosave_persists_on_change`) |
+| GUI smoke test (pytest-qt) mounts each view | 2d/2e | D | ✅ Done (`test_all_registered_views_smoke_mount`); 2e still open |
 
 ### Forensic Soundness & Investigator UX — from [`FORENSIC_SECURITY_REVIEW.md`](./FORENSIC_SECURITY_REVIEW.md)
 
