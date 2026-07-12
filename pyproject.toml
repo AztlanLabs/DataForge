@@ -1,0 +1,19 @@
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+# Default rule set (E4, E7, E9, F) plus ambiguous-name checks.
+select = ["E4", "E7", "E9", "F", "E741"]
+ignore = [
+    "E701",  # multiple statements on one line (colon) - compact guard clauses
+    "E702",  # multiple statements on one line (semicolon) - same convention
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Package __init__ files re-export their public API; the imports are the API.
+"dataforge/core/__init__.py" = ["F401"]
+
+[tool.black]
+line-length = 120
+target-version = ["py310"]
