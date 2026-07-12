@@ -169,6 +169,7 @@ A comprehensive engineering, security, and UX audit lives under [`docs/reviews/`
 - **[`EXECUTIVE_SUMMARY.md`](./docs/reviews/EXECUTIVE_SUMMARY.md)** — start here: overview, findings index, remediation status, brand identity
 - **[`AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md)** — all code-correctness bugs (15 findings, all fixed) and security/forensic findings (13 findings, 3 fixed); forensic-soundness checklist, remediation order
 - **[`IMPROVEMENT_PLAN.md`](./docs/reviews/IMPROVEMENT_PLAN.md)** — UX/UI review, visual design system, engineering improvements, phased roadmap with per-item implementation status (Phase 2a+2b shipped; 2c/2d/2e open)
+- **[`FORENSIC_SECURITY_REVIEW.md`](./docs/reviews/FORENSIC_SECURITY_REVIEW.md)** — forensic-soundness, security, and investigator-facing UX architectural review (F1–F19, U1–U11) evaluated against EnCase/FTK/AXIOM/FIM and ACPO/ISO 27037/NIST SP 800-86
 
 ## Directory Structure
 

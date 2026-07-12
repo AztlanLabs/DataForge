@@ -502,3 +502,4 @@ Your task: [describe the task]
 | [`docs/reviews/AUDIT_FINDINGS.md`](./reviews/AUDIT_FINDINGS.md) | Bug and security tracker |
 | [`docs/reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md) | UX roadmap and phased plan |
 | [`docs/reviews/IMPLEMENTATION_PLAN.md`](./reviews/IMPLEMENTATION_PLAN.md) | Sequenced execution plan and `v0.2.0` release roadmap |
+| [`docs/reviews/FORENSIC_SECURITY_REVIEW.md`](./reviews/FORENSIC_SECURITY_REVIEW.md) | Forensic-soundness, security, and investigator-UX architectural review (F1–F19, U1–U11) |

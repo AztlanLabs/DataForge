@@ -21,6 +21,7 @@ It does not replace the trackers — it **links into** them:
 | UX/engineering rationale, per-item backlog | [`IMPROVEMENT_PLAN.md`](./IMPROVEMENT_PLAN.md) |
 | Doc-defect audit (D1–D7) | [`NOTES_REVIEW.md`](./NOTES_REVIEW.md) |
 | Status overview, brand, Definition of Done | [`EXECUTIVE_SUMMARY.md`](./EXECUTIVE_SUMMARY.md) |
+| Forensic-soundness, security, investigator-UX architectural findings (F1–F19, U1–U11) | [`FORENSIC_SECURITY_REVIEW.md`](./FORENSIC_SECURITY_REVIEW.md) |
 | Commit format, branch model, versioning, release checklist | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) §2, §3, §6, §7 |
 
 ### 1.1 Documentation standard — every item answers Where / Why / How
@@ -45,12 +46,12 @@ trust from the review files. Verified open, with evidence:
 | ID | Verified open at (2026-07-11, plan authoring) | Evidence | Status |
 | --- | --- | --- | --- |
 | S2 | `dataforge/modules/forensics.py:581-625` | interpolated values, no `html.escape()` | ✅ **Fixed** (WS-A) |
-| S4 | `dataforge/modules/recovery.py:225-250` | `original_path` → `shutil.move` + `os.makedirs` | ⏳ Open |
-| S5 | `dataforge/ui/plugin_loader.py:38-51` | `exec_module()`, no signing/sandbox | ⏳ Open |
-| S7 | `dataforge/modules/system_cleanup.py:249` | blanket junk classification | ⏳ Open |
-| S8 | `dataforge/modules/password_tools.py:246` | `open(hash_file, "w")`, no `0o600` | ⏳ Open |
-| S9 | `dataforge/modules/forensics.py:1033` | `xml.etree.ElementTree`, no `defusedxml` | ⏳ Open |
-| S10 | `dataforge/core/config.py` | blind merge, zero validation | ⏳ Open |
+| S4 | `dataforge/modules/recovery.py:225-250` | `original_path` → `shutil.move` + `os.makedirs` | ✅ **Fixed** (WS-B) |
+| S5 | `dataforge/ui/plugin_loader.py:38-51` | `exec_module()`, no signing/sandbox | ✅ **Fixed** (WS-B) |
+| S7 | `dataforge/modules/system_cleanup.py:249` | blanket junk classification | ✅ **Fixed** (WS-B) |
+| S8 | `dataforge/modules/password_tools.py:246` | `open(hash_file, "w")`, no `0o600` | ✅ **Fixed** (WS-B) |
+| S9 | `dataforge/modules/forensics.py:1033` | `xml.etree.ElementTree`, no `defusedxml` | ✅ **Fixed** (WS-B) |
+| S10 | `dataforge/core/config.py` | blind merge, zero validation | ✅ **Fixed** (WS-B) |
 
 Also verified: NOTES_REVIEW **D1–D3 are already resolved in the source docs** — the
 broken anchor, `"224"` count, and dead `docs/reviews/01` refs now survive *only
