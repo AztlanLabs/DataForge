@@ -238,7 +238,8 @@ def generate_crackable_hash(source_path, output_dir=None):
     os.makedirs(out_dir, exist_ok=True)
     hash_file = os.path.join(out_dir, f"{os.path.basename(source_path)}.hash")
     try:
-        with open(hash_file, "w") as f:
+        fd = os.open(hash_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
             f.write(hash_line + "\n")
     except OSError as exc:
         return {"error": f"Could not write hash file: {exc}"}
@@ -403,7 +404,7 @@ def analyze_password_strength(passwords):
 
     for pwd in passwords:
         analysis = {
-            "password": pwd[:2] + "*" * (len(pwd) - 2) if len(pwd) > 2 else "**",
+            "password": "*" * len(pwd),
             "length": len(pwd),
             "has_upper": bool(re.search(r"[A-Z]", pwd)),
             "has_lower": bool(re.search(r"[a-z]", pwd)),
