@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install system Qt runtime deps (headless PyQt5)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgl1 libegl1 libxkbcommon-x11-0 libdbus-1-3 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt -r requirements-dev.txt
+          pip install -e .
+
+      - name: Lint (ruff)
+        run: ruff check dataforge tests
+
+      - name: Type check (mypy)
+        # Advisory only: 65 pre-existing errors remain (PyQt5 Optional/
+        # union-attr patterns in dataforge/ui/app.py mostly). Burning
+        # those down is separate follow-up work, not a merge gate yet.
+        run: mypy dataforge || true
+
+      - name: Test (pytest + coverage)
+        run: PYTHONPATH=. pytest -q --cov=dataforge --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
