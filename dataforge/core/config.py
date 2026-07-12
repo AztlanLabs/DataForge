@@ -3,30 +3,31 @@ import os
 from typing import Any, Dict
 from .logger import logger
 
+_VALID_HASH_ALGORITHMS = {"md5", "sha1", "sha256", "sha512", "blake2b"}
+_VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+_VALID_SIZE_UNITS = {"Auto", "Bytes", "KB", "MB", "GB"}
+_VALID_PATH_MODES = {"full", "relative"}
+_VALID_TIERS = {"Basic", "Advanced", "Expert"}
+
+
 class ConfigManager:
     _instance = None
-    
+
     DEFAULT_CONFIG = {
         "theme": "cosmo",
-        "safe_mode": True,  # Use trash bin
+        "safe_mode": True,
         "excluded_extensions": [".tmp", ".log"],
         "excluded_folders": [".git", "node_modules", "__pycache__"],
-        # Separate worker-count budgets per operation category, so a user can
-        # e.g. keep hashing single-threaded on a low-power machine while still
-        # parallelizing search, or vice versa, rather than one shared knob
-        # that silently only ever governed duplicate-file hashing.
-        "max_thread_workers": 4,       # hashing/batch work: duplicates, forensics hash manifests, integrity snapshots, metadata batch reads
-        "search_thread_workers": 4,    # search/keyword-search parallel scanning
-        # SHA-256 by default: MD5 is collision-prone, and duplicate detection
-        # can delete files that merely share a digest. Users may still opt into
-        # md5/sha1 for speed via Settings.
+        "max_thread_workers": 4,
+        "search_thread_workers": 4,
         "hash_algorithm": "sha256",
         "log_level": "INFO",
-        "size_unit": "Auto", # Auto, Bytes, KB, MB, GB
-        "path_display_mode": "full",  # "full" or "relative" (relative to each view's scan/source folder)
+        "size_unit": "Auto",
+        "path_display_mode": "full",
         "dashboard_paths": [os.path.join(os.path.expanduser("~"), "Documents")],
-        "settings_ui_tier": "Basic",  # Basic, Advanced, Expert
+        "settings_ui_tier": "Basic",
         "duplicate_default_keep_strategy": "first path",
+        "plugins_enabled": False,
     }
 
     def __new__(cls, *args, **kwargs):
@@ -37,11 +38,11 @@ class ConfigManager:
     def __init__(self):
         if hasattr(self, 'initialized'):
             return
-            
+
         self.config_dir = os.path.join(os.path.expanduser("~"), ".dataforge")
         self.config_file = os.path.join(self.config_dir, "config.json")
         self.data: Dict[str, Any] = self.DEFAULT_CONFIG.copy()
-        
+
         self.load()
         self.initialized = True
 
@@ -55,10 +56,55 @@ class ConfigManager:
         try:
             with open(self.config_file, 'r') as f:
                 loaded = json.load(f)
-                self.data.update(loaded)
+                if not isinstance(loaded, dict):
+                    logger.warning("Config file is not a JSON object; using defaults.")
+                    return
+                self._merge_validated(loaded)
             logger.info(f"Configuration loaded from {self.config_file}")
         except (OSError, json.JSONDecodeError) as e:
             logger.error(f"Failed to load config: {e}")
+
+    def _merge_validated(self, loaded: dict):
+        """Merge *loaded* into ``self.data`` after validating types, ranges,
+        and enums. Unknown keys are silently dropped; invalid values are
+        replaced with defaults."""
+        for key, default_val in self.DEFAULT_CONFIG.items():
+            if key not in loaded:
+                continue
+            val = loaded[key]
+            if not self._validate_one(key, val, default_val):
+                logger.warning(
+                    f"Config key {key!r} has invalid value {val!r}; "
+                    f"using default {default_val!r}."
+                )
+                continue
+            self.data[key] = val
+
+    def _validate_one(self, key: str, val: Any, default: Any) -> bool:
+        """Return True when *val* is acceptable for *key*."""
+        if key in ("max_thread_workers", "search_thread_workers"):
+            if not isinstance(val, int) or val < 1 or val > 256:
+                return False
+            return True
+        if key == "hash_algorithm":
+            return isinstance(val, str) and val.lower() in _VALID_HASH_ALGORITHMS
+        if key == "log_level":
+            return isinstance(val, str) and val.upper() in _VALID_LOG_LEVELS
+        if key == "size_unit":
+            return isinstance(val, str) and val in _VALID_SIZE_UNITS
+        if key == "path_display_mode":
+            return isinstance(val, str) and val in _VALID_PATH_MODES
+        if key == "settings_ui_tier":
+            return isinstance(val, str) and val in _VALID_TIERS
+        if key in ("safe_mode", "plugins_enabled"):
+            return isinstance(val, bool)
+        if key in ("excluded_extensions", "excluded_folders", "dashboard_paths"):
+            return isinstance(val, list)
+        if key == "theme":
+            return isinstance(val, str) and len(val) > 0
+        if key == "duplicate_default_keep_strategy":
+            return isinstance(val, str)
+        return isinstance(val, type(default))
 
     def save(self):
         """Save config to disk."""
@@ -77,5 +123,4 @@ class ConfigManager:
         self.data[key] = value
         self.save()
 
-# Global instance
 config = ConfigManager()

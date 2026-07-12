@@ -407,6 +407,27 @@ class TestConfig(unittest.TestCase):
         result = config.get("nonexistent_key_xyz", "fallback")
         self.assertEqual(result, "fallback")
 
+    def test_config_merge_validates_and_clamps_bad_values(self):
+        from dataforge.core.config import ConfigManager
+        # Bypass the singleton/disk-loading __init__ to unit-test the merge
+        # logic in isolation, without touching the real ~/.dataforge/config.json.
+        cfg = object.__new__(ConfigManager)
+        cfg.data = ConfigManager.DEFAULT_CONFIG.copy()
+
+        cfg._merge_validated({
+            "hash_algorithm": "sha256",
+            "max_thread_workers": 999999,
+            "log_level": "NOT_A_LEVEL",
+            "totally_unknown_key": "value",
+            "theme": "midnight",
+        })
+
+        self.assertEqual(cfg.data["hash_algorithm"], "sha256")
+        self.assertEqual(cfg.data["max_thread_workers"], ConfigManager.DEFAULT_CONFIG["max_thread_workers"])
+        self.assertEqual(cfg.data["log_level"], ConfigManager.DEFAULT_CONFIG["log_level"])
+        self.assertNotIn("totally_unknown_key", cfg.data)
+        self.assertEqual(cfg.data["theme"], "midnight")
+
 
 # ===========================================================================
 # SearchQuery / search.py
