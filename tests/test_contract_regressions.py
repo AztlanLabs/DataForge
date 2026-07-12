@@ -1616,7 +1616,111 @@ class ContractRegressionTests(unittest.TestCase):
         finally:
             dfconfig.set("ui_reduce_motion", original if original is not None else False)
 
+    def test_focus_ring_token_exists_in_both_themes(self):
+        """2e.4 — A ``focus_ring`` token must be defined for both the
+        light and dark themes and exposed as :data:`FOCUS_RING_TOKEN`
+        so tests and the settings help text can reference it without
+        hard-coding a hex value."""
+        from dataforge.ui import theme_tokens
+
+        self.assertEqual(theme_tokens.FOCUS_RING_TOKEN, "focus_ring")
+        for mode in ("light", "dark"):
+            self.assertIn(
+                "focus_ring", theme_tokens.TOKENS[mode],
+                f"focus_ring token missing in {mode} theme",
+            )
+            value = theme_tokens.TOKENS[mode]["focus_ring"]
+            self.assertTrue(value.startswith("#") and len(value) == 7,
+                            f"focus_ring must be a #rrggbb hex value, got {value!r}")
+            # Distinct from the related accent_focus so the focus ring
+            # is not visually confusable with the input accent border.
+            self.assertNotEqual(
+                value, theme_tokens.TOKENS[mode]["accent_focus"],
+                f"focus_ring and accent_focus must be distinct in {mode} theme",
+            )
+
+    def test_qss_contains_focus_rules_for_interactive_widgets(self):
+        """2e.4 — The generated QSS must contain a ``:focus`` rule for
+        every interactive widget that draws a border:
+        ``QPushButton``, ``QLineEdit``, ``QSpinBox``, ``QComboBox``,
+        ``QTreeWidget``/``QTreeView``, ``QListWidget``, ``QTextEdit``,
+        and ``QCheckBox::indicator``."""
+        from dataforge.ui.theme_tokens import (
+            FOCUS_RING_TOKEN, generate_qss,
+        )
+
+        qss_light = generate_qss("light")
+        qss_dark = generate_qss("dark")
+
+        # The actual token value (not the placeholder) must appear in
+        # the rendered QSS, proving the template substitution worked.
+        from dataforge.ui.theme_tokens import TOKENS
+        for mode, qss in (("light", qss_light), ("dark", qss_dark)):
+            self.assertIn(
+                TOKENS[mode][FOCUS_RING_TOKEN], qss,
+                f"focus ring colour not found in {mode} QSS",
+            )
+
+        for widget in (
+            "QPushButton:focus",
+            "QLineEdit:focus",
+            "QSpinBox:focus",
+            "QComboBox:focus",
+            "QTreeWidget:focus",
+            "QTreeView:focus",
+            "QListWidget:focus",
+            "QTextEdit:focus",
+            "QCheckBox:focus::indicator",
+            "QTabBar::tab:focus",
+        ):
+            self.assertIn(widget, qss_light,
+                          f"{widget!r} rule missing from light QSS")
+            self.assertIn(widget, qss_dark,
+                          f"{widget!r} rule missing from dark QSS")
+
+    def test_button_border_is_stable_across_focus_state(self):
+        """2e.4 — Toggling a QPushButton's focus must not change the
+        button's overall size; the rule switches the *colour* of a
+        pre-existing 2px border rather than introducing a new border
+        on focus. The padding must compensate accordingly."""
+        from dataforge.ui.theme_tokens import generate_qss
+
+        qss = generate_qss("light")
+        # Both the base and :focus rules must use the same border width
+        # so the button does not jump when the user tabs onto it.
+        import re
+        base_match = re.search(
+            r"QPushButton \{[^}]*border:\s*(\d+)px[^}]*\}",
+            qss, re.DOTALL,
+        )
+        focus_match = re.search(
+            r"QPushButton:focus \{[^}]*border-color:\s*#", qss, re.DOTALL
+        )
+        self.assertIsNotNone(base_match, "QPushButton base rule not found")
+        self.assertIsNotNone(focus_match, "QPushButton:focus rule not found")
+        self.assertEqual(
+            base_match.group(1), "2",
+            "QPushButton base border must be 2px so focus does not shift",
+        )
+
     def test_storage_devices_view_surfaces_fm_devices_in_gui(self):
+        """``fm devices`` had no GUI path; the new ``Storage & Devices``
+        view wires the same ``device_manager.list_storage_devices`` API
+        into a QTableWidget so the data is discoverable in-app."""
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.ui.views.storage_devices import StorageDevicesView
+
+        _ = QApplication.instance() or QApplication([])
+
+        view = StorageDevicesView(None, app=MagicMock())
+        self.assertEqual(view.get_title(), "Storage & Devices")
+        self.assertEqual(view.table.columnCount(), 5)
+        self.assertEqual(
+            [view.table.horizontalHeaderItem(i).text() for i in range(5)],
+            ["Mount point", "Type", "Filesystem", "Used", "Total"],
+        )
+        self.assertIn("refresh", view.TOOLTIP_TEXTS)
+        self.assertIn("details", view.TOOLTIP_TEXTS)
         """``fm devices`` had no GUI path; the new ``Storage & Devices``
         view wires the same ``device_manager.list_storage_devices`` API
         into a QTableWidget so the data is discoverable in-app."""

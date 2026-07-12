@@ -33,6 +33,7 @@ __all__ = [
     "SEMANTIC_TOKEN_NAMES",
     "generate_qss",
     "generate_palette",
+    "FOCUS_RING_TOKEN",
 ]
 
 # ---------------------------------------------------------------------------
@@ -72,6 +73,13 @@ TOKENS: dict[str, dict[str, str]] = {
         # --- Accents ---
         "primary":            "#2563eb",
         "accent_focus":       "#3b82f6",
+
+        # --- Focus ring (2e.4) — drawn on the outer border of focused
+        # interactive widgets. Distinct from ``accent_focus`` (which
+        # drives the inner background tint of inputs) so the keyboard
+        # focus indicator is unmistakable for sighted users; the
+        # colour clears AA on both surface backgrounds.
+        "focus_ring":         "#1d4ed8",
 
         # --- Semantic (validated AA — doc 05 §1.4) ---
         "danger":             "#dc2626",
@@ -138,6 +146,12 @@ TOKENS: dict[str, dict[str, str]] = {
         "primary":            "#818cf8",
         "accent_focus":       "#6366f1",
 
+        # --- Focus ring (2e.4) — dark-theme counterpart of the
+        # light-theme focus_ring token. The colour clears AA on the
+        # dark surface palette and stays distinct from ``accent_focus``
+        # so the keyboard focus indicator is unmistakable.
+        "focus_ring":         "#a5b4fc",
+
         # --- Semantic ---
         "danger":             "#f87171",
         "danger_bg":          "#ef4444",
@@ -180,6 +194,12 @@ TOKENS: dict[str, dict[str, str]] = {
 SEMANTIC_TOKEN_NAMES = frozenset({
     "primary", "success", "warning", "danger", "info",
 })
+
+# Public token name (2e.4) for keyboard focus indicators. The actual
+# value is the ``focus_ring`` entry in :data:`TOKENS`; exposing the
+# name as a constant lets tests and the settings help text reference
+# the token without hard-coding the colour.
+FOCUS_RING_TOKEN = "focus_ring"
 
 # ---------------------------------------------------------------------------
 # Typography
@@ -265,15 +285,21 @@ QFrame#navFrame QPushButton[compact="true"] {
 QPushButton {
     background-color: $surface_elevated;
     color: $text_button;
-    border: 1px solid $border_strong;
+    /* 2e.4 — border is 2px even when unfocused (transparent) so the
+       focus-ring switch does not shift the button's content. */
+    border: 2px solid transparent;
     border-radius: 6px;
-    padding: 6px 14px;
+    padding: 5px 13px;
     font-weight: 500;
     text-align: center;
 }
 QPushButton:hover {
     background-color: $surface_hover;
     border-color: $border_hover;
+}
+QPushButton:focus {
+    border-color: $focus_ring;
+    outline: none;
 }
 QPushButton:pressed {
     background-color: $surface_pressed;
@@ -336,19 +362,24 @@ QGroupBox::title {
 QLineEdit, QSpinBox, QComboBox {
     background-color: $surface_elevated;
     color: $text;
-    border: 1px solid $border_strong;
+    border: 2px solid $border_strong;
     border-radius: 6px;
-    padding: 6px 10px;
+    padding: 5px 9px;
 }
 QLineEdit:focus, QSpinBox:focus, QComboBox:focus {
-    border-color: $accent_focus;
+    border-color: $focus_ring;
     background-color: $surface_elevated;
+    outline: none;
 }
 QTreeWidget, QTreeView, QListWidget, QTextEdit {
     background-color: $surface;
     color: $text;
-    border: 1px solid $border;
+    border: 2px solid $border;
     border-radius: 8px;
+}
+QTreeWidget:focus, QTreeView:focus, QListWidget:focus, QTextEdit:focus {
+    border-color: $focus_ring;
+    outline: none;
 }
 QTreeView::item {
     padding: 6px;
@@ -378,6 +409,12 @@ QTabBar::tab {
     border-top-left-radius: 6px;
     border-top-right-radius: 6px;
     font-weight: 500;
+}
+QTabBar::tab:focus {
+    outline: none;
+    border: 2px solid $focus_ring;
+    /* preserve the same tab height by trimming padding */
+    padding: 9px 15px;
 }
 QTabBar::tab:selected {
     background-color: $surface;
@@ -500,6 +537,11 @@ _INDICATOR_TEMPLATE = Template("""
 QCheckBox {
     spacing: 8px;
 }
+QCheckBox:focus {
+    /* 2e.4 — focus ring on the label area (the box itself gets the
+       accent border when focused via the indicator below). */
+    outline: none;
+}
 QCheckBox::indicator {
     width: 16px;
     height: 16px;
@@ -518,6 +560,12 @@ QCheckBox::indicator:checked {
 QCheckBox::indicator:disabled {
     background-color: $indicator_disabled;
     border-color: $indicator_border;
+}
+QCheckBox:focus::indicator {
+    border: 2px solid $focus_ring;
+    /* keep the 16px box stable by compensating for the 1px→2px border */
+    width: 14px;
+    height: 14px;
 }
 QSpinBox::up-button, QSpinBox::down-button {
     background-color: $indicator_btn_bg;
