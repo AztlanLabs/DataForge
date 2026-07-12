@@ -890,6 +890,28 @@ class ContractRegressionTests(unittest.TestCase):
         self.assertTrue(callable(getattr(BaseView, "confirm_destructive_preview", None)))
         QApplication.instance() or QApplication([])
 
+    def test_humanize_callable_name(self):
+        from functools import partial
+        from dataforge.ui.app import _humanize_callable_name
+
+        def search_files(*_args, **_kwargs):
+            return None
+
+        self.assertEqual(_humanize_callable_name(search_files), "search files")
+
+        wrapped = partial(search_files)
+        self.assertEqual(_humanize_callable_name(wrapped), "search files")
+
+        class View:
+            def start_search(self):
+                return None
+
+        v = View()
+        self.assertEqual(_humanize_callable_name(v.start_search), "start search")
+
+        anon = lambda: None
+        self.assertEqual(_humanize_callable_name(anon), "background task")
+
     def test_cli_search_help_mentions_extension_sort_examples(self):
         runner = CliRunner()
 

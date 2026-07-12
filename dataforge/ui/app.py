@@ -52,6 +52,27 @@ HEADER_COLORS = {
 BackgroundArgs: TypeAlias = tuple[Any, ...]
 BackgroundKwargs: TypeAlias = dict[str, Any]
 
+
+def _humanize_callable_name(target) -> str:
+    """Return a short, user-readable name for ``target``.
+
+    Module-level functions expose ``__name__``; bound methods expose
+    ``__qualname__`` (e.g. ``SearchView.start_search``). ``functools.partial``
+    wraps another callable whose name we can read instead. Lambdas have
+    only ``<lambda>`` for both and fall through to the generic label."""
+    name = getattr(target, "__name__", None)
+    if name and name != "<lambda>":
+        return name.replace("_", " ")
+    qualname = getattr(target, "__qualname__", None)
+    if qualname:
+        leaf = qualname.split(".")[-1]
+        if leaf and leaf != "<lambda>":
+            return leaf.replace("_", " ")
+    func = getattr(target, "func", None)
+    if func is not None:
+        return _humanize_callable_name(func)
+    return "background task"
+
 class ProgressCallback(Protocol):
     def __call__(self, current: int, total: int, step_name: str = "") -> None: ...
 
@@ -463,6 +484,16 @@ class DataForgeApp(QMainWindow):
             txt = f"{step_name}: {current}..."
         self.update_status(txt)
 
+    def set_task_name(self, name: str):
+        """Override the name shown in the status bar for the running task.
+
+        Most callers should pass ``task_name=`` to ``run_workflow`` instead.
+        This helper exists for places that spawn a task inside another
+        workflow and need to relabel what the user sees."""
+        if name:
+            self._current_task_name = name
+            self.update_status(f"Running: {name}…")
+
     def post_to_main(self, callback: Callable[..., Any], *args: Any, **kwargs: Any):
         self.post_signal.emit(callback, args, kwargs)
 
@@ -509,13 +540,20 @@ class DataForgeApp(QMainWindow):
         on_error: ErrorCallback | None = None,
         progress: bool = False,
         error_title: str = "Operation Failed",
+        task_name: str | None = None,
     ) -> None:
         kwargs = {}
         signature = inspect.signature(target)
         if progress and "progress_callback" in signature.parameters:
             kwargs["progress_callback"] = self.make_progress_callback()
         error_handler = on_error or partial(self.show_workflow_error, title=error_title)
-        self.run_background(target, on_success, *args, on_error=error_handler, show_progress=progress, **kwargs)
+        self.run_background(
+            target, on_success, *args,
+            on_error=error_handler,
+            show_progress=progress,
+            task_name=task_name,
+            **kwargs,
+        )
 
     def run_background(
         self,
@@ -524,6 +562,7 @@ class DataForgeApp(QMainWindow):
         *args: Any,
         on_error: ErrorCallback | None = None,
         show_progress: bool = False,
+        task_name: str | None = None,
         **extra_kwargs: Any,
     ) -> None:
         """
@@ -531,10 +570,15 @@ class DataForgeApp(QMainWindow):
         Automatically starts spinner and handles cancellation.
         """
         if self.is_busy:
-            self.update_status("Busy: please wait for the current operation to finish.")
+            current = getattr(self, "_current_task_name", None) or "another task"
+            self.update_status(
+                f"Busy: '{current}' is still running — please wait for it to finish."
+            )
             return
 
         self.reset_status()
+        self._current_task_name = task_name or _humanize_callable_name(target)
+        self.update_status(f"Running: {self._current_task_name}…")
 
         self.is_busy = True
         self.cancel_event.clear()
@@ -570,6 +614,7 @@ class DataForgeApp(QMainWindow):
         self.cancel_btn.setVisible(False)
         self.progress_bar.setVisible(False)
         self.current_worker = None
+        self._current_task_name = None
 
     def run_in_thread(
         self,
