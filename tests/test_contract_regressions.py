@@ -952,6 +952,31 @@ class ContractRegressionTests(unittest.TestCase):
 
         self.assertTrue(callable(getattr(DataForgeApp, "build_navigation_sidebar", None)))
 
+    def test_automations_view_merges_tools_and_action_builder(self):
+        """Tools & Workflows and Action Builder both sounded like
+        duplicate multi-step builders; they're now a single sidebar
+        entry called "Automations" with sub-tabs."""
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.ui.views.automations import AutomationsView
+
+        _ = QApplication.instance() or QApplication([])
+
+        view = AutomationsView(None, app=MagicMock())
+        self.assertEqual(view.get_title(), "Automations")
+        self.assertEqual(view.notebook.count(), 2)
+
+        tab_titles = [
+            view.notebook.tabText(i) for i in range(view.notebook.count())
+        ]
+        self.assertIn("Action Builder", tab_titles)
+        self.assertIn("Tools", tab_titles)
+
+        self.assertIsNotNone(view.action_builder)
+        self.assertIsNotNone(view.tools)
+        # The 4 inner Tools sub-tabs (Integrity / Cleaner / Renamer / Sync)
+        # are owned by the embedded ToolsView, not the outer notebook.
+        self.assertEqual(view.tools.notebook.count(), 4)
+
     def test_storage_devices_view_surfaces_fm_devices_in_gui(self):
         """``fm devices`` had no GUI path; the new ``Storage & Devices``
         view wires the same ``device_manager.list_storage_devices`` API

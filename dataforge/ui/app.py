@@ -15,9 +15,7 @@ from .views.base import BaseView
 from .views.dashboard import DashboardView
 from .views.search import SearchView
 from .views.duplicates import DuplicatesView
-from .views.tools import ToolsView
 from .views.settings import SettingsView
-from .views.action_builder import ActionBuilderView
 from .views.media import MediaView
 from .views.system_cleanup import SystemCleanupView
 from .views.performance_view import PerformanceView
@@ -26,6 +24,7 @@ from .views.metadata_view import MetadataView
 from .views.hardware_view import HardwareView
 from .views.forensics_view import ForensicsView
 from .views.storage_devices import StorageDevicesView
+from .views.automations import AutomationsView
 from .views.about import AboutView
 from .plugin_loader import PluginLoader
 from .theme_tokens import generate_qss, generate_palette, TYPE_SCALE
@@ -268,8 +267,7 @@ class DataForgeApp(QMainWindow):
             (DashboardView, "Dashboard"),
             (SearchView, "Search & Organize"),
             (DuplicatesView, "Duplicate Finder"),
-            (ActionBuilderView, "Action Builder"),
-            (ToolsView, "Tools & Workflows"),
+            (AutomationsView, "Automations"),
             (MediaView, "Media Tools"),
             (SystemCleanupView, "System Cleanup"),
             (PerformanceView, "Performance"),
@@ -344,8 +342,7 @@ class DataForgeApp(QMainWindow):
                 "Duplicate Finder",
                 "Media Tools",
                 "Metadata Studio",
-                "Action Builder",
-                "Tools & Workflows",
+                "Automations",
             ],
             "Clean & Optimize": [
                 "System Cleanup",
