@@ -220,7 +220,7 @@ fm usage ~/Media
 fm integrity create PATH SNAPSHOT
 ```
 
-Creates a self-describing JSON snapshot for later verification. The snapshot is `{"algorithm": ..., "created_at": ..., "files": {relative_path: hash}}` and uses the configured `hash_algorithm` (default `sha256`); legacy flat `{path: md5}` snapshots are still readable by `integrity check`. See [`reviews/01_CODE_REVIEW_AND_BUGS.md`](./reviews/01_CODE_REVIEW_AND_BUGS.md) (M4) and [`reviews/02_SECURITY_AND_FORENSIC_AUDIT.md`](./reviews/02_SECURITY_AND_FORENSIC_AUDIT.md) (S1).
+Creates a self-describing JSON snapshot for later verification. The snapshot is `{"algorithm": ..., "created_at": ..., "files": {relative_path: hash}}` and uses the configured `hash_algorithm` (default `sha256`); legacy flat `{path: md5}` snapshots are still readable by `integrity check`. See [`reviews/AUDIT_FINDINGS.md`](./reviews/AUDIT_FINDINGS.md) (M4, S1).
 
 ### Example
 
@@ -265,7 +265,7 @@ Scans for and optionally removes junk/cache files across known categories.
 Category names are matched **exactly** (case-sensitive) against the platform's category keys: `System Temp`, `User Cache`, `Thumbnails`, `Trash`, `Log Files`, `Package Cache`, `Crash Reports`. A name that doesn't match one of these scans nothing.
 
 > [!CAUTION]
-> Files under `System Temp` (`/tmp`, `/var/tmp`), `User Cache`, `Thumbnails`, `Trash`, and `Crash Reports` are treated as junk **regardless of type**, and any `--path` you pass is folded into that blanket classification. With `--execute` this can remove in-use temp files/sockets of other running processes, or everything inside a folder you point `--path` at. Always review the `--dry-run` output first. See [`reviews/02_SECURITY_AND_FORENSIC_AUDIT.md`](./reviews/02_SECURITY_AND_FORENSIC_AUDIT.md) (S7).
+> Files under `System Temp` (`/tmp`, `/var/tmp`), `User Cache`, `Thumbnails`, `Trash`, and `Crash Reports` are treated as junk **regardless of type**, and any `--path` you pass is folded into that blanket classification. With `--execute` this can remove in-use temp files/sockets of other running processes, or everything inside a folder you point `--path` at. Always review the `--dry-run` output first. See [`reviews/AUDIT_FINDINGS.md`](./reviews/AUDIT_FINDINGS.md) (S7).
 
 ### Example
 
@@ -310,7 +310,7 @@ Recovers deleted files from the system trash or carves file types from a disk im
 - `--types jpg,png,pdf` - restrict carving to specific extensions
 
 > [!CAUTION]
-> `--restore-trash` restores files to the original path recorded in each item's `.trashinfo` metadata. When scanning trash on removable media, that path is attacker-controllable, so restore can write outside the expected location. Prefer restoring to a dedicated folder and reviewing targets first — see [`reviews/02_SECURITY_AND_FORENSIC_AUDIT.md`](./reviews/02_SECURITY_AND_FORENSIC_AUDIT.md) (S4).
+> `--restore-trash` restores files to the original path recorded in each item's `.trashinfo` metadata. When scanning trash on removable media, that path is attacker-controllable, so restore can write outside the expected location. Prefer restoring to a dedicated folder and reviewing targets first — see [`reviews/AUDIT_FINDINGS.md`](./reviews/AUDIT_FINDINGS.md) (S4).
 
 ### Example
 
@@ -380,7 +380,7 @@ fm forensics ~/Evidence --search-keyword "confidential"
 fm hash-calc PATH... [--algo md5|sha1|sha256|sha512]
 ```
 
-Calculates cryptographic hashes for one or more files. All four algorithms are supported (`core/hasher.py` also implements `blake2b` internally); the earlier `sha512` crash is fixed — see [`reviews/01_CODE_REVIEW_AND_BUGS.md`](./reviews/01_CODE_REVIEW_AND_BUGS.md) (M1).
+Calculates cryptographic hashes for one or more files. All four algorithms are supported (`core/hasher.py` also implements `blake2b` internally); the earlier `sha512` crash is fixed — see [`reviews/AUDIT_FINDINGS.md`](./reviews/AUDIT_FINDINGS.md) (M1).
 
 ### Example
 

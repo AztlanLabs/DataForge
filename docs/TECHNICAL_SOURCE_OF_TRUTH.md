@@ -23,16 +23,7 @@ It is intended to answer four questions for a new maintainer:
 
 This document is based on the current source files in the repository, not on intended behavior.
 
-> [!WARNING]
-> **Partially stale.** The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5** and several new modules/views (hardware, forensics, recovery, metadata, performance, system cleanup, password tools, device manager, file signatures) were added after most of this document was written. The GUI-stack references below (`ttkbootstrap`, `tkinter`) have been corrected, but the deeper GUI/file-by-file sections have not been fully re-audited against the new modules — treat unreviewed GUI implementation details as `Needs confirmation` and prefer [`README.md`](./README.md) for the current, verified status.
-
-> [!IMPORTANT]
-> **Correctness & security caveats (2026-07-10 review + remediation).** A full engineering/security/UX pass is recorded under [`docs/reviews/`](./docs/reviews/). The correctness backlog (report 01) has since been **fixed**; the most load-bearing corrections to statements elsewhere in this document:
-> - The **test suite runs green — 224 tests pass.** `rename_with_regex` was restored in `dataforge/core/operations/files.py` (as documented below), and stale tests were updated. (See `docs/reviews/01`, H1.)
-> - **Integrity and duplicate detection no longer default to MD5.** The config default `hash_algorithm` is now `sha256`; `IntegrityMonitor` honours it and writes self-describing snapshots (`{"algorithm", "created_at", "files"}`), with legacy flat MD5 snapshots still readable. Duplicate deletion byte-verifies each group. (`docs/reviews/01`, M4/M6.)
-> - **`core/scanner.py` no longer follows symlinks** — it skips symlinks and passes `follow_symlinks=False` to every `is_dir()`/`is_file()` check, closing the scope-escape/recursion window. (`docs/reviews/01`, M3.)
-> - Also fixed: `sha512` CLI crash (added to the hasher allow-list), unguarded `json.load` in `verify_snapshot` (now catches `JSONDecodeError`), and non-thread-safe cache access (now lock + WAL).
-> - **Still open (report 02):** forensic HTML report HTML-injection (S2), trash-restore path traversal (S4), System Cleanup over-classification (S7).
+The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5** and several new modules were added after this document was written. Some GUI/file-by-file sections may not be fully re-audited. A complete review of correctness, security, and staleness is maintained in [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md). Key points: 254 tests pass, integrity defaults to SHA-256 (not MD5), the scanner no longer follows symlinks, and the SQLite cache is thread-safe. Open findings include forensic-report HTML injection (S2), trash-restore path traversal (S4), and System Cleanup over-classification (S7).
 
 ## Scope
 
@@ -559,7 +550,7 @@ Main GUI controller and shell.
 Constants:
 
 - `HEADER_COLORS` — light/dark color maps for sidebar group header labels (Overview, File Utilities, System Maintenance, Advanced Analysis, Application, Plugins).
-- `LIGHT_STYLE`, `DARK_STYLE` — full Qt stylesheets applied to the whole window.
+- `LIGHT_STYLE`, `DARK_STYLE` — full Qt stylesheets (now generated from `ui/theme_tokens.py::generate_qss()`; the old hand-written blocks have been replaced by a single token-driven template).
 
 Types:
 
@@ -588,7 +579,7 @@ Key methods:
 - `run_in_thread()` — thin compatibility wrapper around `run_background`.
 - `post_to_main(callback, *args, **kwargs)` — marshals a callback onto the UI thread via the `post_signal` Qt signal (not a queue).
 - `post_progress(current, total, step_name)` / `post_status(message)` — safe to call from a `BackgroundWorker` thread; emit the worker's Qt signals when called off-thread, or update the UI directly when called on the UI thread.
-- `toggle_theme()` — switches between the `LIGHT_STYLE`/`DARK_STYLE` stylesheets and persists `"cosmo"`/`"darkly"` as the saved theme name.
+- `toggle_theme()` — switches between the light/dark stylesheets (generated from `ui/theme_tokens.py`) and persists `"cosmo"`/`"darkly"` as the saved theme name.
 - `show_error_dialog`, `show_warning_dialog`, `show_info_dialog`, `show_workflow_error` — `QMessageBox`-based dialog helpers.
 - `make_progress_callback() -> ProgressCallback` — returns `self.post_progress` for injection into worker targets.
 - `show_current_help()` — delegates to the current view's `show_help()`.
@@ -861,8 +852,7 @@ Integration and cross-layer tests:
 
 #### `tests/test_comprehensive.py`
 
-> [!NOTE]
-> **This module now imports and passes.** `rename_with_regex` was restored in `core/operations/files.py`, so the whole suite collects and runs green (224 tests). The coverage list below is accurate. (See `docs/reviews/01_CODE_REVIEW_AND_BUGS.md`, H1.)
+This module now imports and passes — `rename_with_regex` was restored in `dataforge/core/operations/files.py`. The whole suite collects and runs green (254 tests). The coverage list below is accurate. See [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) for verification details.
 
 Comprehensive unit and functional test suite covering every layer:
 
@@ -891,8 +881,7 @@ Comprehensive unit and functional test suite covering every layer:
 
 These are concrete structural facts about the codebase, not opinions.
 
-> [!NOTE]
-> The structural facts below are still accurate. Most *defects* found in the 2026-07-10 review are now **fixed** (broken tests, MD5 integrity, symlink-following scan, `sha512` crash, non-thread-safe cache); the still-open *security risks* (forensic-report HTML injection, trash-restore path traversal, System Cleanup over-classification) are tracked in [`docs/reviews/`](./docs/reviews/) with severities, line-level evidence, and fixes rather than repeated here.
+The structural facts below are still accurate. Most *defects* from the 2026-07-10 review are now **fixed**; still-open *security risks* are tracked in [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) with severities and line-level evidence.
 
 ### File mutation is centralized through two layers
 
@@ -943,6 +932,10 @@ All GUI bulk operations follow: dry-run preview → user confirmation → execut
 - `PluginLoader` imports as `dataforge.ui.plugins.<module>`
 - Build scripts bundle the correct path
 - Covered by regression tests
+
+### 10. Design tokens are the single source of truth for colour
+
+`dataforge/ui/theme_tokens.py` (added Phase 2b — 2026-07-11) — semantic colour tokens with validated AA contrast, a template-driven `generate_qss(mode)` function that replaces the two ~200-line hand-written `LIGHT_STYLE`/`DARK_STYLE` blocks in `app.py`, `generate_palette(mode)` for `QPalette`, `TYPE_SCALE` named font-size constants, and SVG glyph helpers for checkbox/spinbox/combobox indicators. All per-widget hardcoded hex colours across the views have been migrated to Qt dynamic-property variant rules (`setProperty("variant", "danger")` etc.) driven by the token module.
 
 ### `LocalProvider` is unused infrastructure
 

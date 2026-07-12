@@ -12,8 +12,7 @@ DataForge provides both a **terminal interface** (`fm` CLI) and **interactive de
   <img src="DataForgeLogo.jpeg" alt="DataForge Logo - File & System Intelligence" width="300" />
 </div>
 
-> [!NOTE]
-> **This project recently went through a large, multi-part change:** the GUI was migrated from Tkinter/ttkbootstrap to **PyQt5**, and a batch of new modules (hardware, forensics, recovery, metadata, performance, system cleanup, password tools, device manager, file signatures) were added. Documentation, packaging metadata, and CLI wiring have since been reconciled to match — a couple of smaller items are still open. See [Known incomplete / in-progress changes](#known-incomplete--in-progress-changes) for the current, verified list.
+The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5**, and new modules (hardware, forensics, recovery, metadata, performance, system cleanup, password tools, device manager, file signatures) were added. Documentation, packaging metadata, and CLI wiring have been reconciled to match. Remaining open items and a full audit are tracked in [`docs/reviews/NOTES_REVIEW.md`](./docs/reviews/NOTES_REVIEW.md).
 
 ## Why DataForge? (The Superpowers)
 
@@ -24,7 +23,7 @@ DataForge provides both a **terminal interface** (`fm` CLI) and **interactive de
 | **🔍 Go deep into data** | Forensic file carving, GPS metadata stripping, disk SMART health, password strength analysis, trash recovery — extract what's hidden |
 | **⚡ Unified interface** | Terminal and desktop — choose your workflow. Same features, same results, same safety standards — no tool switching |
 | **🧩 Extensible** | Action Builder pipeline for custom multi-step workflows; plugin system for custom views; scriptable CLI — build your own workflows |
-| **🛡️ Production-ready** | 224 passing tests, thread-safe batch operations, dry-run previews, cancellation support, detailed logging — trust the tool |
+| **🛡️ Production-ready** | 254 passing tests, thread-safe batch operations, dry-run previews, cancellation support, detailed logging — trust the tool |
 | **🚀 Automation at scale** | Parallel hashing, batch operations on thousands of files, configurable worker threads, progress tracking, cancellation — process like a pro |
 | **🔐 Enterprise features** | Role-based experience levels (Basic/Advanced/Expert), audit logging, integrity verification, forensic reports — audit-ready |
 
@@ -77,7 +76,7 @@ DataForge provides both a **terminal interface** (`fm` CLI) and **interactive de
 | **Cache** | `~/.dataforge/cache.db` (SQLite hash cache, thread-safe with WAL, parallel hashing) |
 | **Logging** | `~/.dataforge/app.log` (rotating, 5 MB / 3 backups, full audit trail) |
 | **Architecture** | Layered: core primitives → operations → service layer → modules → GUI/CLI orchestration (shared logic, zero duplication) |
-| **Tests** | 224 passing (`pytest`, full coverage across all feature layers, production-grade quality) |
+| **Tests** | 254 passing (`pytest`, full coverage across all feature layers, production-grade quality) |
 | **Build** | `setup.py` (CLI/core), `build_exe.py` (PyInstaller → standalone desktop bundles, one-file release mode) |
 
 ## Quick Start
@@ -119,11 +118,10 @@ PYTHONPATH=. python -m dataforge.cli --help
 ### Verify the Build
 
 ```bash
-PYTHONPATH=. pytest -q  # 224 tests pass
+PYTHONPATH=. pytest -q  # 254 tests pass
 ```
 
-> [!NOTE]
-> **Full test suite passes — 224 tests.** All correctness fixes are verified. See [`docs/reviews/01_CODE_REVIEW_AND_BUGS.md`](./docs/reviews/01_CODE_REVIEW_AND_BUGS.md) for the comprehensive audit.
+Full test suite passes — 254 tests. All correctness fixes are verified. See [`docs/reviews/AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md) and [`docs/reviews/NOTES_REVIEW.md`](./docs/reviews/NOTES_REVIEW.md) for the full audit.
 
 ### Build desktop executables
 
@@ -158,15 +156,17 @@ python build_exe.py debug
 - [`docs/GUI_WORKFLOWS.md`](./docs/GUI_WORKFLOWS.md) - view-by-view desktop workflows, threading, background execution model
 - [`docs/TECHNICAL_SOURCE_OF_TRUTH.md`](./docs/TECHNICAL_SOURCE_OF_TRUTH.md) - authoritative file-by-file source map for maintainers
 
+**Contributing:**
+- [`docs/COMMIT_CONVENTION.md`](./docs/COMMIT_CONVENTION.md) - standardized commit message format and enforcement hook
+- [`docs/VERSIONING.md`](./docs/VERSIONING.md) - semantic versioning rules and release process
+
 ### Project Review & Audit (2026-07-10)
 
 A comprehensive engineering, security, and UX audit lives under [`docs/reviews/`](./docs/reviews/):
 
-- **[`00_EXECUTIVE_SUMMARY.md`](./docs/reviews/00_EXECUTIVE_SUMMARY.md)** — start here: overview, findings index, remediation status
-- **[`01_CODE_REVIEW_AND_BUGS.md`](./docs/reviews/01_CODE_REVIEW_AND_BUGS.md)** — 224 tests pass; all correctness bugs fixed (MD5→SHA-256, symlink scope escape, cache threading, JSON error handling, sha512 crash)
-- **[`02_SECURITY_AND_FORENSIC_AUDIT.md`](./docs/reviews/02_SECURITY_AND_FORENSIC_AUDIT.md)** — application and forensics security hardening; open issues (HTML injection, path traversal, over-classification)
-- **[`03_UIUX_REVIEW.md`](./docs/reviews/03_UIUX_REVIEW.md)** — UX improvements: naming, information architecture, interactions, accessibility
-- **[`04_IMPROVEMENTS_AND_ROADMAP.md`](./docs/reviews/04_IMPROVEMENTS_AND_ROADMAP.md)** — engineering practices, architecture modernization, planned features
+- **[`EXECUTIVE_SUMMARY.md`](./docs/reviews/EXECUTIVE_SUMMARY.md)** — start here: overview, findings index, remediation status, brand identity
+- **[`AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md)** — all code-correctness bugs (15 findings, all fixed) and security/forensic findings (13 findings, 2 fixed); forensic-soundness checklist, remediation order
+- **[`IMPROVEMENT_PLAN.md`](./docs/reviews/IMPROVEMENT_PLAN.md)** — UX/UI review, visual design system, engineering improvements, phased roadmap with per-item implementation status (Phase 2a+2b shipped; 2c/2d/2e open)
 
 ## Directory Structure
 
@@ -179,10 +179,10 @@ A comprehensive engineering, security, and UX audit lives under [`docs/reviews/`
 | **`dataforge/core/services/`** | `FileActionService` — centralized batch file operations (move, copy, delete, rename, archive with progress/cancel/dry-run) |
 | **`dataforge/core/actions/`** | Action Builder pipeline engine: filters, IO steps, transformations, media operations |
 | **`dataforge/modules/`** | Feature implementations (search, duplicates, organizer, cleaner, integrity, usage, reporting, forensics, hardware, recovery, metadata, performance, system_cleanup, password_tools, device_manager, file_signatures) |
-| **`dataforge/ui/`** | PyQt5 desktop shell, 14 built-in views, widget library, plugin loader |
+| **`dataforge/ui/`** | PyQt5 desktop shell, 14 built-in views, widget library, plugin loader, design-token module (`theme_tokens.py`) |
 | **`dataforge/ui/views/`** | Dashboard, Search, Duplicates, Action Builder, Tools, Media, System Cleanup, Performance, Recovery, Metadata, Hardware, Forensics, Settings, About |
 | **`dataforge/ui/plugins/`** | Plugin system; bundled example: Metadata Cleaner plugin |
-| **`tests/`** | 224 passing tests: comprehensive, integration, contract, new-modules suites |
+| **`tests/`** | 254 passing tests: comprehensive, integration, contract, new-modules suites, token-regression guard |
 | **`docs/`** | Architecture, CLI reference, GUI workflows, development guide, audit reviews |
 | **`build/`, `dist/`** | Generated build artifacts (output only, not maintained source) |
 
@@ -227,7 +227,8 @@ The **two user interfaces are thin adapters** — all the real superpowers live 
 
 ### ✅ Fixed in the 2026-07-10 Audit Pass
 
-- **Correctness** — 224 tests pass (was failing at collection). All correctness bugs fixed: MD5→SHA-256 defaults, symlink-loop scope escape, thread-safe cache, JSON error handling, SHA-512 crash, etc.
+- **Correctness** — 254 tests pass. All correctness bugs fixed: MD5→SHA-256 defaults, symlink-loop scope escape, thread-safe cache, JSON error handling, SHA-512 crash, etc.
+- **UI/UX overhaul** — Phase 2a/2b shipped: surface brightness fix, themed checkboxes/combos, design-token module (`ui/theme_tokens.py`) with AA-validated colours replacing three legacy colour vocabularies, type-scale constants, per-widget colour migration.
 - **Security findings** — classified and tracked (open security items in audit report; fixable at identified seams)
 - **Documentation** — ARCHITECTURE, CLI_REFERENCE, GUI_WORKFLOWS, DEVELOPMENT_GUIDE all verified against current PyQt5 source
 - **Packaging** — setup.py and build_exe.py verified; release bundle working
@@ -246,7 +247,7 @@ Three open security findings (all detailed in audit report with severity, fix st
 - **S4** — Trash restore trusts attacker-controlled `.trashinfo` paths (path-traversal risk)
 - **S7** — System Cleanup blanket-classifies `/tmp` and cache trees as junk (data-loss risk under misuse)
 
-See [`docs/reviews/02_SECURITY_AND_FORENSIC_AUDIT.md`](./docs/reviews/02_SECURITY_AND_FORENSIC_AUDIT.md) for severity, impact, and fixes.
+See [`docs/reviews/AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md) for severity, impact, and fixes.
 
 ## Developer & Deployment Notes
 
@@ -254,7 +255,7 @@ See [`docs/reviews/02_SECURITY_AND_FORENSIC_AUDIT.md`](./docs/reviews/02_SECURIT
 - **Dependency split** — `setup.py` = CLI + core only. `requirements.txt` = full stack (GUI/media). Install both for development.
 - **User data** — `~/.dataforge/config.json`, cache.db, app.log — all created on first run, no migration needed.
 - **Build artifacts** — `build/` and `dist/` are generated; don't maintain them. `release` profile is current; refresh `debug` via `python build_exe.py debug`.
-- **Next milestone** — Put under version control + wire CI/CD (see [`docs/reviews/04_IMPROVEMENTS_AND_ROADMAP.md`](./docs/reviews/04_IMPROVEMENTS_AND_ROADMAP.md), Phase 0).
+- **Next milestone** — Put under version control + wire CI/CD (see [`docs/reviews/IMPROVEMENT_PLAN.md`](./docs/reviews/IMPROVEMENT_PLAN.md), Phase 0).
 
 ---
 
@@ -264,7 +265,7 @@ DataForge is an open-source project. The audit and roadmap under [`docs/reviews/
 
 **For questions:**
 - File an issue in the repository
-- Check the [audit findings](./docs/reviews/01_CODE_REVIEW_AND_BUGS.md) — your question may be answered there
+- Check the [audit findings](./docs/reviews/AUDIT_FINDINGS.md) — your question may be answered there
 - Review the [CLI reference](./docs/CLI_REFERENCE.md) and [GUI workflows](./docs/GUI_WORKFLOWS.md) for usage
 
 ---

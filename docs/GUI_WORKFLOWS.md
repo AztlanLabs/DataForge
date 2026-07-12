@@ -33,7 +33,7 @@ The application registers these built-in screens on startup:
 
 After those are loaded, the app scans `dataforge/ui/plugins/` and registers plugin views that inherit from `BaseView` (they appear under a **Plugins** group).
 
-> **Experience-level gating:** the `settings_ui_tier` setting (`Basic` / `Advanced` / `Expert`, chosen in Settings) hides groups whose minimum tier is higher than the current tier. A `Basic` user therefore does **not** see System Maintenance or Advanced Analysis at all. This trade-off (hidden navigation vs. progressive disclosure) is discussed in [`reviews/03_UIUX_REVIEW.md`](./reviews/03_UIUX_REVIEW.md).
+> **Experience-level gating:** the `settings_ui_tier` setting (`Basic` / `Advanced` / `Expert`, chosen in Settings) hides groups whose minimum tier is higher than the current tier. A `Basic` user therefore does **not** see System Maintenance or Advanced Analysis at all. This trade-off (hidden navigation vs. progressive disclosure) is discussed in [`reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md).
 >
 > Note: the CLI-only `fm devices` capability has **no GUI view** yet.
 
@@ -141,7 +141,7 @@ Supports two operations:
 - create a snapshot of a file or folder
 - verify the current state against a saved snapshot
 
-This wraps the `IntegrityMonitor` module and uses background execution for long-running checks. Snapshots are self-describing (`{"algorithm": ..., "created_at": ..., "files": {...}}`) and use the configured hash algorithm (default `sha256`); legacy flat MD5 snapshots are still verifiable — see [`reviews/01_CODE_REVIEW_AND_BUGS.md`](./reviews/01_CODE_REVIEW_AND_BUGS.md) (M4).
+This wraps the `IntegrityMonitor` module and uses background execution for long-running checks. Snapshots are self-describing (`{"algorithm": ..., "created_at": ..., "files": {...}}`) and use the configured hash algorithm (default `sha256`); legacy flat MD5 snapshots are still verifiable — see [`reviews/AUDIT_FINDINGS.md`](./reviews/AUDIT_FINDINGS.md) (M4).
 
 ### Metadata Cleaner
 
@@ -196,7 +196,7 @@ It allows the user to manage:
 
 These values persist through `ConfigManager` into `~/.dataforge/config.json`.
 
-> **Persistence is currently inconsistent:** theme, path display, and duplicate keep-strategy save immediately on change, whereas the Performance, Exclusions, and Dashboard tabs require an explicit *Save* button — unsaved edits in those tabs are lost on navigation. See [`reviews/03_UIUX_REVIEW.md`](./reviews/03_UIUX_REVIEW.md) §4.2.
+> **Persistence is currently inconsistent:** theme, path display, and duplicate keep-strategy save immediately on change, whereas the Performance, Exclusions, and Dashboard tabs require an explicit *Save* button — unsaved edits in those tabs are lost on navigation. See [`reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md) §2.4.
 
 ## Plugin view: Metadata Cleaner
 

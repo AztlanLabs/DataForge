@@ -54,8 +54,7 @@ PYTHONPATH=. pytest -q
 
 The nested project layout means plain `pytest -q` may not resolve `dataforge` unless the package is installed or the project root is placed on `PYTHONPATH`.
 
-> [!NOTE]
-> **The full suite passes — 224 tests.** The earlier collection failure (a stale `rename_with_regex` import in `tests/test_comprehensive.py`) has been fixed; see [`reviews/01_CODE_REVIEW_AND_BUGS.md`](./reviews/01_CODE_REVIEW_AND_BUGS.md) (H1). Just run `PYTHONPATH=. pytest -q`.
+The full suite passes — 254 tests. The earlier collection failure (a stale `rename_with_regex` import) has been fixed. See [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) for verification details.
 
 ## Packaging and distribution
 
@@ -162,7 +161,8 @@ New top-level screens and plugins should inherit from `BaseView` and use its sha
 ## Practical maintenance notes
 
 - The repository mixes application source with generated build output. Be deliberate about which files are source of truth.
-- **The working tree is not currently a git repository and has no CI.** There is no history, diffing, or automated test/lint gate. Putting the project under version control and running the (fixed) test suite in CI is the highest-leverage next step — see [`reviews/04_IMPROVEMENTS_AND_ROADMAP.md`](./reviews/04_IMPROVEMENTS_AND_ROADMAP.md), Phase 0.
+- The repository is under Git version control on `develop` and `main` branches. Follow [`docs/COMMIT_CONVENTION.md`](./COMMIT_CONVENTION.md) for commit messages and see [`docs/VERSIONING.md`](./VERSIONING.md) for the semver release process. A `commit-msg` hook in `.githooks/` validates every commit; install it with `git config core.hooksPath .githooks`.
+- **CI is not yet wired.** Tests do not run automatically on push. Setting up CI/CD is the highest-leverage next step — see [`reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md), Phase 0.
 - The plugin loader registers every discovered `BaseView` subclass in `dataforge/ui/plugins/`; plugin import failures are now logged (via `logger.error`) and skipped. Plugins are arbitrary code executed with full app privileges — only add plugins you trust (see `reviews/02`, S5).
 - The stray empty `26.1.2` file has been removed and a root `.gitignore` added (the tree still needs to be put under version control).
 - The current dependency story is split: `setup.py` is enough for the core package/CLI entrypoint; `requirements.txt` provisions the full GUI/media runtime, and `requirements-dev.txt` adds the build/test tooling.
@@ -173,5 +173,6 @@ New top-level screens and plugins should inherit from `BaseView` and use its sha
 1. Read [`../README.md`](../README.md)
 2. Read [`./ARCHITECTURE.md`](./ARCHITECTURE.md)
 3. Read [`./GUI_WORKFLOWS.md`](./GUI_WORKFLOWS.md) or [`./CLI_REFERENCE.md`](./CLI_REFERENCE.md), depending on your work area
-4. Use [`../TECHNICAL_SOURCE_OF_TRUTH.md`](../TECHNICAL_SOURCE_OF_TRUTH.md) when you need file-by-file depth
-5. Skim [`./reviews/00_EXECUTIVE_SUMMARY.md`](./reviews/00_EXECUTIVE_SUMMARY.md) for the current bug/security/UX backlog before picking up work
+4. Use [`./TECHNICAL_SOURCE_OF_TRUTH.md`](./TECHNICAL_SOURCE_OF_TRUTH.md) when you need file-by-file depth
+5. Read [`./COMMIT_CONVENTION.md`](./COMMIT_CONVENTION.md) and [`./VERSIONING.md`](./VERSIONING.md) before your first commit
+6. Skim [`./reviews/EXECUTIVE_SUMMARY.md`](./reviews/EXECUTIVE_SUMMARY.md) for the current bug/security/UX backlog before picking up work

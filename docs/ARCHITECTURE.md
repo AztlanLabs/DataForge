@@ -22,6 +22,7 @@ Both surfaces ultimately depend on the same lower-level modules and services, wh
 | Feature modules | `dataforge/modules/*.py` | Search, duplicates, organize, rename, cleaner, integrity, usage, reporting, plus the newer batch: `system_cleanup`, `performance`, `recovery`, `metadata`, `hardware`, `forensics`, `password_tools`, `device_manager`, `file_signatures` |
 | Workflow engine | `dataforge/core/actions/*.py` | Action Builder context, filters, and step execution |
 | GUI shell and views | `dataforge/ui/app.py`, `dataforge/ui/views/*.py`, `dataforge/ui/widgets.py` | Desktop shell (**PyQt5**), background execution, view rendering, previews, plugins |
+| Design tokens / theming | `dataforge/ui/theme_tokens.py` | Single-source-of-truth colour table (WCAG AA validated), template-driven QSS/palette generation (`generate_qss`, `generate_palette`), type-scale constants, variant-QSS rules |
 | Tests | `tests/*.py` | End-to-end, contract, and feature coverage |
 
 ## Key abstractions
@@ -163,7 +164,7 @@ The desktop application eagerly registers these built-in views (see `DataForgeAp
 
 It then loads plugin views from `dataforge/ui/plugins/`.
 
-**Experience-level gating.** The sidebar groups these views and shows/hides whole groups based on the `settings_ui_tier` setting (`Basic` / `Advanced` / `Expert`). At `Basic`, the *System Maintenance* and *Advanced Analysis* groups (System Cleanup, Performance, File Recovery, Metadata Studio, Hardware Diagnostics, Forensics Lab) are hidden; `Advanced` reveals System Maintenance; `Expert` shows everything. (See `GROUP_MIN_TIER` in `ui/app.py`. The usability trade-off of hiding navigation is discussed in [`../docs/reviews/03_UIUX_REVIEW.md`](./reviews/03_UIUX_REVIEW.md).)
+**Experience-level gating.** The sidebar groups these views and shows/hides whole groups based on the `settings_ui_tier` setting (`Basic` / `Advanced` / `Expert`). At `Basic`, the *System Maintenance* and *Advanced Analysis* groups (System Cleanup, Performance, File Recovery, Metadata Studio, Hardware Diagnostics, Forensics Lab) are hidden; `Advanced` reveals System Maintenance; `Expert` shows everything. (See `GROUP_MIN_TIER` in `ui/app.py`. The usability trade-off of hiding navigation is discussed in [`../docs/reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md).)
 
 ## Extension points
 
@@ -208,8 +209,7 @@ If a new feature starts from file discovery, it should usually build on:
 - `core/provider.py` (`FileProvider`/`LocalProvider`) is defined but unused — dead abstraction.
 - Generated build output exists in-repo (`build/`, `dist/`), but it is not maintained source.
 
-> [!NOTE]
-> **Correctness/security caveats affecting the design (2026-07-10 review + remediation):** several controls live at these seams. **Now hardened:** the scanner no longer follows symlinks (scope escape/recursion), the shared SQLite cache connection is thread-safe (lock + WAL), and integrity/dedup no longer default to MD5 (configured algorithm, default `sha256`; duplicate deletes byte-verify groups). **Still open:** the forensic HTML report is HTML-injectable, and trash-restore trusts `.trashinfo` paths. Because mutation and scanning are centralized, these are fixable once at the seam. See [`../docs/reviews/`](./reviews/) for the full audit.
+Correctness and security caveats from the 2026-07-10 review are tracked in [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md). Key points: the scanner no longer follows symlinks, the cache is thread-safe, integrity/dedup default to SHA-256. Open risks include forensic-report HTML injection (S2) and trash-restore path traversal (S4).
 
 ## Related documents
 
