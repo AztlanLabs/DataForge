@@ -395,9 +395,10 @@ If you find a security vulnerability, **do not open a public issue**. Email the 
 
 Open security findings are tracked in [`docs/reviews/AUDIT_FINDINGS.md`](./reviews/AUDIT_FINDINGS.md). Key open items:
 
-- **S2** — Forensic HTML report does not escape interpolated data (XSS risk)
 - **S4** — Trash restore trusts attacker-controllable `.trashinfo` paths (path traversal)
 - **S7** — System Cleanup blanket-classifies `/tmp` and cache trees (data-loss risk)
+
+(`S2` — forensic HTML report XSS — is fixed: interpolated values are `html.escape()`d.)
 
 ### Guidelines
 

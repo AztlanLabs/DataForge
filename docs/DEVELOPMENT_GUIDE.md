@@ -2,6 +2,8 @@
 
 *File System Management with Steroids and Superpowers*
 
+**Last verified:** 2026-07-11
+
 ## Effective Project Root
 
 The application lives inside the repository subdirectory:

@@ -2,6 +2,8 @@
 
 *File System Management with Steroids and Superpowers*
 
+**Last verified:** 2026-07-11
+
 ## System Summary
 
 **DataForge** is a local-first desktop and CLI application for inspecting, organizing, recovering, and analyzing files with enterprise-grade forensic capabilities. It has **two entrypoints** that share the exact same superpowers:
@@ -209,7 +211,7 @@ If a new feature starts from file discovery, it should usually build on:
 - `dataforge/core/provider.py` (`FileProvider`/`LocalProvider`) is defined but unused — dead abstraction.
 - Generated build output exists in-repo (`build/`, `dist/`), but it is not maintained source.
 
-Correctness and security caveats from the 2026-07-10 review are tracked in [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md). Key points: the scanner no longer follows symlinks, the cache is thread-safe, integrity/dedup default to SHA-256. Open risks include forensic-report HTML injection (S2) and trash-restore path traversal (S4).
+Correctness and security caveats from the 2026-07-10 review are tracked in [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md). Key points: the scanner no longer follows symlinks, the cache is thread-safe, integrity/dedup default to SHA-256, and the forensic-report HTML injection (S2) is fixed. Open risks include trash-restore path traversal (S4) and System Cleanup over-classification (S7).
 
 ## Related documents
 

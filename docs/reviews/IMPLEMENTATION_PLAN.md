@@ -56,7 +56,7 @@ Also verified: NOTES_REVIEW **D1–D3 are already resolved in the source docs** 
 broken anchor, `"224"` count, and dead `docs/reviews/01` refs now survive *only
 inside NOTES_REVIEW.md itself* as its audit record. Still open: `TECHNICAL_SOURCE_OF_TRUTH.md`
 carries ~16 unprefixed `core/`/`modules/` path references (D4/D5). Baseline:
-`PYTHONPATH=. pytest -q` → **254 passed**.
+`PYTHONPATH=. pytest -q` → **255 passed**.
 
 > **Rule of engagement:** every task below maps to a Conventional Commit
 > (`type(scope): description`, see [CONTRIBUTING §3](../CONTRIBUTING.md)) with a stated

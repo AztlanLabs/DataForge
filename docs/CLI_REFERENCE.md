@@ -2,6 +2,8 @@
 
 *File System Management with Steroids and Superpowers*
 
+**Last verified:** 2026-07-11
+
 ## Entry Point — CLI Superpowers
 
 The CLI is exposed as:

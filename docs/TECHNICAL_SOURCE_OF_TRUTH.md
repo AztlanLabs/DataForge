@@ -1,5 +1,7 @@
 # Technical Source of Truth
 
+**Last verified:** 2026-07-11
+
 > This is the deepest technical map in the repository.
 >
 > For faster onboarding, start with:
@@ -23,7 +25,7 @@ It is intended to answer four questions for a new maintainer:
 
 This document is based on the current source files in the repository, not on intended behavior.
 
-The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5** and several new modules were added after this document was written. Some GUI/file-by-file sections may not be fully re-audited. A complete review of correctness, security, and staleness is maintained in [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md). Key points: 255 tests pass, integrity defaults to SHA-256 (not MD5), the scanner no longer follows symlinks, and the SQLite cache is thread-safe. Open findings include forensic-report HTML injection (S2), trash-restore path traversal (S4), and System Cleanup over-classification (S7).
+The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5** and several new modules were added after this document was written. Path references have been audited and corrected (all `core/`/`modules/` mentions now carry the `dataforge/` prefix; the old dead `docs/reviews/01/` links are gone) - see [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) A5/D4/D5. Some GUI/file-by-file *content* (as opposed to paths) may still not be fully re-audited against the newest modules. Key points: 255 tests pass, integrity defaults to SHA-256 (not MD5), the scanner no longer follows symlinks, the SQLite cache is thread-safe, and the forensic-report HTML injection (S2) is fixed. Open findings include trash-restore path traversal (S4) and System Cleanup over-classification (S7).
 
 ## Scope
 

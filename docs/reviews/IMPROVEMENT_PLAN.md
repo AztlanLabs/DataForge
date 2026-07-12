@@ -1,6 +1,6 @@
 # Improvement Plan — UX, Engineering & Phased Roadmap
 
-**Date:** 2026-07-10 · **Updated:** 2026-07-11
+**Date:** 2026-07-10 · **Updated:** 2026-07-11 · **Last verified:** 2026-07-11
 **Consolidates** the old `03_UIUX_REVIEW.md` + `04_IMPROVEMENTS_AND_ROADMAP.md` + `05_VISUAL_DESIGN_SYSTEM.md` + `06_UIUX_IMPLEMENTATION_PLAN.md` + cross-cutting quality observations from `01_CODE_REVIEW_AND_BUGS.md`. No information was removed — this is a merge, not a rewrite.
 
 ---
@@ -145,7 +145,7 @@ Named scale constants in `theme_tokens.py` — `caption 11 / body 13 / subheadin
 | Item | Status |
 | --- | --- |
 | Under version control (git + `.gitignore`) | ✅ Done |
-| Test suite green — 254 tests pass | ✅ Done |
+| Test suite green — 255 tests pass | ✅ Done |
 | CI (GitHub Actions) running pytest/lint/type-check on push | ⏳ Open |
 | Linting (ruff + black) | ⏳ Open |
 | Type checking (mypy/pyright) | ⏳ Open |
@@ -171,7 +171,7 @@ Named scale constants in `theme_tokens.py` — `caption 11 / body 13 / subheadin
 - ✅ Symlink loop & out-of-tree symlink — guards M3/S3.
 - ✅ Token-regression suite (`tests/test_theme_tokens.py` — 30 tests) — guards 2b.1.
 - ⏳ Malicious `.trashinfo` with absolute/`..` Path → restore confined — guards S4.
-- ⏳ Forensic HTML report with `<script>` in filename → output escaped — guards S2.
+- ✅ Forensic HTML report with `<script>` in filename → output escaped — guards S2.
 - ⏳ System cleanup never flags user-supplied folder as blanket junk — guards S7.
 - ⏳ Config with out-of-range/unknown keys → clamped/ignored — guards S10.
 - ⏳ GUI smoke test (pytest-qt) — constructs each view and mounts/unmounts it.
@@ -184,16 +184,16 @@ Named scale constants in `theme_tokens.py` — `caption 11 / body 13 / subheadin
 ### Phase 0 — Stabilize (1 sprint) 🔴
 
 ✅ git init + `.gitignore` · ✅ unbreak test suite (H1) · ✅ fix crashes (M1–M3) · ✅ lock cache (M5).
-⏳ CI running pytest · ⏳ escape forensic report (S2).
+✅ CI running pytest + ruff + mypy + coverage + pip-audit · ✅ escape forensic report (S2).
 
 ### Phase 1 — Trust & Safety (1–2 sprints) 🟠
 
 ✅ SHA-256 default + integrity algo stored · ✅ dedup byte-compare · ✅ symlink confinement in scanner.
-⏳ trash-restore confinement (S4) · ⏳ cleanup allow-listing (S7) · ⏳ secret hygiene (S8) · ⏳ config validation (S10) · ⏳ regression tests for S2/S4/S7.
+⏳ trash-restore confinement (S4) · ⏳ cleanup allow-listing (S7) · ⏳ secret hygiene (S8) · ⏳ config validation (S10) · ✅ regression test for S2 · ⏳ regression tests for S4/S7.
 
 ### Phase 2 — Coherence (2–3 sprints)
 
-✅ **Sprint A** — surface brightness, combo arrow, outline:0 removal, design-token module, type scale, per-widget colour migration. 254 tests green, zero legacy hex.
+✅ **Sprint A** — surface brightness, combo arrow, outline:0 removal, design-token module, type scale, per-widget colour migration. 255 tests green, zero legacy hex.
 
 ⏳ **Sprint B (2c)** — 7 interaction fixes: path picker, settings persistence, dark-mode dedup, progressive disclosure, destructive checklist, named busy task, rich help.
 
@@ -261,6 +261,6 @@ Task-first dashboard · scheduled cleanup/integrity · saved searches/automation
 
 ## Explicitly Out of Scope
 
-- Security items S2/S4/S7 (forensic XSS, trash-restore, cleanup over-classification) — tracked in [`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md).
+- Security items S4/S7 (trash-restore, cleanup over-classification) — tracked in [`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md). S2 (forensic XSS) is fixed.
 - Custom webfont, general animation framework, logo-asset production — rejected as inappropriate for a file-management utility.
 - Product rename — already complete (DataForge). 2d.5 is only a consistency sweep.

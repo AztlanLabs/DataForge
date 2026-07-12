@@ -1,6 +1,6 @@
 # Executive Summary — DataForge Project Review
 
-**Date:** 2026-07-10 · **Updated:** 2026-07-11
+**Date:** 2026-07-10 · **Updated:** 2026-07-11 · **Last verified:** 2026-07-11
 **Consolidates** the old `00_EXECUTIVE_SUMMARY.md` + `BRANDING.md`. No information was removed.
 
 ---
@@ -19,7 +19,7 @@ The **architecture is genuinely good**: filesystem mutation is centralised throu
 
 | File | Covers | Headline |
 | --- | --- | --- |
-| **[`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md)** | Code bugs + security | 15 correctness bugs (all fixed) + 13 security findings (2 fixed, 11 open). |
+| **[`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md)** | Code bugs + security | 15 correctness bugs (all fixed) + 13 security findings (3 fixed, 10 open). |
 | **[`IMPROVEMENT_PLAN.md`](./IMPROVEMENT_PLAN.md)** | UX + engineering + roadmap | IA redesign, 7 interaction fixes, design-token system, phased plan with per-item status. |
 | **[`EXECUTIVE_SUMMARY.md`](./EXECUTIVE_SUMMARY.md)** | Overview + brand | This document — assessment, quick wins, brand identity. |
 | **[`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md)** | Execution + release | Sequenced work-streams for the whole open backlog, mapped to commits and the `v0.2.0` release. |
@@ -28,11 +28,11 @@ The **architecture is genuinely good**: filesystem mutation is centralised throu
 
 ## The five things that matter most
 
-1. **✅ The test suite runs green — 254 tests pass.** Original collection failure (`rename_with_regex` removed) is fixed. All correctness bugs (H1, M1–M6, L1–L9) are resolved. 30 new token-regression tests guard the design system.
+1. **✅ The test suite runs green — 255 tests pass.** Original collection failure (`rename_with_regex` removed) is fixed. All correctness bugs (H1, M1–M6, L1–L9) are resolved. 30 new token-regression tests guard the design system.
 
-2. **🟠 No CI yet.** The repo is under git but no CI workflow runs pytest/lint on push. *(Phase 0 — highest-leverage next step.)*
+2. **✅ CI now runs.** `.github/workflows/ci.yml` runs pytest + coverage, ruff (blocking), mypy (advisory), and pip-audit on every push/PR to `develop`/`main`.
 
-3. **◑ Security controls undercut the product's promises.** Integrity now uses SHA-256 (was MD5), symlinks no longer followed. Still open: forensic-report XSS (S2), trash-restore path traversal (S4), System Cleanup over-classification (S7). See **[`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md)**.
+3. **◑ Security controls undercut the product's promises.** Integrity now uses SHA-256 (was MD5), symlinks no longer followed, and forensic-report XSS (S2) is fixed. Still open: trash-restore path traversal (S4), System Cleanup over-classification (S7). See **[`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md)**.
 
 4. **◑ UX is organised around developer modules, not user tasks.** Duplicate-sounding destinations, a Yes/No/Cancel file-vs-folder picker, inconsistent settings persistence, and experience-tier gating that hides features. The visual layer has been overhauled (token-driven QSS, type scale, per-widget colour migration). The interaction layer (7 fixes) and IA restructure are the open work in **[`IMPROVEMENT_PLAN.md`](./IMPROVEMENT_PLAN.md)**.
 
@@ -45,7 +45,7 @@ The **architecture is genuinely good**: filesystem mutation is centralised throu
 | Item | Status |
 | --- | --- |
 | Stray `26.1.2` deleted; `.gitignore` added; repo under git | ✅ Done |
-| Test suite unbroken — 254 tests pass | ✅ Done |
+| Test suite unbroken — 255 tests pass | ✅ Done |
 | `sha512` added; `JSONDecodeError` caught on snapshot load | ✅ Done |
 | Surface brightness fix (light `#ffffff`→`#f7f7f8`, dark elevated `#26262c`) | ✅ Done |
 | Design-token module (`ui/theme_tokens.py`) — AA-validated, template-driven QSS/palette | ✅ Done |
@@ -68,7 +68,7 @@ The **architecture is genuinely good**: filesystem mutation is centralised throu
 
 ## Overall assessment
 
-**Solid engineering under a good architecture.** The correctness backlog is cleared and 254 tests are green. What remains: CI, a few residual security items (forensic XSS, trash-restore, cleanup over-classification), and an information architecture built for the code rather than the user. The design-token foundation makes all downstream visual work cheap. The interaction fixes (Phase 2c) are the highest-leverage next step for user trust — they're concentrated at seams the codebase already has (scanner, `FileActionService`, report writer, settings).
+**Solid engineering under a good architecture.** The correctness backlog is cleared and 255 tests are green. What remains: CI, a few residual security items (forensic XSS, trash-restore, cleanup over-classification), and an information architecture built for the code rather than the user. The design-token foundation makes all downstream visual work cheap. The interaction fixes (Phase 2c) are the highest-leverage next step for user trust — they're concentrated at seams the codebase already has (scanner, `FileActionService`, report writer, settings).
 
 ---
 
@@ -103,7 +103,7 @@ The **architecture is genuinely good**: filesystem mutation is centralised throu
 ## Definition of Done for "Healthy Project"
 
 - [x] Under git with `.gitignore`. — [ ] Protected main branch and CI (pytest + ruff + mypy) green.
-- [x] `pytest` collects and passes all 254 tests. — [ ] Coverage tracked.
+- [x] `pytest` collects and passes all 255 tests. — [ ] Coverage tracked.
 - [ ] No crash on documented flags (done); hostile input still open for trash-restore (S4) and forensic reports (S2).
 - [x] SHA-256 is the default; integrity snapshots are self-describing; destructive dedup is collision-safe.
 - [ ] One consistent settings-persistence model and one product name across CLI/GUI/package.
