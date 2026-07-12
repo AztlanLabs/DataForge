@@ -393,12 +393,22 @@ If you find a security vulnerability, **do not open a public issue**. Email the 
 
 ### Current Status
 
-Open security findings are tracked in [`docs/reviews/AUDIT_FINDINGS.md`](./reviews/AUDIT_FINDINGS.md). Key open items:
+Security findings are tracked in [`docs/reviews/AUDIT_FINDINGS.md`](./reviews/AUDIT_FINDINGS.md).
+The point-security backlog **S1–S13 is complete** — all closed across WS-A/WS-B
+(trash-restore confinement, plugin-loader hardening, cleanup safeguards, `0600`
+report/credential permissions, `defusedxml`, config validation, executable-open
+confirm, decompression-bomb caps).
 
-- **S4** — Trash restore trusts attacker-controllable `.trashinfo` paths (path traversal)
-- **S7** — System Cleanup blanket-classifies `/tmp` and cache trees (data-loss risk)
+The open work is now **forensic-soundness architecture**, tracked as F1–F4 in
+[`docs/reviews/FORENSIC_SECURITY_REVIEW.md`](./reviews/FORENSIC_SECURITY_REVIEW.md):
 
-(`S2` — forensic HTML report XSS — is fixed: interpolated values are `html.escape()`d.)
+- **F1** — no chain-of-custody / tamper-evident audit log
+- **F2** — no acquisition provenance (operator, host, source-image hash) in reports
+- **F3** — no read-only "Evidence Mode"; destructive ops one click from evidence
+- **F4** — `secure_delete` placement and hardlink/reflink-awareness (with F21)
+
+These are the gating items for any forensic-product claim and are sequenced in
+[`docs/reviews/IMPLEMENTATION_PLAN.md`](./reviews/IMPLEMENTATION_PLAN.md) as WS-H → WS-J.
 
 ### Guidelines
 
@@ -407,7 +417,7 @@ Open security findings are tracked in [`docs/reviews/AUDIT_FINDINGS.md`](./revie
 - Validate and sanitize file paths before use in `shutil.move`, `os.makedirs`, etc.
 - Prefer `send2trash` over `os.remove` for user-facing delete operations
 - Write sensitive files with `0o600` permissions
-- Use `defusedxml` for XML parsing (not yet adopted — see S9)
+- Use `defusedxml` for XML parsing (adopted in `forensics.py`; S9 closed)
 
 ---
 
@@ -502,4 +512,4 @@ Your task: [describe the task]
 | [`docs/reviews/AUDIT_FINDINGS.md`](./reviews/AUDIT_FINDINGS.md) | Bug and security tracker |
 | [`docs/reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md) | UX roadmap and phased plan |
 | [`docs/reviews/IMPLEMENTATION_PLAN.md`](./reviews/IMPLEMENTATION_PLAN.md) | Sequenced execution plan and `v0.2.0` release roadmap |
-| [`docs/reviews/FORENSIC_SECURITY_REVIEW.md`](./reviews/FORENSIC_SECURITY_REVIEW.md) | Forensic-soundness, security, and investigator-UX architectural review (F1–F19, U1–U11) |
+| [`docs/reviews/FORENSIC_SECURITY_REVIEW.md`](./reviews/FORENSIC_SECURITY_REVIEW.md) | Forensic-soundness, security, and investigator-UX architectural review (F1–F21, U1–U11) |
