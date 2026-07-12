@@ -1,5 +1,5 @@
 """
-Metadata Studio GUI view.
+Metadata & EXIF GUI view.
 
 Three-panel interface for reading, inspecting, editing, and stripping
 metadata across 180+ file formats with GPS and timestamp visualization.

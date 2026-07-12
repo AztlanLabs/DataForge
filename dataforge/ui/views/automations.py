@@ -3,7 +3,7 @@ Automations GUI view.
 
 Single sidebar entry that groups the two multi-step workflow builders
 under one "Automations" heading with sub-tabs. Previously, the
-sidebar exposed "Tools & Workflows" (Integrity Monitor, Metadata
+sidebar exposed a Tools tab (Integrity Monitor, Metadata
 Cleaner, Batch Renamer, Folder Sync) and "Action Builder" as
 sibling entries, which sounded duplicate and forced users to choose
 between two destinations they had to mentally combine.

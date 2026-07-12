@@ -977,6 +977,42 @@ class ContractRegressionTests(unittest.TestCase):
         # are owned by the embedded ToolsView, not the outer notebook.
         self.assertEqual(view.tools.notebook.count(), 4)
 
+    def test_no_stray_renamed_module_or_view_names_in_code(self):
+        """The 2d.3 rename sweep must not leave old "Metadata Studio" /
+        "Forensics Lab" / "Hardware Diagnostics" / "Tools & Workflows" /
+        "Search & Organize" / "Experience Level" strings in the codebase
+        other than (a) the historical CHANGELOG / review audit record and
+        (b) the legacy ToolsView class itself (still used as the embedded
+        Tools sub-tab of the Automations view, but no longer surfaced in
+        the sidebar). The Search title has been reworded everywhere.
+        """
+        from pathlib import Path
+
+        root = Path("dataforge")
+        forbidden_in_code = [
+            "Search & Organize",
+            "Metadata Studio",
+            "Forensics Lab",
+            "Hardware Diagnostics",
+            "Experience Level",
+        ]
+        offenders: list[tuple[str, int, str]] = []
+        for path in root.rglob("*.py"):
+            for lineno, line in enumerate(path.read_text().splitlines(), 1):
+                for needle in forbidden_in_code:
+                    if needle in line:
+                        offenders.append((str(path), lineno, needle))
+
+        if offenders:
+            details = "\n".join(
+                f"  {p}:{lineno}  contains {needle!r}"
+                for p, lineno, needle in offenders
+            )
+            self.fail(
+                "Stray renamed labels found in code (2d.5 sweep):\n"
+                + details
+            )
+
     def test_view_titles_use_task_oriented_names(self):
         """Sidebar labels were renamed to user-facing names
         (IMPROVEMENT_PLAN §2.3): Search & Organize → Search,

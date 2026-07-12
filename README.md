@@ -140,7 +140,7 @@ python build_exe.py debug
 | **System forensics analyst** | `fm forensics ~/Evidence --search-keyword "confidential"` + `fm hash-calc --algo sha256` |
 | **IT auditor** | `fm integrity create /critical_data snapshot.json` → `fm integrity check /critical_data snapshot.json` (detect tampering) |
 | **DevOps automating cleanup** | `fm dupes --format jsonl \| jq '.path' \| xargs rm` (scripted duplicate removal) |
-| **Data hoarder organizing chaos** | GUI: Search & Organize → glob pattern → preview → move to categorized folders |
+| **Data hoarder organizing chaos** | GUI: Search → glob pattern → preview → move to categorized folders |
 | **Incident responder** | `fm recover --carve /dev/sdb1 --out ~/Recovered --types jpg,png,pdf` |
 | **Metadata scrubber** | `fm metadata photo.jpg --strip-gps` (remove location before sharing) |
 | **Workflow builder** | GUI: Action Builder → filter by date → rename template → move to archive → zip |

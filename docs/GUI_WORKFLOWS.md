@@ -25,19 +25,17 @@ The shell is implemented by `dataforge.ui.app.DataForgeApp` (a `PyQt5.QtWidgets.
 
 The application registers these built-in screens on startup:
 
-| Sidebar group | Views | Min. experience tier |
-| --- | --- | --- |
-| Overview | Dashboard | Basic |
-| File Utilities | Search & Organize, Duplicate Finder, Media Tools, Action Builder, Tools & Workflows | Basic |
-| System Maintenance | System Cleanup, Performance, File Recovery | Advanced |
-| Advanced Analysis | Metadata Studio, Hardware Diagnostics, Forensics Lab | Expert |
-| Application | Settings, About & Help | Basic |
+| Sidebar group | Views |
+| --- | --- |
+| Home | Dashboard |
+| Find & Organize | Search, Duplicate Finder, Media Tools, Metadata & EXIF, Automations (Action Builder + Tools sub-tabs) |
+| Clean & Optimize | Clean Up Space, Storage & Devices, Performance |
+| Recover & Investigate | File Recovery, Forensics |
+| System | Hardware Info, Settings, About & Help |
 
 After those are loaded, the app scans `dataforge/ui/plugins/` and registers plugin views that inherit from `BaseView` (they appear under a **Plugins** group).
 
-> **Experience-level gating:** the `settings_ui_tier` setting (`Basic` / `Advanced` / `Expert`, chosen in Settings) hides groups whose minimum tier is higher than the current tier. A `Basic` user therefore does **not** see System Maintenance or Advanced Analysis at all. This trade-off (hidden navigation vs. progressive disclosure) is discussed in [`reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md).
->
-> Note: the CLI-only `fm devices` capability has **no GUI view** yet.
+> **Detail-level gating:** the `settings_ui_tier` setting (now relabelled "Detail level" in Settings, values `Simple` / `Standard` / `Everything`, was `Basic` / `Advanced` / `Expert`) controls *in-view* complexity only — advanced controls stay hidden behind in-view expanders on `Simple` and `Standard`. The sidebar shows every group regardless of tier so users can always discover what DataForge can do. This trade-off (hidden navigation vs. progressive disclosure) is discussed in [`reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md).
 
 ## Background execution model
 
@@ -92,7 +90,7 @@ It shows:
 
 The dashboard paths come from `config["dashboard_paths"]`. The actual scan runs in the background so the UI can remain responsive.
 
-## Search & Organize
+## Search
 
 `SearchView` is the main interactive file-discovery and bulk-action screen.
 
@@ -132,9 +130,9 @@ This view allows the user to compose multi-step workflows from filters and actio
 
 Architecturally, this view is important because it is the repository's workflow-composition surface. It is where new generic pipeline steps belong if the capability should be reusable.
 
-## Tools & Workflows
+## Automations (Tools sub-tab)
 
-`ToolsView` is a notebook-based collection of secondary utilities.
+`ToolsView` (embedded as a sub-tab inside the Automations view) is a notebook-based collection of secondary utilities.
 
 ### Integrity Monitor
 
@@ -181,7 +179,7 @@ The image pane also uses a preview panel for selected files.
 
 ## Settings
 
-`SettingsView` is the main runtime-configuration UI, organized into tabs (General, Performance, Exclusions, Dashboard) plus an **Experience Level** selector that gates both these settings and the sidebar.
+`SettingsView` is the main runtime-configuration UI, organized into tabs (General, Performance, Exclusions, Dashboard) plus a **Detail level** selector (`Simple` / `Standard` / `Everything`) that gates in-view complexity and notifies the sidebar to rebuild so the rail stays in sync.
 
 It allows the user to manage:
 

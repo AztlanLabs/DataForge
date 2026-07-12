@@ -1,5 +1,5 @@
 """
-Hardware Diagnostics GUI view.
+Hardware Info GUI view.
 
 System hardware profiling with CPU, RAM, storage, GPU details,
 upgrade recommendations, and exportable reports.

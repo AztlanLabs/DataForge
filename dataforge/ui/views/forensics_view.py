@@ -1,5 +1,5 @@
 """
-Forensics Lab GUI view.
+Forensics GUI view.
 
 Multi-tab forensic analysis workbench with disk image ingestion,
 hash calculator, OS artifact parser, and password tools.

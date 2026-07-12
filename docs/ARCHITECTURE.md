@@ -150,23 +150,23 @@ The app is local-stateful: configuration and caching live in the user profile, n
 The desktop application eagerly registers these built-in views (see `DataForgeApp.__init__` in `dataforge/ui/app.py`):
 
 - Dashboard
-- Search & Organize
+- Search
 - Duplicate Finder
-- Action Builder
-- Tools & Workflows
+- Automations (Action Builder + Tools sub-tabs)
 - Media Tools
-- System Cleanup
+- Clean Up Space
 - Performance
+- Storage & Devices
 - File Recovery
-- Metadata Studio
-- Hardware Diagnostics
-- Forensics Lab
+- Metadata & EXIF
+- Hardware Info
+- Forensics
 - Settings
 - About & Help
 
 It then loads plugin views from `dataforge/ui/plugins/`.
 
-**Experience-level gating.** The sidebar groups these views and shows/hides whole groups based on the `settings_ui_tier` setting (`Basic` / `Advanced` / `Expert`). At `Basic`, the *System Maintenance* and *Advanced Analysis* groups (System Cleanup, Performance, File Recovery, Metadata Studio, Hardware Diagnostics, Forensics Lab) are hidden; `Advanced` reveals System Maintenance; `Expert` shows everything. (See `GROUP_MIN_TIER` in `ui/app.py`. The usability trade-off of hiding navigation is discussed in [`../docs/reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md).)
+**Detail-level gating.** The sidebar groups these views into task-oriented sections (Home / Find & Organize / Clean & Optimize / Recover & Investigate / System); every group is always visible. The `settings_ui_tier` setting (now relabelled "Detail level" with values `Simple` / `Standard` / `Everything`, was `Basic` / `Advanced` / `Expert`) controls *in-view* complexity only — advanced controls stay hidden behind in-view expanders on `Simple` and `Standard`. The discoverability cliff of hiding whole groups at `Simple`/`Standard` is gone. See `IMPROVEMENT_PLAN.md` §6 Phase 2c.4 / Phase 2d for the rationale.
 
 ## Extension points
 
@@ -206,7 +206,7 @@ If a new feature starts from file discovery, it should usually build on:
 
 - The repository root contains a nested application root (`DataForge/`), so command examples and tooling must be explicit about where they run.
 - `setup.py` only lists a minimal dependency set, while `requirements.txt` contains the full GUI/media/test toolchain. Treat `requirements.txt` as the authoritative development environment definition.
-- Some feature overlap is intentional but real: metadata cleaning exists both inside `Tools & Workflows` and as a standalone plugin view (and in two different implementations — `dataforge/modules/cleaner.py::MetadataCleaner` vs `dataforge/modules/metadata.py::MetadataEngine`).
+- Some feature overlap is intentional but real: metadata cleaning exists both inside the Automations view and as a standalone plugin view (and in two different implementations — `dataforge/modules/cleaner.py::MetadataCleaner` vs `dataforge/modules/metadata.py::MetadataEngine`).
 - The Action Builder filters (`dataforge/core/actions/filters.py`) are an independent implementation of the same size/date/name filtering as `dataforge/modules/search.py::SearchQuery`; the two can drift.
 - `dataforge/core/provider.py` (`FileProvider`/`LocalProvider`) is defined but unused — dead abstraction.
 - Generated build output exists in-repo (`build/`, `dist/`), but it is not maintained source.

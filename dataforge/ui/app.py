@@ -370,7 +370,7 @@ class DataForgeApp(QMainWindow):
         if unregistered:
             groups["Plugins"] = unregistered
 
-        # Apply Experience Level gating from Settings before rendering.
+        # Apply Detail level gating from Settings before rendering.
         # The tier is kept as a hint for in-view expanders but the sidebar
         # itself is no longer filtered by it; every group is rendered.
         tier_name = config.get("settings_ui_tier", "Simple")

@@ -27,7 +27,7 @@ class SearchView(BaseView):
 
     def get_help_text(self):
         return """
-# Search & Organize Guide
+# Search Guide
 
 Powerful search tool with built-in actions.
 

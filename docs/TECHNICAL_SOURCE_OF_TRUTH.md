@@ -84,7 +84,7 @@ CLI commands: `scan`, `dupes`, `search`, `organize`, `rename`, `clean`, `usage`,
 Runtime flow:
 
 1. `DataForgeApp` builds a fixed-width (230px), non-collapsible sidebar (`QFrame` with grouped nav buttons) plus a `QStackedWidget` content area, a status bar, progress controls, and a cancellation event.
-2. Fourteen base views are instantiated eagerly at startup (Dashboard, Search & Organize, Duplicate Finder, Action Builder, Tools & Workflows, Media Tools, System Cleanup, Performance, File Recovery, Metadata Studio, Hardware Diagnostics, Forensics Lab, Settings, About & Help), plus any discovered plugins.
+2. Fourteen base views are instantiated eagerly at startup (Dashboard, Search, Duplicate Finder, Automations, Media Tools, Clean Up Space, Performance, File Recovery, Metadata & EXIF, Hardware Info, Forensics, Storage & Devices, Settings, About & Help), plus any discovered plugins.
 3. Long-running work is pushed to a `BackgroundWorker(QThread)` through `DataForgeApp.run_workflow` or `run_background`.
 4. Worker results and progress updates are sent back via Qt signals (`progress_signal`, `status_signal`, `result_signal`, `error_signal`) connected directly to UI update slots — there is no `queue.Queue` or polling loop.
 5. `run_workflow` auto-inspects worker function signatures for `progress_callback` and `cancel_token` parameters and injects them automatically.
@@ -668,7 +668,7 @@ Key internals:
 
 #### `dataforge/ui/views/search.py`
 
-Search and bulk-action view. Title: "Search & Organize".
+Search and bulk-action view. Title: "Search".
 
 - `SearchView(BaseView)` — builds `SearchQuery` from form state, displays results in `EnhancedTreeview`, supports bulk actions.
 
@@ -753,7 +753,7 @@ Pipeline execution:
 
 #### `dataforge/ui/views/tools.py`
 
-Multi-tool notebook with four tabs. Title: "Tools & Workflows".
+Multi-tool notebook with four tabs (Integrity Monitor / Metadata Cleaner / Batch Renamer / Folder Sync). Title: "Tools & Workflows" (the view is still registered in source but no longer surfaced in the sidebar — it is embedded as the "Tools" sub-tab of `AutomationsView`).
 
 - `ToolsView(BaseView)` — `QTabWidget` with `TOOLTIP_TEXTS` for all controls.
 
