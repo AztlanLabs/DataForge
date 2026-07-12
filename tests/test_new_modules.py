@@ -18,6 +18,7 @@ from dataforge.modules.performance import (
 )
 from dataforge.modules.recovery import (
     scan_trash,
+    restore_from_trash,
 )
 from dataforge.modules.metadata import MetadataEngine
 from dataforge.modules.hardware import get_hardware_report
@@ -69,6 +70,47 @@ class TestNewModules(unittest.TestCase):
             self.assertIsInstance(results, list)
         except Exception as e:
             self.fail(f"scan_trash raised an exception: {e}")
+
+    def test_restore_from_trash_confines_traversal_trashinfo_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            trash_file = os.path.join(tmp, "deleted_evil.txt")
+            Path(trash_file).write_text("payload", encoding="utf-8")
+            restore_root = os.path.join(tmp, "Recovered")
+            malicious_target = os.path.join(tmp, "victim", "..", "..", "etc", "passwd")
+
+            items = [{
+                "path": trash_file,
+                "filename": "evil.txt",
+                "original_path": malicious_target,
+                "info_file": None,
+            }]
+
+            result = restore_from_trash(items, restore_root=restore_root)
+
+            self.assertEqual(len(result["restored"]), 1)
+            restored_to = result["restored"][0]["restored_to"]
+            self.assertTrue(restored_to.startswith(restore_root))
+            self.assertFalse(os.path.exists(malicious_target))
+
+    def test_restore_from_trash_confines_system_dir_trashinfo_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            trash_file = os.path.join(tmp, "deleted_evil2.txt")
+            Path(trash_file).write_text("payload", encoding="utf-8")
+            restore_root = os.path.join(tmp, "Recovered")
+
+            items = [{
+                "path": trash_file,
+                "filename": "evil2.txt",
+                "original_path": "/etc/evil_cron_job",
+                "info_file": None,
+            }]
+
+            result = restore_from_trash(items, restore_root=restore_root)
+
+            self.assertEqual(len(result["restored"]), 1)
+            restored_to = result["restored"][0]["restored_to"]
+            self.assertTrue(restored_to.startswith(restore_root))
+            self.assertFalse(os.path.exists("/etc/evil_cron_job"))
 
     def test_password_strength(self):
         # Test basic strength analyzer
