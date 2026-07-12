@@ -1,15 +1,18 @@
 # Runtime dependencies for the DataForge application (CLI + GUI).
 # For development/build tooling (pytest, pyinstaller, ...) see requirements-dev.txt.
-click
-rich
-tqdm
-pandas
+# Lower bounds pin to the last version verified clean by `pip-audit`
+# (see requirements-dev.txt / CI) - not exact pins, so patch releases
+# still flow in.
+click>=8.4.2
+rich>=15.0.0
+tqdm>=4.68.4
+pandas>=3.0.3
 PyQt5>=5.15.0
-send2trash
+send2trash>=2.1.0
 Pillow>=10.0.0
-pypdf
-pymupdf
-opencv-python-headless
+pypdf>=6.14.2
+pymupdf>=1.28.0
+opencv-python-headless>=5.0.0.93
 psutil>=5.9.0
 python-magic>=0.4.27
 PyExifTool>=0.5.0

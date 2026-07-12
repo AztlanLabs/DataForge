@@ -61,5 +61,6 @@ build/release/*
 Thumbs.db
 .github/*
 !.github/workflows/
+!.github/dependabot.yml
 .claude
 

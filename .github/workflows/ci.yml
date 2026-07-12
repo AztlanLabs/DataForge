@@ -35,6 +35,9 @@ jobs:
       - name: Lint (ruff)
         run: ruff check dataforge tests
 
+      - name: Dependency vulnerability scan (pip-audit)
+        run: pip-audit -r requirements.txt
+
       - name: Type check (mypy)
         # Advisory only: 65 pre-existing errors remain (PyQt5 Optional/
         # union-attr patterns in dataforge/ui/app.py mostly). Burning
