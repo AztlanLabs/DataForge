@@ -109,18 +109,13 @@ DARK_PALETTE = generate_palette("dark")
 class DataForgeApp(QMainWindow):
     post_signal = pyqtSignal(object, tuple, dict)
 
-    # Each sidebar group is gated to a minimum Experience Level (the
-    # `settings_ui_tier` setting the user picks in Settings). Higher tiers
-    # unlock progressively more specialised tools, so the left rail stays
-    # uncluttered for Basic users but still exposes everything for Experts.
-    GROUP_MIN_TIER = {
-        "Overview": "Basic",
-        "File Utilities": "Basic",
-        "System Maintenance": "Advanced",
-        "Advanced Analysis": "Expert",
-        "Application": "Basic",
-        "Plugins": "Basic",
-    }
+    # The sidebar used to hide groups above the user's current Experience
+    # Level (Basic → no System Maintenance/Advanced Analysis; Advanced → no
+    # Advanced Analysis; Expert → everything). That created a
+    # discoverability cliff: a user on Basic could not see that Forensics
+    # Lab existed. The rail now shows every group and the tier only filters
+    # in-view complexity, so the navigation is stable while advanced
+    # controls stay hidden behind "More options" expanders per view.
     TIER_RANK = {"Basic": 0, "Advanced": 1, "Expert": 2}
 
     def __init__(self, on_progress: Callable[[int, int, str], None] | None = None):
@@ -335,30 +330,25 @@ class DataForgeApp(QMainWindow):
             groups["Plugins"] = unregistered
 
         # Apply Experience Level gating from Settings before rendering.
+        # The tier is kept as a hint for in-view expanders but the sidebar
+        # itself is no longer filtered by it; every group is rendered.
         tier_name = config.get("settings_ui_tier", "Basic")
         tier_rank = self.TIER_RANK.get(tier_name, 0)
-            
+        self._current_tier_rank = tier_rank
+
         # Clear layout first (if re-building)
         while self.nav_btn_layout.count():
             item = self.nav_btn_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-                
+
         # Load collapsed state
         collapsed_groups = config.get("collapsed_groups", [])
         is_dark = self.theme_chk.isChecked()
         theme_key = "dark" if is_dark else "light"
-        
+
         # Populate grouped layout
         for group_name, titles in groups.items():
-            # Skip groups above the user's current Experience Level so the
-            # sidebar reflects the tier selected in Settings (Basic hides
-            # System Maintenance and Advanced Analysis, Advanced hides
-            # Advanced Analysis, Expert shows everything).
-            min_tier = self.GROUP_MIN_TIER.get(group_name, "Basic")
-            if self.TIER_RANK.get(min_tier, 0) > tier_rank:
-                continue
-
             available = [t for t in titles if t in self.views]
             if not available:
                 continue
@@ -422,28 +412,12 @@ class DataForgeApp(QMainWindow):
             header_btn.setStyleSheet(f"color: {color};")
 
     def update_sidebar_experience(self):
-        """Rebuild the sidebar to reflect the current Experience Level
-        (Settings → Experience Level) and switch off any active view whose
-        group is now hidden by a lower tier."""
+        """Rebuild the sidebar and notify the current view of the new tier
+        so its in-view complexity (e.g. advanced expanders) can update."""
         self.build_navigation_sidebar()
-        if not self.current_view:
-            return
-        active_title = self.current_view.get_title()
-        groups = {
-            "Overview": ["Dashboard"],
-            "File Utilities": ["Search & Organize", "Duplicate Finder", "Media Tools", "Action Builder", "Tools & Workflows"],
-            "System Maintenance": ["System Cleanup", "Performance", "File Recovery"],
-            "Advanced Analysis": ["Metadata Studio", "Hardware Diagnostics", "Forensics Lab"],
-            "Application": ["Settings", "About & Help"],
-        }
-        # Also account for plugin-only groups.
-        for group_name, titles in groups.items():
-            if active_title in titles:
-                min_tier = self.GROUP_MIN_TIER.get(group_name, "Basic")
-                tier_name = config.get("settings_ui_tier", "Basic")
-                if self.TIER_RANK.get(min_tier, 0) > self.TIER_RANK.get(tier_name, 0):
-                    self.switch_view("Dashboard")
-                return
+        if self.current_view and hasattr(self.current_view, "apply_tier"):
+            tier_name = config.get("settings_ui_tier", "Basic")
+            self.current_view.apply_tier(tier_name)
 
     def switch_view(self, title):
         if self.current_view:

@@ -866,6 +866,22 @@ class ContractRegressionTests(unittest.TestCase):
         view._sync_theme_label()
         self.assertEqual(view.lbl_theme.text(), "Dark (Darkly)")
 
+    def test_sidebar_does_not_filter_groups_by_tier(self):
+        """The sidebar used to hide System Maintenance / Advanced Analysis
+        groups from Basic users. That created a discoverability cliff —
+        users on Basic could not even see that Forensics Lab existed.
+        The sidebar must now show every group regardless of tier; the
+        tier only controls in-view complexity."""
+        from dataforge.ui.app import DataForgeApp
+
+        self.assertFalse(
+            hasattr(DataForgeApp, "GROUP_MIN_TIER"),
+            "DataForgeApp.GROUP_MIN_TIER must be removed so the sidebar no "
+            "longer hides groups based on Experience Level.",
+        )
+        self.assertTrue(hasattr(DataForgeApp, "TIER_RANK"))
+        self.assertTrue(callable(getattr(DataForgeApp, "build_navigation_sidebar", None)))
+
     def test_cli_search_help_mentions_extension_sort_examples(self):
         runner = CliRunner()
 

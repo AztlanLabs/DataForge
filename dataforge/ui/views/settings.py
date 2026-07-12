@@ -294,9 +294,10 @@ class SettingsView(BaseView):
         if hasattr(self, "_excl_tab_index"):
             self.nb.setTabVisible(self._excl_tab_index, rank >= self.TIER_ORDER.index("Advanced"))
         config.set("settings_ui_tier", tier_name)
-        # Rebuild the left navigation so the rail reflects the new tier.
-        # Basic -> System Maintenance & Advanced Analysis groups hide;
-        # Advanced -> Advanced Analysis group hides; Expert -> everything.
+        # Tier now controls in-view complexity (advanced controls stay
+        # hidden behind tiered rows and the Exclusions tab), NOT the
+        # sidebar. The sidebar shows every group regardless of tier so
+        # users can always discover what DataForge can do.
         if getattr(self, "app", None) and hasattr(self.app, "update_sidebar_experience"):
             self.app.update_sidebar_experience()
 
