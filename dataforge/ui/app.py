@@ -229,6 +229,11 @@ class DataForgeApp(QMainWindow):
         self.setStatusBar(self.status_bar)
 
         self.status_label = QLabel("Ready", self)
+        self.status_label.setAccessibleName("Status message")
+        self.status_label.setAccessibleDescription(
+            "Persistent status text. The current state is shown as plain text; "
+            "running tasks include a progress bar to the right."
+        )
         self.status_bar.addWidget(self.status_label, 1)
 
         # 2e.2: the busy indicator is now a Qt-native ``QProgressBar``
@@ -240,12 +245,23 @@ class DataForgeApp(QMainWindow):
         self.progress_bar = QProgressBar(self)
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setVisible(False)
+        self.progress_bar.setAccessibleName("Task progress")
+        self.progress_bar.setAccessibleDescription(
+            "Indeterminate while a task is running; shows a fraction when "
+            "the task reports a known total. The percentage is also "
+            "announced by the screen reader."
+        )
         self.status_bar.addWidget(self.progress_bar, 2)
 
         self.cancel_btn = QPushButton("STOP", self)
         self.cancel_btn.setObjectName("stopBtn")
         self.cancel_btn.setVisible(False)
         self.cancel_btn.clicked.connect(self.cancel_action)
+        self.cancel_btn.setAccessibleName("Stop the running task")
+        self.cancel_btn.setAccessibleDescription(
+            "Signals the background thread to cancel. The currently-running "
+            "task finishes whatever it is doing and returns control to the UI."
+        )
         self.status_bar.addPermanentWidget(self.cancel_btn)
 
         # Sidebar navigation buttons state
@@ -441,6 +457,17 @@ class DataForgeApp(QMainWindow):
             for title in available:
                 btn = QPushButton(title, group_container)
                 btn.setCheckable(True)
+                # 2e.6 — accessible name + description for the
+                # sidebar. Screen readers announce the bare title
+                # ("Search") as a button name; pairing it with an
+                # "Open" verb makes the action explicit. The
+                # description is the long form for the user who
+                # wants context.
+                btn.setAccessibleName(f"Open {title}")
+                btn.setAccessibleDescription(
+                    f"Switches the main panel to the {title} view. "
+                    f"Part of the {group_name} group."
+                )
                 btn.clicked.connect(lambda checked, t=title: self.switch_view(t))
                 container_layout.addWidget(btn)
                 self.nav_buttons.append((btn, title))

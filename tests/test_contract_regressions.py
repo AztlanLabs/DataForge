@@ -1854,6 +1854,120 @@ class ContractRegressionTests(unittest.TestCase):
         self.assertIsNotNone(view.empty_state.action_callback)
         self.assertFalse(view.empty_state.isVisible())
 
+    def test_sidebar_buttons_carry_accessible_names(self):
+        """2e.6 — Every sidebar button must carry an ``accessibleName``
+        and ``accessibleDescription`` so a screen reader announces the
+        action (e.g. "Open Search") and the parent group, instead of
+        the bare title that screen readers otherwise read as a
+        label-less button."""
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.ui.app import DataForgeApp
+        from dataforge.ui.views import dashboard as _dashboard
+        from unittest.mock import patch as _patch
+
+        _ = QApplication.instance() or QApplication([])
+
+        with _patch.object(_dashboard.DashboardView, "mount", lambda self: None), \
+             _patch("dataforge.ui.app.config") as mock_config:
+            mock_config.get.side_effect = lambda k, d=None: {
+                "theme": "cosmo",
+                "settings_ui_tier": "Simple",
+                "plugins_enabled": False,
+                "collapsed_groups": [],
+            }.get(k, d)
+            mock_config.set = lambda *a, **k: None
+            app = DataForgeApp()
+
+        # Iterate every registered view that shows up in the sidebar
+        # and assert its button has the expected accessible name and
+        # description.
+        for btn, title in app.nav_buttons:
+            self.assertTrue(
+                btn.accessibleName().startswith("Open "),
+                f"sidebar button {title!r} has accessibleName "
+                f"{btn.accessibleName()!r}; expected to start with 'Open '",
+            )
+            self.assertIn(title, btn.accessibleName())
+            self.assertIn("group", btn.accessibleDescription().lower())
+
+    def test_status_bar_widgets_carry_accessible_names(self):
+        """2e.6 — The status bar's status label, progress bar, and
+        STOP button must each have an accessibleName and a
+        description, so a screen reader user navigating the status
+        bar learns the role of each widget rather than the default
+        "label" / "progress bar" / "push button" placeholder."""
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.ui.app import DataForgeApp
+        from dataforge.ui.views import dashboard as _dashboard
+        from unittest.mock import patch as _patch
+
+        _ = QApplication.instance() or QApplication([])
+
+        with _patch.object(_dashboard.DashboardView, "mount", lambda self: None), \
+             _patch("dataforge.ui.app.config") as mock_config:
+            mock_config.get.side_effect = lambda k, d=None: {
+                "theme": "cosmo",
+                "settings_ui_tier": "Simple",
+                "plugins_enabled": False,
+                "collapsed_groups": [],
+            }.get(k, d)
+            mock_config.set = lambda *a, **k: None
+            app = DataForgeApp()
+
+        # status_label
+        self.assertTrue(app.status_label.accessibleName())
+        self.assertIn("status", app.status_label.accessibleName().lower())
+        self.assertTrue(app.status_label.accessibleDescription())
+
+        # progress_bar
+        self.assertTrue(app.progress_bar.accessibleName())
+        self.assertIn("progress", app.progress_bar.accessibleName().lower())
+        self.assertTrue(app.progress_bar.accessibleDescription())
+
+        # cancel_btn
+        self.assertTrue(app.cancel_btn.accessibleName())
+        self.assertIn("stop", app.cancel_btn.accessibleName().lower())
+        self.assertIn("cancel", app.cancel_btn.accessibleDescription().lower())
+
+    def test_destructive_preview_button_has_glyph_and_accessible_label(self):
+        """2e.6 — The destructive confirm dialog's proceed button must
+        carry a leading ``⚠`` glyph when the caller's ``action_label``
+        is not already explicit about destruction, so colour-blind
+        users get the same danger signal sighted users get from the
+        red background. The button's accessible name and description
+        explicitly mention "destructive" so screen readers do too."""
+        from dataforge.ui.views.base import BaseView
+
+        source_file = BaseView.confirm_destructive_preview.__code__.co_filename
+        with open(source_file) as fh:
+            text = fh.read()
+
+        # The colour-blind signal: leading ⚠ glyph prepended to
+        # generic action labels (e.g. "Proceed") so the danger is
+        # not carried by colour alone.
+        self.assertIn("\\u26A0", text,
+                      "destructive preview button must add a leading \\u26A0 "
+                      "glyph for the colour-blind channel")
+        # The verb detection list — only "Delete", "Remove", "Trash",
+        # "Drop", "Purge", "Wipe" are considered already-explicit so
+        # the existing descriptive labels stay readable.
+        for verb in ("delete ", "remove ", "trash ", "drop ", "purge ", "wipe "):
+            self.assertIn(verb, text.lower(),
+                          f"destructive verb {verb!r} missing from "
+                          f"colour-blind check")
+        # The screen-reader signal: the button's accessible name and
+        # description both surface the word "destructive" so the
+        # action is unmistakable to assistive tech.
+        self.assertIn("(destructive)", text,
+                      "destructive preview button accessibleName must "
+                      "annotate the action as destructive")
+        self.assertIn("setAccessibleDescription", text,
+                      "destructive preview button must call "
+                      "setAccessibleDescription to annotate the action")
+        self.assertIn("permanently removes", text.lower(),
+                      "destructive preview button accessibleDescription "
+                      "must explain the consequence")
+
     def test_storage_devices_view_surfaces_fm_devices_in_gui(self):
         """``fm devices`` had no GUI path; the new ``Storage & Devices``
         view wires the same ``device_manager.list_storage_devices`` API

@@ -367,9 +367,25 @@ class BaseView(QWidget, metaclass=QWidgetABCMeta):
         cancel_btn = button_box.addButton("Cancel", QDialogButtonBox.RejectRole)
         cancel_btn.setDefault(True)
         cancel_btn.setAutoDefault(True)
-        proceed_btn = button_box.addButton(action_label, QDialogButtonBox.AcceptRole)
+        # 2e.6 — colour-blind channel. The proceed button is rendered
+        # with the ``danger`` variant (red background) which carries
+        # the destructive signal for sighted users; colour-blind users
+        # get the same signal from a leading ⚠ glyph and an explicit
+        # "destructive" accessible description. The glyph is only
+        # prepended when the label does not already start with a
+        # destructive verb (e.g. "Delete", "Remove") so the existing
+        # descriptive labels stay readable.
+        destructive_verbs = ("delete ", "remove ", "trash ", "drop ", "purge ", "wipe ")
+        is_explicit = action_label.lower().startswith(destructive_verbs)
+        button_text = action_label if is_explicit else f"\u26A0  {action_label}"
+        proceed_btn = button_box.addButton(button_text, QDialogButtonBox.AcceptRole)
         proceed_btn.setProperty("variant", "danger")
         proceed_btn.setAutoDefault(False)
+        proceed_btn.setAccessibleName(f"{action_label} (destructive)")
+        proceed_btn.setAccessibleDescription(
+            "This action permanently removes the selected items. "
+            "Use only after reviewing the preview list above."
+        )
         button_box.accepted.connect(dialog.accept)
         button_box.rejected.connect(dialog.reject)
         layout.addWidget(button_box)
