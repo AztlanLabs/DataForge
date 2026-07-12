@@ -533,7 +533,8 @@ def ingest_disk_image(
 
         # Save keyword results
         keyword_file = os.path.join(output_dir, "keyword_results.json")
-        with open(keyword_file, "w") as f:
+        fd = os.open(keyword_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
             json.dump(keyword_hits, f, indent=2, default=str)
 
     if progress_callback:
@@ -565,12 +566,14 @@ def generate_forensic_report(results, output_path, fmt="json"):
     }
 
     if fmt == "json":
-        with open(output_path, "w") as f:
+        fd = os.open(output_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
             json.dump(report, f, indent=2, default=str)
     elif fmt == "html":
-        html = _forensic_report_html(report)
-        with open(output_path, "w") as f:
-            f.write(html)
+        html_content = _forensic_report_html(report)
+        fd = os.open(output_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(html_content)
 
     return output_path
 
