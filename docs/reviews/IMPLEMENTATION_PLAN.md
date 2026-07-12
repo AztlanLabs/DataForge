@@ -141,16 +141,16 @@ This is the "tackle any of them" master list.
 | ID | Severity | Title | Commit type | Ver | WS | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | S2 | 🔴 High | Forensic HTML report XSS (no `html.escape`) | `fix(modules)` | PATCH | **A** | ✅ Done |
-| S4 | 🟠 Med | Trash-restore trusts `.trashinfo` path → arbitrary write | `fix(modules)` | PATCH | B | ⏳ Open |
-| S7 | 🟠 Med | System Cleanup blanket-classifies `/tmp`/cache as junk | `fix(modules)` | PATCH | B | ⏳ Open |
-| S5 | 🟠 Med | Plugin loader executes arbitrary local Python | `fix(ui)` | PATCH | B | ⏳ Open |
-| S6 | 🟠 Med | `secure_delete` overstates guarantee; trash fallback | `fix(modules)` | PATCH | B | ⏳ Open |
-| S8 | 🟠 Med | Credential material world-readable; password leak | `fix(modules)` | PATCH | B | ⏳ Open |
-| S9 | 🟡 Low | Unhardened XML parsing (billion-laughs) | `fix(modules)` | PATCH | B | ⏳ Open |
-| S10 | 🟡 Low | No config validation; blind merge of `config.json` | `fix(core)` | PATCH | B | ⏳ Open |
-| S11 | 🟡 Low | Opening scanned files via OS handler | `fix(ui)` | PATCH | B | ⏳ Open |
-| S12 | 🟡 Low | Forensic outputs world-readable | `fix(modules)` | PATCH | B | ⏳ Open |
-| S13 | 🟡 Low | Decompression-bomb exposure (Pillow/PDF) | `fix(modules)` | PATCH | B | ⏳ Open |
+| S4 | 🟠 Med | Trash-restore trusts `.trashinfo` path → arbitrary write | `fix(modules)` | PATCH | B | ✅ Done |
+| S7 | 🟠 Med | System Cleanup blanket-classifies `/tmp`/cache as junk | `fix(modules)` | PATCH | B | ✅ Done |
+| S5 | 🟠 Med | Plugin loader executes arbitrary local Python | `fix(ui)` | PATCH | B | ✅ Done |
+| S6 | 🟠 Med | `secure_delete` overstates guarantee; trash fallback | `fix(modules)` | PATCH | B | ✅ Done |
+| S8 | 🟠 Med | Credential material world-readable; password leak | `fix(modules)` | PATCH | B | ✅ Done |
+| S9 | 🟡 Low | Unhardened XML parsing (billion-laughs) | `fix(modules)` | PATCH | B | ✅ Done |
+| S10 | 🟡 Low | No config validation; blind merge of `config.json` | `fix(core)` | PATCH | B | ✅ Done |
+| S11 | 🟡 Low | Opening scanned files via OS handler | `fix(ui)` | PATCH | B | ✅ Done |
+| S12 | 🟡 Low | Forensic outputs world-readable | `fix(modules)` | PATCH | B | ✅ Done |
+| S13 | 🟡 Low | Decompression-bomb exposure (Pillow/PDF) | `fix(modules)` | PATCH | B | ✅ Done |
 
 ### Documentation — from [`NOTES_REVIEW.md`](./NOTES_REVIEW.md) §3–4
 
@@ -239,9 +239,9 @@ This is the "tackle any of them" master list.
 | Guard | For | WS | Status |
 | --- | --- | --- | --- |
 | Forensic HTML report escapes `<script>` filename | S2 | A | ✅ Done (`test_forensic_report_html_escapes_script_filename`) |
-| Malicious `.trashinfo` (absolute/`..`) → restore confined | S4 | B | ⏳ Open |
-| Cleanup never flags user folder as blanket junk | S7 | B | ⏳ Open |
-| Config out-of-range/unknown keys → clamped/ignored | S10 | B | ⏳ Open |
+| Malicious `.trashinfo` (absolute/`..`) → restore confined | S4 | B | ✅ Done (`test_restore_from_trash_confines_*`, 2 tests) |
+| Cleanup never flags user folder as blanket junk | S7 | B | ✅ Done (`test_junk_scan_never_blanket_classifies_user_supplied_path`) |
+| Config out-of-range/unknown keys → clamped/ignored | S10 | B | ✅ Done (`test_config_merge_validates_and_clamps_bad_values`) |
 | Settings persistence round-trip | 2c.2 | C | ⏳ Open |
 | GUI smoke test (pytest-qt) mounts each view | 2d/2e | D/E | ⏳ Open |
 
@@ -281,7 +281,7 @@ docs: add last-verified datestamps and retire staleness caveat
 ```
 **Version impact:** PATCH (from S2). **Gate:** CI must be green before WS-B opens — ✅ satisfied (255 passed, ruff clean, pip-audit clean; `v0.2.0-alpha.1` tagged locally on `develop`).
 
-### WS-B — Trust & Safety (remaining security) → `v0.2.0-alpha.2`
+### WS-B — Trust & Safety (remaining security) → `v0.2.0-alpha.2` ✅ CLOSED
 
 - **Where:** `dataforge/modules/recovery.py:225-250` (S4),
   `system_cleanup.py:249` (S7), `dataforge/ui/plugin_loader.py:38-51` (S5),
@@ -312,7 +312,8 @@ fix(ui): confirm before opening executables via the OS handler
 fix(modules): write forensic report artefacts with 0600 permissions
 fix(modules): cap image pixels and pdf pages against decompression bombs
 ```
-**Version impact:** PATCH (cumulative).
+**Version impact:** PATCH (cumulative). **Gate:** ✅ satisfied (260 passed, ruff
+clean, pip-audit clean; ready for the `v0.2.0-alpha.2` tag on `develop`).
 
 ### WS-C — Interaction Correctness (Phase 2c) → `v0.2.0-alpha.3`
 
@@ -511,7 +512,7 @@ Update the `WS` streams here as they close; the detailed per-item status stays i
 | Stream | Scope | Tag | Status |
 | --- | --- | --- | --- |
 | WS-A | Stabilize & Doc Truth (CI, tooling, S2, doc audit) | `v0.2.0-alpha.1` | ✅ Done — tagged locally |
-| WS-B | Trust & Safety (S4–S13) | `v0.2.0-alpha.2` | ⏳ Not started |
+| WS-B | Trust & Safety (S4–S13) | `v0.2.0-alpha.2` | ✅ Done — ready to tag |
 | WS-C | Interaction Correctness (2c) | `v0.2.0-alpha.3` | ⏳ Not started |
 | WS-D | IA, Naming & Parity (2d) | `v0.2.0-alpha.4` | ⏳ Not started |
 | WS-E | Motion, Empty/Error, A11y (2e) | `v0.2.0-alpha.5` | ⏳ Not started |

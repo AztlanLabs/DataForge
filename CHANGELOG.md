@@ -29,6 +29,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 - **S2 (Fixed)**: Forensic HTML report was vulnerable to stored HTML/JS injection — every interpolated value is now passed through `html.escape()`
+- **S4 (Fixed)**: Trash restore trusted the `original_path` from a `.trashinfo` file directly as a move destination — paths with `..` traversal or targeting a system directory now redirect into a confined `restore_root` (defaults to `~/Recovered`)
+- **S5 (Fixed)**: Plugin loader executed any `.py` file in the plugins directory with no signing, manifest, or sandbox — loading is now opt-in (`config["plugins_enabled"]`, default off) and checks directory/file permissions before exec'ing
+- **S6 (Fixed)**: `secure_delete()` overstated its guarantee and silently fell back to `send2trash` on unlink failure — now documented as best-effort with no trash fallback
+- **S7 (Fixed)**: System Cleanup blanket-classified every file under System Temp/User Cache/etc. as junk, including user-supplied paths — user-supplied paths now only match by extension/filename; sockets/FIFOs are always skipped; `/tmp` and `/var/tmp` get a 1-day minimum-age filter
+- **S8 (Fixed)**: Cracked-hash files were written with default permissions and displayed passwords leaked their first two characters — hash files are now `0600`, passwords fully masked
+- **S9 (Fixed)**: `collect_recent_documents()` parsed untrusted XML with stdlib `xml.etree.ElementTree` (entity-expansion DoS) — switched to `defusedxml.ElementTree`
+- **S10 (Fixed)**: Config loading blind-merged `config.json` with no validation — values are now type/range/enum-checked, unknown keys dropped, invalid values replaced with defaults
+- **S11 (Fixed)**: Scanned/recovered files were opened via the OS handler with no check — executables (by extension or Unix execute bit) now prompt for confirmation first
+- **S12 (Fixed)**: Forensic report and keyword-index files were written with default (often world-readable) permissions — now written `0600`
+- **S13 (Fixed)**: No cap on decoded image pixels or PDF page counts — added `Image.MAX_IMAGE_PIXELS` and a `MAX_PDF_PAGES` limit against decompression-bomb inputs
 
 ## [0.1.0] - 2026-07-11
 
