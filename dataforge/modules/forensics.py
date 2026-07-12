@@ -7,6 +7,7 @@ OS artifact parsing, keyword searching, and forensic report generation.
 import os
 import json
 import math
+import html
 import hashlib
 import binascii
 import subprocess
@@ -580,6 +581,7 @@ def generate_forensic_report(results, output_path, fmt="json"):
 
 def _forensic_report_html(report):
     """Generate HTML forensic report."""
+    esc = html.escape
     lines = [
         "<html><head><title>Forensic Analysis Report</title>",
         "<style>body{font-family:sans-serif;max-width:1000px;margin:auto;padding:20px}",
@@ -588,24 +590,24 @@ def _forensic_report_html(report):
         ".warning{color:#d97706}.danger{color:#dc2626}.success{color:#059669}",
         "</style></head><body>",
         "<h1>🔬 Forensic Analysis Report</h1>",
-        f"<p>Generated: {report['report_generated']}</p>",
-        f"<p>Tool: {report['tool']}</p>",
+        f"<p>Generated: {esc(str(report['report_generated']))}</p>",
+        f"<p>Tool: {esc(str(report['tool']))}</p>",
         "<hr>",
     ]
 
     data = report.get("data", {})
 
     if data.get("file_count"):
-        lines.append(f"<h2>Files Analyzed: {data['file_count']}</h2>")
+        lines.append(f"<h2>Files Analyzed: {esc(str(data['file_count']))}</h2>")
 
     if data.get("hashes"):
         lines.append(f"<h2>Hash Manifest ({len(data['hashes'])} files)</h2>")
         lines.append("<table><tr><th>File</th><th>Size</th><th>MD5</th><th>SHA-256</th></tr>")
         for h in data["hashes"][:100]:
             lines.append(
-                f"<tr><td>{h.get('filename','')}</td><td>{h.get('formatted_size','')}</td>"
-                f"<td><code>{h.get('md5','')[:16]}...</code></td>"
-                f"<td><code>{h.get('sha256','')[:16]}...</code></td></tr>"
+                f"<tr><td>{esc(str(h.get('filename','')))}</td><td>{esc(str(h.get('formatted_size','')))}</td>"
+                f"<td><code>{esc(str(h.get('md5',''))[:16])}...</code></td>"
+                f"<td><code>{esc(str(h.get('sha256',''))[:16])}...</code></td></tr>"
             )
         lines.append("</table>")
 
@@ -616,8 +618,8 @@ def _forensic_report_html(report):
             lines.append("<table><tr><th>Username</th><th>UID</th><th>Home</th><th>Shell</th></tr>")
             for user in artifacts["users"]:
                 lines.append(
-                    f"<tr><td>{user['username']}</td><td>{user['uid']}</td>"
-                    f"<td>{user['home']}</td><td>{user['shell']}</td></tr>"
+                    f"<tr><td>{esc(str(user['username']))}</td><td>{esc(str(user['uid']))}</td>"
+                    f"<td>{esc(str(user['home']))}</td><td>{esc(str(user['shell']))}</td></tr>"
                 )
             lines.append("</table>")
 
