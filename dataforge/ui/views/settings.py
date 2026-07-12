@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox,
     QSpinBox, QPushButton, QLineEdit, QListWidget, QTabWidget, QGroupBox, QMessageBox
 )
+from PyQt5.QtCore import QTimer
 from .base import BaseView
 from .. import dialogs
 from ...core.config import config
@@ -20,14 +21,11 @@ class SettingsView(BaseView):
         "max_threads": "Controls parallel hashing/batch work (duplicate scanning, forensic hash manifests, integrity snapshots, metadata batch reads). Set to 1 to run this work single-threaded; raise it for faster disks/CPUs.",
         "search_threads": "Controls parallel keyword search and content-scanning work, independent of the hashing thread budget above.",
         "path_display_mode": "Full always shows the complete path. Relative shows paths relative to each view's scan/source folder, which is shorter and easier to scan when browsing deep folder trees.",
-        "save_performance": "Persist the current hashing, size-unit, and worker settings for future scans.",
         "excluded_folders": "Comma-separated folder names to skip everywhere, such as build output or dependency caches.",
         "excluded_extensions": "Comma-separated file extensions to skip during scans, for example .tmp or .log.",
-        "save_exclusions": "Save the current exclusion lists so search, duplicates, and dashboard scans all honor them.",
         "dashboard_paths": "These folders feed the dashboard overview and quick statistics cards.",
         "dashboard_add": "Add another folder to the dashboard watch list.",
         "dashboard_remove": "Remove the currently selected dashboard folder from the list.",
-        "dashboard_save": "Persist the dashboard watch list so it is restored on the next launch.",
     }
 
     def get_title(self):
@@ -35,11 +33,18 @@ class SettingsView(BaseView):
 
     def __init__(self, master, app=None):
         super().__init__(master, app)
-        
+
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(10, 10, 10, 10)
 
         self._tiered_widgets = []
+        self._suppress_autosave = False
+        self._saved_indicator = QLabel("", self)
+        self._saved_indicator.setProperty("variant", "success")
+        self._saved_indicator.setVisible(False)
+        self._saved_timer = QTimer(self)
+        self._saved_timer.setSingleShot(True)
+        self._saved_timer.timeout.connect(self._hide_saved_indicator)
 
         tier_row = QWidget(self)
         tier_layout = QHBoxLayout(tier_row)
@@ -51,6 +56,7 @@ class SettingsView(BaseView):
         self.cb_tier.currentTextChanged.connect(self.apply_tier)
         tier_layout.addWidget(self.cb_tier)
         tier_layout.addStretch()
+        tier_layout.addWidget(self._saved_indicator)
         self.main_layout.addWidget(tier_row)
         attach_tooltips([(self.cb_tier, self.TOOLTIP_TEXTS["settings_tier"])])
 
@@ -88,7 +94,7 @@ class SettingsView(BaseView):
         self.cb_path_display.addItems(["Full", "Relative"])
         self.cb_path_display.setCurrentText(config.get("path_display_mode", "full").capitalize())
         self.cb_path_display.currentTextChanged.connect(
-            lambda text: config.set("path_display_mode", text.lower())
+            lambda text: self._autosave("path_display_mode", text.lower())
         )
         path_display_layout.addWidget(self.cb_path_display)
         path_display_layout.addStretch()
@@ -129,7 +135,7 @@ class SettingsView(BaseView):
         self.cb_dup_strategy.addItems(list(KEEP_STRATEGIES))
         self.cb_dup_strategy.setCurrentText(config.get("duplicate_default_keep_strategy", "first path"))
         self.cb_dup_strategy.currentTextChanged.connect(
-            lambda text: config.set("duplicate_default_keep_strategy", text)
+            lambda text: self._autosave("duplicate_default_keep_strategy", text)
         )
         defaults_layout.addWidget(self.cb_dup_strategy)
         defaults_layout.addStretch()
@@ -151,6 +157,9 @@ class SettingsView(BaseView):
         self.hash_algo_combo = QComboBox(row_hash)
         self.hash_algo_combo.addItems(["md5", "sha1", "sha256", "sha512"])
         self.hash_algo_combo.setCurrentText(config.get("hash_algorithm", "md5"))
+        self.hash_algo_combo.currentTextChanged.connect(
+            lambda text: self._autosave("hash_algorithm", text)
+        )
         row_hash_layout.addWidget(self.hash_algo_combo)
         row_hash_layout.addStretch()
         perf_layout.addWidget(row_hash)
@@ -162,6 +171,9 @@ class SettingsView(BaseView):
         self.cb_unit = QComboBox(row_unit)
         self.cb_unit.addItems(["Auto", "Bytes", "KB", "MB", "GB"])
         self.cb_unit.setCurrentText(config.get("size_unit", "Auto"))
+        self.cb_unit.currentTextChanged.connect(
+            lambda text: self._autosave("size_unit", text)
+        )
         row_unit_layout.addWidget(self.cb_unit)
         row_unit_layout.addStretch()
         perf_layout.addWidget(row_unit)
@@ -174,6 +186,9 @@ class SettingsView(BaseView):
         self.max_threads_spinbox = QSpinBox(row_threads)
         self.max_threads_spinbox.setRange(1, 32)
         self.max_threads_spinbox.setValue(config.get("max_thread_workers", 4))
+        self.max_threads_spinbox.valueChanged.connect(
+            lambda value: self._autosave("max_thread_workers", value)
+        )
         row_threads_layout.addWidget(self.max_threads_spinbox)
         row_threads_layout.addStretch()
         perf_layout.addWidget(row_threads)
@@ -186,19 +201,13 @@ class SettingsView(BaseView):
         self.search_threads_spinbox = QSpinBox(row_search_threads)
         self.search_threads_spinbox.setRange(1, 32)
         self.search_threads_spinbox.setValue(config.get("search_thread_workers", 4))
+        self.search_threads_spinbox.valueChanged.connect(
+            lambda value: self._autosave("search_thread_workers", value)
+        )
         row_search_threads_layout.addWidget(self.search_threads_spinbox)
         row_search_threads_layout.addStretch()
         perf_layout.addWidget(row_search_threads)
         self.register_tiered(row_search_threads, "Advanced")
-
-        row_save = QWidget(self.tab_perf)
-        row_save_layout = QHBoxLayout(row_save)
-        row_save_layout.setContentsMargins(0, 0, 0, 0)
-        self.save_perf_button = QPushButton("Save Performance", row_save)
-        self.save_perf_button.clicked.connect(self.save_perf)
-        row_save_layout.addWidget(self.save_perf_button)
-        row_save_layout.addStretch()
-        perf_layout.addWidget(row_save)
 
         row_cache = QWidget(self.tab_perf)
         row_cache_layout = QHBoxLayout(row_cache)
@@ -225,18 +234,15 @@ class SettingsView(BaseView):
         excl_layout.addWidget(QLabel("Excluded Folders (comma separated):"))
         self.excl_folders_entry = QLineEdit(self.tab_excl)
         self.excl_folders_entry.setText(",".join(config.get("excluded_folders", [])))
+        self.excl_folders_entry.editingFinished.connect(self._save_excluded_folders)
         excl_layout.addWidget(self.excl_folders_entry)
-        
+
         excl_layout.addWidget(QLabel("Excluded Extensions (comma separated):"))
         self.excl_ext_entry = QLineEdit(self.tab_excl)
         self.excl_ext_entry.setText(",".join(config.get("excluded_extensions", [])))
+        self.excl_ext_entry.editingFinished.connect(self._save_excluded_extensions)
         excl_layout.addWidget(self.excl_ext_entry)
-        
-        self.save_exclusions_button = QPushButton("Save Exclusions", self.tab_excl)
-        self.save_exclusions_button.setProperty("variant", "success")
-        self.save_exclusions_button.clicked.connect(self.save_exclusions)
-        excl_layout.addWidget(self.save_exclusions_button)
-        
+
         excl_layout.addStretch()
         self._init_exclusion_tooltips()
 
@@ -254,22 +260,17 @@ class SettingsView(BaseView):
         d_btns = QWidget(self.tab_dash)
         d_btns_layout = QHBoxLayout(d_btns)
         d_btns_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         self.dash_add_button = QPushButton("Add Folder", d_btns)
         self.dash_add_button.clicked.connect(self.add_dash_path)
         d_btns_layout.addWidget(self.dash_add_button)
-        
+
         self.dash_remove_button = QPushButton("Remove Selected", d_btns)
         self.dash_remove_button.clicked.connect(self.remove_dash_path)
         d_btns_layout.addWidget(self.dash_remove_button)
-        
+
         d_btns_layout.addStretch()
-        
-        self.dash_save_button = QPushButton("Save Dashboard", d_btns)
-        self.dash_save_button.clicked.connect(self.save_dashboard)
-        self.dash_save_button.setProperty("variant", "info")
-        d_btns_layout.addWidget(self.dash_save_button)
-        
+
         dash_layout.addWidget(d_btns)
         self._init_dashboard_tooltips()
 
@@ -303,25 +304,42 @@ class SettingsView(BaseView):
         else:
             self.app.theme_chk.setChecked(False)
 
-    def save_perf(self):
-        config.set("hash_algorithm", self.hash_algo_combo.currentText())
-        config.set("max_thread_workers", self.max_threads_spinbox.value())
-        config.set("search_thread_workers", self.search_threads_spinbox.value())
-        config.set("size_unit", self.cb_unit.currentText())
-        logger.info("Performance settings updated.")
-        self.app.show_info_dialog("Success", "Performance settings saved.")
+    def _autosave(self, key, value):
+        """Persist a single setting and flash a transient 'Saved ✓' indicator.
+
+        The previous design forced the user to click one of three ad-hoc Save
+        buttons (Save Performance / Save Exclusions / Save Dashboard) and then
+        dismiss a modal confirmation dialog. That hid whether the change had
+        actually taken effect and required two interactions to use. Every
+        setting now persists the moment it changes; the indicator gives
+        unobtrusive feedback instead of an interrupting dialog."""
+        if self._suppress_autosave:
+            return
+        config.set(key, value)
+        logger.debug("Setting autosaved: %s=%r", key, value)
+        self._flash_saved_indicator()
+
+    def _save_excluded_folders(self):
+        folders = [f.strip() for f in self.excl_folders_entry.text().split(',') if f.strip()]
+        self._autosave("excluded_folders", folders)
+
+    def _save_excluded_extensions(self):
+        exts = [e.strip() for e in self.excl_ext_entry.text().split(',') if e.strip()]
+        self._autosave("excluded_extensions", exts)
+
+    def _flash_saved_indicator(self, duration_ms=1500):
+        self._saved_indicator.setText("Saved ✓")
+        self._saved_indicator.setVisible(True)
+        self._saved_timer.start(duration_ms)
+
+    def _hide_saved_indicator(self):
+        self._saved_indicator.setVisible(False)
+        self._saved_indicator.setText("")
 
     def save_safe(self, event=None):
         config.set("safe_mode", self.chk_safe.isChecked())
         config.set("log_level", self.cb_log.currentText())
-        
-    def save_exclusions(self):
-        folders = [f.strip() for f in self.excl_folders_entry.text().split(',') if f.strip()]
-        exts = [e.strip() for e in self.excl_ext_entry.text().split(',') if e.strip()]
-        config.set("excluded_folders", folders)
-        config.set("excluded_extensions", exts)
-        logger.info("Exclusions updated.")
-        self.app.show_info_dialog("Success", "Exclusions updated.")
+        self._flash_saved_indicator()
 
     def clear_cache_db(self):
         reply = QMessageBox.question(
@@ -341,30 +359,29 @@ class SettingsView(BaseView):
             existing = [self.dash_list.item(i).text() for i in range(self.dash_list.count())]
             if path not in existing:
                 self.dash_list.addItem(path)
+                paths = [self.dash_list.item(i).text() for i in range(self.dash_list.count())]
+                self._autosave("dashboard_paths", paths)
 
     def remove_dash_path(self):
         selected_items = self.dash_list.selectedItems()
+        if not selected_items:
+            return
         for item in selected_items:
             self.dash_list.takeItem(self.dash_list.row(item))
-            
-    def save_dashboard(self):
         paths = [self.dash_list.item(i).text() for i in range(self.dash_list.count())]
-        config.set("dashboard_paths", paths)
-        self.app.show_info_dialog("Success", "Dashboard paths saved.")
+        self._autosave("dashboard_paths", paths)
 
     def _init_performance_tooltips(self):
         self._performance_tooltips = attach_tooltips([
             (self.hash_algo_combo, self.TOOLTIP_TEXTS["hash_algorithm"]),
             (self.max_threads_spinbox, self.TOOLTIP_TEXTS["max_threads"]),
             (self.search_threads_spinbox, self.TOOLTIP_TEXTS["search_threads"]),
-            (self.save_perf_button, self.TOOLTIP_TEXTS["save_performance"]),
         ])
 
     def _init_exclusion_tooltips(self):
         self._exclusion_tooltips = attach_tooltips([
             (self.excl_folders_entry, self.TOOLTIP_TEXTS["excluded_folders"]),
             (self.excl_ext_entry, self.TOOLTIP_TEXTS["excluded_extensions"]),
-            (self.save_exclusions_button, self.TOOLTIP_TEXTS["save_exclusions"]),
         ])
 
     def _init_dashboard_tooltips(self):
@@ -372,5 +389,4 @@ class SettingsView(BaseView):
             (self.dash_list, self.TOOLTIP_TEXTS["dashboard_paths"]),
             (self.dash_add_button, self.TOOLTIP_TEXTS["dashboard_add"]),
             (self.dash_remove_button, self.TOOLTIP_TEXTS["dashboard_remove"]),
-            (self.dash_save_button, self.TOOLTIP_TEXTS["dashboard_save"]),
         ])

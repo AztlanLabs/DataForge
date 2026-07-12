@@ -795,7 +795,55 @@ class ContractRegressionTests(unittest.TestCase):
         self.assertIn("dependency caches", SettingsView.TOOLTIP_TEXTS["excluded_folders"])
         self.assertIn(".tmp", SettingsView.TOOLTIP_TEXTS["excluded_extensions"])
         self.assertIn("watch list", SettingsView.TOOLTIP_TEXTS["dashboard_add"])
-        self.assertIn("restored", SettingsView.TOOLTIP_TEXTS["dashboard_save"])
+        self.assertNotIn("dashboard_save", SettingsView.TOOLTIP_TEXTS)
+
+    def test_settings_autosave_persists_on_change(self):
+        """Settings must persist the moment the user changes a value, with
+        a transient 'Saved ✓' indicator instead of an interrupting dialog
+        or a hidden Save button."""
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.core.config import config as dfconfig
+
+        existing_app = QApplication.instance()
+        app = existing_app if existing_app is not None else QApplication([])
+
+        snapshot = {
+            "hash_algorithm": dfconfig.get("hash_algorithm"),
+            "size_unit": dfconfig.get("size_unit"),
+            "max_thread_workers": dfconfig.get("max_thread_workers"),
+            "search_thread_workers": dfconfig.get("search_thread_workers"),
+            "excluded_folders": dfconfig.get("excluded_folders"),
+            "excluded_extensions": dfconfig.get("excluded_extensions"),
+            "path_display_mode": dfconfig.get("path_display_mode"),
+            "duplicate_default_keep_strategy": dfconfig.get("duplicate_default_keep_strategy"),
+            "dashboard_paths": dfconfig.get("dashboard_paths"),
+        }
+
+        try:
+            view = SettingsView(None, app=MagicMock())
+            self.assertTrue(hasattr(view, "_autosave"))
+            self.assertTrue(hasattr(view, "_saved_indicator"))
+
+            view._autosave("hash_algorithm", "sha256")
+            self.assertEqual(dfconfig.get("hash_algorithm"), "sha256")
+
+            view._autosave("max_thread_workers", 8)
+            self.assertEqual(dfconfig.get("max_thread_workers"), 8)
+
+            view._autosave("excluded_folders", ["build", "node_modules"])
+            self.assertEqual(dfconfig.get("excluded_folders"), ["build", "node_modules"])
+
+            view._autosave("excluded_extensions", [".tmp", ".log"])
+            self.assertEqual(dfconfig.get("excluded_extensions"), [".tmp", ".log"])
+
+            self.assertEqual(view._saved_indicator.text(), "Saved ✓")
+
+            view._autosave("hash_algorithm", "sha512")
+            view._hide_saved_indicator()
+            self.assertEqual(view._saved_indicator.text(), "")
+        finally:
+            for key, value in snapshot.items():
+                dfconfig.set(key, value)
 
     def test_cli_search_help_mentions_extension_sort_examples(self):
         runner = CliRunner()
