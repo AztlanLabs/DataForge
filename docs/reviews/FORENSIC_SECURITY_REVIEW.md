@@ -1,6 +1,6 @@
 # Forensic, Security & UI/UX Architectural Review
 
-**Date:** 2026-07-12 · **Reviewed against:** source tree at HEAD of `develop`
+**Date:** 2026-07-12 · **Last verified:** 2026-07-12 · **Reviewed against:** source tree at HEAD of `develop`
 **Scope:** forensic-soundness, security posture, and investigator-facing UX/UI of the current DataForge codebase, evaluated against the enterprise forensic market (EnCase, FTK, Magnet AXIOM, CrowdStrike FIM) and against ACPO / RFC 3227 / ISO/IEC 27037 / NIST SP 800-86 expectations.
 **Stance:** analytically neutral, evidence-based. Each finding is anchored to source by `path:line` and follows the Where / Why / How standard mandated by [`CONTRIBUTING.md` §8](../CONTRIBUTING.md).
 **Companion documents:**
@@ -31,15 +31,17 @@
 | F9 | 🔴 High | Forensic soundness | tz-naive timestamps in reports; UTC/local mixed in one artefact | Open | Forensic timestamp standardisation |
 | F10 | 🟠 High | Forensic engine | Filename handling ignores NFC/NFD normalisation and bidi controls | Open | Scanner + duplicates |
 | F11 | 🟠 High | Backend security | Audit log (`app.log`) is rotatable, world-readable, not hash-chained | Open | `core/logger.py` rewrite |
-| F12 | 🟠 High | Backend security | Plugin loader executes arbitrary local Python with full app privileges | Open | `ui/plugin_loader.py` (S5) |
+| F12 | 🟠 High | Backend security | Plugin loader executes arbitrary local Python with full app privileges | Partial | `ui/plugin_loader.py` (S5) — owner/world-writable checks + opt-in landed; isolation + signing remain |
 | F13 | 🟠 High | Backend security | Untrusted parsers run in-process — no CPU/mem/`seccomp` isolation | Open | `multiprocessing` worker pool |
 | F14 | 🟡 Medium | Engine perf | `ingest_disk_image` materialises file list; doubles `os.stat` in timeline | Open | Streaming + `FileEntry` schema |
 | F15 | 🟡 Medium | Engine perf | Keyword worker buffers 10 MB × N threads; no global byte budget | Open | `modules/forensics.py:keyword_search` |
 | F16 | 🔴 High | Forensic soundness | Sparse files not detected; hash manifest treated as `st_size` bytes | Open | Carve + hash pre-check |
+| F20 | 🟠 High | Forensic engine | Locked / in-use files silently skipped; no Volume Shadow Copy or raw-volume acquisition | Open | New `core/acquire.py` + scanner/hasher `access_error` |
+| F21 | 🟡 Medium | Forensic engine | `secure_delete` and dedup are not hardlink/reflink-aware (collateral loss / false destruction) | Open | `st_nlink` guard in F4 seam + dedup `(st_dev, st_ino)` grouping |
 | U1 | 🟠 High | UI/UX | No case / evidence item / operator context (every artefact is unattributed) | Open | New `CaseContext` |
 | U2 | 🔴 High | UI/UX | No EVIDENCE MODE toggle; investigation and clobber sessions share UI | Open | Top-of-window sticky + `FileActionService` gate |
-| U3 | 🟠 High | UI/UX | Timeline renders as flat list past ~5,000 events; investigator fatigue risk | Open | Virtualised `QTreeView` + swimlane |
-| U4 | 🟠 High | UI/UX | No inline hex view; no recognised-field inspector for top 10 file types | Open | `widgets.HexView` |
+| U3 | 🟠 High | UI/UX | Timeline tab renders as a flat list; no virtualisation past ~5,000 events (fatigue risk) | Partial | Virtualised `QTreeView` + swimlane (flat Timeline tab exists) |
+| U4 | 🟠 High | UI/UX | Inline Hex tab exists but no recognised-field inspector for top 10 file types | Partial | `widgets.HexView` field inspector (S11 open-handler fixed) |
 | U5 | 🟡 Medium | UI/UX | "Suspicious mismatches" filter absent (magic-byte vs extension) | Open | Filter on `profile_directory_types` rows |
 | U6 | 🟡 Medium | UI/UX | State conveyed by colour alone; no glyph paired with semantic colour | Open | Token table extension |
 | U7 | 🟡 Medium | UI/UX | Destructive preview does not correlate source evidence row to mutation step | Open | `views/base.py` preview rework |
@@ -116,12 +118,13 @@ competent and usefully distinct. The "with caveats" set:
 - Three marketed capabilities are misleading today (U10, U11, and the
   "30+ types" carving claim — see F6 for why carving success rate will not
   match the marketing).
-- Two open security findings are higher blast radius than the audit severity
-  suggests for any deployment where evidence USB sticks are share
-  input: S4 (trash restore path traversal,
-  [`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md)) and S5
-  (plugin loader executes arbitrary local Python with full app
-  privileges, [`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md)).
+- The two highest-blast-radius security findings for any deployment where an
+  evidence USB stick is share input — S4 (trash-restore path traversal) and S5
+  (plugin loader executes arbitrary local Python) — are now **closed in WS-B**
+  ([`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md), [`IMPLEMENTATION_PLAN.md` §4](./IMPLEMENTATION_PLAN.md)).
+  What remains is architectural, not the original abuse path: parser/plugin
+  process isolation and signing (F12) and a chain-of-custody hook on restore
+  (F19). Both are tracked below.
 
 ### 1.5 False-positive / false-claim risks in production
 
@@ -129,7 +132,7 @@ competent and usefully distinct. The "with caveats" set:
 | --- | --- | --- | --- |
 | "Recover deleted files from the system trash or external media" | README:50 | `_scan_windows_trash` raises `TrashScanUnsupported` (`recovery.py:184-196`) | U11 |
 | "File carving … 30+ types" | README:51 | Carver matches only at 512-byte sector boundaries (`recovery.py:373`); many headers will be missed | F6 |
-| "Detect tampering" | README:49 | `IntegrityMonitor` detects NEW/MODIFIED/DELETED; does not detect tampering with the snapshot itself (snapshot file written with default perms) — S12 | — (see [`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md)) |
+| "Detect tampering" | README:49 | `IntegrityMonitor` detects NEW/MODIFIED/DELETED; does not detect tampering with the snapshot itself (no hash-chain, and `create_snapshot` still writes via plain `open` while reports are now `0600`) | F1 / F11 (report-perms half fixed under S12) |
 | "OS artifact parsing" cross-platform | README:55 | `parse_os_artifacts` (`forensics.py:121-329`) only reads `/etc/passwd`, `/var/log/*`, shell history, cron, dpkg, systemd — Windows returns the empty artefact dict | U10 |
 | Entropy verdict "likely encrypted/packed" at ≥ 7.95 | `forensics.py:717-724` | xz/zstd/JPEG >1 MB/MP4 fragments/PNG optimised all score 7.5-8.0; presents false positives to triage | F-cluster (engine) |
 
@@ -239,6 +242,10 @@ until F1–F4 and U2 are closed.
   - Move `secure_delete` to a new `modules/sanitisation.py` outside the forensics import path, gated under a separate CLI subcommand `fm sanitize` (not `fm forensics`), with a mandatory confirm and an audit-log entry before any write.
   - Rename internal label to "best-effort overwrite" (already done in docstring) and surface that name in the UI/menu — never "secure delete."
   - Refuse to operate when `CaseContext.evidence_mode` is set.
+  - Make the overwrite hardlink/reflink-aware — see **F21**. The point-fix for
+    the SSD/CoW false-assurance (S6) landed in WS-B, but the hardlink case
+    (overwrite destroys data reachable by another link; unlink leaves it intact)
+    is a distinct correctness gap that this seam must also close.
   - Test: `tests/test_sanitisation.py` — assert that the forensics module no longer imports `secure_delete`; assert that under evidence mode, `sanitize` returns `"blocked"`.
 
 ### F5 — Raw image support (E01 / AFF4 / dd) without requiring mount
@@ -265,11 +272,11 @@ until F1–F4 and U2 are closed.
 
 > ⏳ Open · 🟠 High · Effort: M · Release v0.3.0
 
-- **Where.** `dataforge/modules/recovery.py:315-443` (`carve_files_from_image`).
-  Specifically: line 373 `header_buf = f.read(block_size + 16)` matches only
-  at sector boundaries (512-byte increments). Line 388
+- **Where.** `dataforge/modules/recovery.py:312-440` (`carve_files_from_image`).
+  Specifically: line 370 `header_buf = f.read(block_size + 16)` matches only
+  at sector boundaries (512-byte increments). Line 385
   `file_data = f.read(min(max_size, file_size - offset))` reads the entire
-  candidate file into RAM in one shot. Line 397 truncates to `max_size` for
+  candidate file into RAM in one shot. Line 394 truncates to `max_size` for
   footer-less types.
 - **Why.** Real carving tools (scalpel, photorec) use sliding-window
   multi-pattern matchers and validate structure. Sector-aligned scanning
@@ -332,7 +339,7 @@ until F1–F4 and U2 are closed.
 - **Where.** Mixed tz in source:
   - `dataforge/modules/forensics.py:563` `datetime.now().isoformat()` (naive local) for `report_generated`.
   - `dataforge/modules/forensics.py:777-781` `datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()` (UTC) for timeline.
-  - `dataforge/modules/recovery.py:143` and `:559` use `datetime.fromisoformat(date_str).isoformat()` and `datetime.fromtimestamp(stat.st_mtime).isoformat()` (naive local).
+  - `dataforge/modules/recovery.py:143`, `:539` (`datetime.now().timestamp()`), and `:556` (`datetime.fromtimestamp(stat.st_mtime).isoformat()`) are naive local.
 - **Why.** Mixed tz in one forensic artefact is enough to draw a court
   challenge to operator discipline. The audit table lists "Deterministic,
   timezone-aware timestamps" as ⚠️ Partial.
@@ -382,12 +389,17 @@ until F1–F4 and U2 are closed.
 
 ### F12 — Plugin loader privilege boundary (S5 escalation)
 
-> ⏳ Open · 🟠 High · Effort: M · Release v0.2.0
+> 🟡 Partial · 🟠 High · Effort: M · Release v0.2.0
 
-- **Where.** `dataforge/ui/plugin_loader.py:37-52` (S5,
-  [`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md)). Any `*.py` in the plugins dir
-  is imported in-process with full app privileges — no signing, no manifest,
-  no sandbox.
+- **Where.** `dataforge/ui/plugin_loader.py:40-75` (S5,
+  [`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md)). WS-B **partially hardened** this:
+  loading is now opt-in behind an `enabled` flag (line 26-28), the plugins
+  directory is rejected if group/world-writable (`_check_plugin_dir_permissions`),
+  and each `*.py` is skipped unless owned by the running UID
+  (`_check_plugin_file_owner`). **What remains open:** the surviving `glob("*.py")`
+  (line 40) is still imported in-process with `spec.loader.exec_module(module)`
+  (line 63) — no signing, no manifest, no sandbox, and the audit-log record of
+  each load (F11) is not yet wired.
 - **Why.** On a shared investigator workstation a malicious plugin dropped by
   another user — or by a scanned evidence artifact if the user ever points
   `--path` at an attacker-controlled tree — gets full app privileges, can
@@ -423,7 +435,7 @@ until F1–F4 and U2 are closed.
 
 > ⏳ Open · 🟡 Medium · Effort: M · Release v0.2.0
 
-- **Where.** `dataforge/modules/forensics.py:486-489` materialises
+- **Where.** `dataforge/modules/forensics.py:485-489` materialises
   `file_paths`. `dataforge/modules/forensics.py:768` calls `os.stat` again
   inside the timeline loop — duplicating the stat `scan_directory` already
   did.
@@ -432,7 +444,7 @@ until F1–F4 and U2 are closed.
 - **How.**
   - Pass the scan generator directly to a streaming hasher (`calculate_hashes` should accept an iterable, not a list).
   - Extend `dataforge/core/common.py::FileEntry` with `atime, ctime, btime, owner_uid, owner_gid, mode` populated by `build_file_entry`.
-  - Rename `FileEntry.created_at` → `FileEntry.ctime` (this is a documentation correctness fix: `scanner.py:18` currently sets `created_at=stat.st_ctime` — on Linux ext4, st_ctime is metadata-change time, **not** creation time; the field is mislabeled and will produce a court-usable error in expert testimony).
+  - Rename `FileEntry.created_at` → `FileEntry.ctime` (this is a documentation correctness fix: `scanner.py:17` currently sets `created_at=stat.st_ctime` — on Linux ext4, st_ctime is metadata-change time, **not** creation time; the field is mislabeled and will produce a court-usable error in expert testimony).
   - Use the existing batch `ThreadPoolExecutor.map` for streaming with fixed prefetch depth.
   - Test: `tests/test_streaming_ingest.py` — assert peak RSS under ~500 MB for a 1 million FileEntry generator.
 
@@ -456,10 +468,11 @@ until F1–F4 and U2 are closed.
 
 > ⏳ Open · 🔴 High · Effort: S · Release v0.2.0
 
-- **Where.** `dataforge/core/scanner.py:14-20` populates `size=stat.st_size`
+- **Where.** `dataforge/core/scanner.py:16` populates `size=stat.st_size`
   (logical size, ignoring sparseness); no `st_blocks` check anywhere.
-  `dataforge/core/hasher.py` will hash zero regions of sparse files as
-  actual zeros — different from hashing the original content.
+  `dataforge/core/hasher.py:19-28` reads the full byte stream in fixed 64 KB
+  chunks and will hash zero regions of sparse files as actual zeros —
+  different from hashing the original content.
 - **Why.** `os.stat().st_blocks * 512` is the physical block count; if
   `st_blocks * 512 < st_size`, the file is sparse. A 1 TB logically-sized
   sparse file will exhaust memory in hashers (size-keyed buffers) and
@@ -470,6 +483,81 @@ until F1–F4 and U2 are closed.
   - Carver refuses sparse files with a clear surfaced reason.
   - Timeline marks sparse files with a ⚠ icon.
   - Test: `tests/test_sparse.py` — `dd if=/dev/zero of=fixture bs=1 count=0 seek=1G`; assert `FileEntry.is_sparse=True`; assert manifest entry carries the flag.
+
+### F20 — Locked / in-use file handling & Volume Shadow Copy acquisition
+
+> ⏳ Open · 🟠 High · Effort: L · Release v0.3.0
+
+- **Where.** `dataforge/core/scanner.py` (`scan_directory`) and
+  `dataforge/core/hasher.py:19-28` open each file with a plain read handle. A
+  `PermissionError`/`OSError` from a file another process holds open is caught
+  and the entry is silently dropped — there is no `access_error` field on
+  `FileEntry`, no count in the report, and no Volume Shadow Copy (VSS) or
+  raw-volume acquisition path anywhere in the tree.
+- **Why.** On a live Windows host the most forensically valuable artefacts —
+  the registry hives (`SYSTEM`, `SOFTWARE`, `NTUSER.DAT`), `$MFT`,
+  `pagefile.sys`, `hiberfil.sys`, an open Outlook `.pst` — are **always** locked
+  by the OS or a running process. Silently skipping them yields a report that
+  claims a complete scan while omitting exactly the evidence that matters. This
+  is the same false-completeness failure as F8 (ADS): the tool presents a
+  confident, incomplete picture. The DFIR review prompt calls out "handling
+  locked files" as a mandatory capability, and no professional tool acquires a
+  live Windows volume without a shadow copy or raw handle.
+- **How.**
+  - **Surface, don't swallow.** In the scanner/hasher, catch the open error and
+    record `FileEntry.access_error` (with the errno) instead of dropping the
+    entry; count and display "N files inaccessible (locked/in-use)" in reports so
+    the omission is explicit.
+  - **Acquire via snapshot.** Add `dataforge/core/acquire.py` with a Windows VSS
+    path — create a shadow copy (`vssadmin create shadow` or WMI
+    `Win32_ShadowCopy.Create`), read the locked file from the snapshot device
+    (`\\?\GLOBALROOT\Device\HarddiskVolumeShadowCopyN\...`), then release the
+    copy. This ties into F5 (raw-image support): a read-only raw-volume handle
+    (`CreateFile(\\.\C:, GENERIC_READ, FILE_SHARE_READ|WRITE|DELETE, ...)`) is
+    the fallback for whole-volume acquisition.
+  - **Linux.** Locked-file cases are rarer (advisory locks), but still catch and
+    record `EACCES`/`ETXTBSY`; document that live-volume acquisition should use
+    a read-only loop/`dd` image (F5), never a mounted read-write source.
+  - Refuse to operate against a read-write-mounted evidence volume when
+    `CaseContext.evidence_mode` (F3) is set.
+  - Test: `tests/test_locked_files.py` — Windows: open a fixture with an
+    exclusive lock, assert the scanner records `access_error` and does **not**
+    drop the entry; Linux: `xfail`/skip the exclusive-lock case, assert the
+    `EACCES` path records the flag.
+
+### F21 — Hardlink / reflink-aware `secure_delete` and deduplication
+
+> ⏳ Open · 🟡 Medium · Effort: S · Release v0.2.0
+
+- **Where.** `dataforge/modules/forensics.py:912-958` (`secure_delete` —
+  overwrite-in-place then unlink) and `dataforge/modules/duplicates.py`
+  (`find_duplicates` groups candidates by content hash only). Neither consults
+  `st_nlink`, `st_dev`, or `st_ino`.
+- **Why.** This is a correctness gap distinct from the SSD/CoW caveat already
+  noted under F4/S6:
+  - When `st_nlink > 1`, overwriting one path's bytes destroys the data that
+    **every** hardlink to that inode points at — collateral destruction of
+    unrelated evidence. Conversely, a bare unlink of one link leaves the content
+    fully recoverable through the others — the "destroyed" file persists.
+  - On reflink/CoW filesystems (btrfs, XFS `reflink`, APFS clones) an
+    overwrite-in-place writes to freshly-allocated blocks, leaving the original
+    extents intact.
+  - Dedup that counts a hardlink as a reclaimable duplicate over-reports the
+    space it will free (deleting one link frees nothing) and may delete a link
+    the examiner relied on.
+  Each case produces a false chain-of-custody claim — either "I destroyed this"
+  when the bytes persist, or an unlogged mutation of a second artefact.
+- **How.**
+  - In the F4 sanitisation seam (`modules/sanitisation.py`), `os.stat` the target
+    and if `st_nlink > 1` **refuse or warn** with the count of other links, and
+    record `st_dev`, `st_ino`, and `st_nlink` in the audit entry (F1) so the
+    action is attributable to a specific inode, not a path.
+  - In `find_duplicates`, collapse entries sharing `(st_dev, st_ino)` into one
+    physical file before computing reclaimable space, so hardlinks are never
+    presented as recoverable savings.
+  - Test: `tests/test_hardlink_safety.py` — create a hardlink pair, assert
+    `secure_delete` refuses/warns and does not silently overwrite; assert dedup
+    reports zero reclaimable bytes for the pair.
 
 ---
 
@@ -493,33 +581,42 @@ F11, F12, F13 above cover the headline hardening. Three further items:
 
 ### F18 — S7 system-cleanup over-classification (links to existing S7)
 
-> ⏳ Open · 🟠 High · Effort: S · Release v0.2.0
+> 🟡 Partial · 🟠 High · Effort: S · Release v0.2.0
 
-- **Where.** `dataforge/modules/system_cleanup.py:180-263` (S7,
-  [`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md)). Any file under System Temp /
-  User Cache / Thumbnails / Trash / Crash Reports is blanket-classified
-  junk; user-supplied `--path` inherits this classification.
-- **Why.** Active `/tmp` content, Unix sockets, lock files can be deleted;
-  a point-at-my-folder usability misfeature becomes a data-loss incident.
-- **How.** Document this fix at `system_cleanup.py`:
-  - Never blanket-classify user-supplied paths (only built-in category roots).
-  - Minimum-age filter for `/tmp`, `/var/tmp`, `/run/...` (default 1 day).
-  - Skip sockets, FIFOs, block devices, character devices (check `stat.S_ISSOCK` etc.).
-  - Allow-list safe subtrees (e.g., `~/.cache/mozilla/*/cache2/`).
-  - Test: `tests/test_system_cleanup_safety.py` — point `--path` at a user folder containing a socket and an in-use temp file; assert neither is deleted.
+- **Where.** `dataforge/modules/system_cleanup.py:201-300` (S7,
+  [`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md)). WS-B **fixed the live abuse path**:
+  sockets/FIFOs are now skipped (line 267), System Temp entries carry a
+  minimum-age guard of one day (lines 273-275), and user-supplied `--path`
+  no longer inherits blanket classification — it falls under a stricter
+  extension/name-only rule (lines 277-281). **What remains open:** the
+  blanket-by-category rule still fires for the built-in category roots
+  (`category in ("System Temp", "User Cache", "Thumbnails", "Trash", "Crash
+  Reports")`, line 286), so an allow-list of provably-safe subtrees is still
+  the higher-precision follow-up.
+- **Why.** The original data-loss incident (point-at-my-folder deletes a live
+  socket or in-use temp file) is closed. The residual is precision, not safety:
+  the built-in category sweep is coarser than an allow-list would be.
+- **How.** Remaining work at `system_cleanup.py`:
+  - Allow-list safe subtrees (e.g., `~/.cache/mozilla/*/cache2/`) instead of
+    the whole category root.
+  - Extend the age/handle guards from System Temp to the other category roots.
+  - Test: `tests/test_system_cleanup_safety.py` already guards the user-path
+    case (`test_junk_scan_never_blanket_classifies_user_supplied_path`, WS-B);
+    add an allow-list precision test when the follow-up lands.
 
 ### F19 — S4 trash-restore confinement (links to existing S4)
 
-> ⏳ Open · 🟠 High · Effort: S · Release v0.2.0
+> 🟡 Partial · 🟠 High · Effort: S · Release v0.2.0
 
-- **Where.** `dataforge/modules/recovery.py:205-309` (S4). `_is_safe_restore_path`
-  at line 205 already rejects absolute paths and `..` traversal; the audit is
-  now partly closed. However, `restore_root` fallback (line 270) and
-  `os.makedirs(parent, exist_ok=True)` (line 286) still warrant a written
-  audit-log entry before restore.
-- **Why.** The path-traversal vector itself is closed, but the restore
-  action itself is not audited. Per F1 every restore must emit a
-  chain-of-custody entry.
+- **Where.** `dataforge/modules/recovery.py:205-309` (S4, **closed in WS-B**).
+  `_is_safe_restore_path` (lines 205-227) now rejects non-absolute paths,
+  `..` traversal, and system directories; unsafe paths are redirected to the
+  confined `restore_root` fallback (line 270), and `os.makedirs(parent,
+  exist_ok=True)` (line 283) only runs inside that root. **What remains open:**
+  the restore action is not yet written to the F1 audit trail.
+- **Why.** The path-traversal vector itself is closed (S4). The residual gap is
+  chain-of-custody: per F1 every restore must emit a tamper-evident audit
+  entry, which cannot land until `core/audit.py` exists.
 - **How.**
   - Hook `restore_from_trash` into the F1 audit trail (`core/audit.py::log_entry`) with `op="restore"` and `{src=trash_path, dst=dest, validate_reason, case_id}`.
   - Refuse restore under EVIDENCE MODE (F3/U2).
@@ -567,13 +664,16 @@ investigator-specific UX. Severity convention same as above.
 
 ### U3 — Virtualised timeline view
 
-> ⏳ Open · 🟠 High · Effort: M · Release v0.3.0
+> 🟡 Partial · 🟠 High · Effort: M · Release v0.3.0
 
 - **Where.** `build_timeline` (`forensics.py:754-791`) returns a flat sorted
-  list. The GUI has no timeline view today (`ui/views/forensics.py` is
-  menu-driven).
-- **Why.** A flat list past ~5,000 events produces investigator fatigue,
-  scrolling-induced RSI, and missed events at high triage velocity.
+  list. The Forensics screen (`ui/views/forensics_view.py`) is **tab-driven**
+  (`QTabWidget`, 11 tabs) and already renders a flat **Timeline tab**
+  (`forensics_view.py:770-821`). What is missing is the *virtualisation*: the
+  tab loads every event into the widget at once.
+- **Why.** A flat, fully-materialised list past ~5,000 events produces
+  investigator fatigue, scrolling-induced RSI, and missed events at high triage
+  velocity.
 - **How.**
   - New `ui/views/timeline.py::TimelineView(BaseView)` backed by a `QTreeView` with a `QAbstractItemModel` that loads pages of 1k events from DuckDB (F-engine).
   - Layout: vertical swimlane per file; time on y-axis, color-coded by MACB type (M=amber, A=green, C=blue, B=violet — paired with glyphs per U6).
@@ -581,20 +681,31 @@ investigator-specific UX. Severity convention same as above.
   - Lazy-load on scroll (Qt's `fetchMore`).
   - Test: `tests/test_timeline_view.py` — synthesise 100k events; assert memory RSS constant during scroll; assert `j`/`k` move selection.
 
-### U4 — Inline hex view + inspector
+### U4 — Inline hex view + field inspector
 
-> ⏳ Open · 🟠 High · Effort: M · Release v0.3.0
+> 🟡 Partial · 🟠 High · Effort: M · Release v0.3.0
 
-- **Where.** `dataforge/modules/forensics.py:798-842` already returns a
-  structured hex dump, but the GUI has no inline hex pane. The "Open File"
-  context menu in `widgets.py::EnhancedTreeview` hands files to the OS
-  default handler (S11 — risky).
-- **Why.** Investigators do not leave the tool to inspect bytes; in-HxD hex
-  view is the baseline expectation.
+- **Where.** `dataforge/modules/forensics.py:798-842` returns a structured hex
+  dump, and the Forensics screen now hosts an inline read-only **Hex Viewer tab**
+  (`forensics_view.py:868-914`, fed by `hex_dump`). The risky OS-default-handler
+  hand-off (S11) is **fixed** (commit `961cf7f`): `open_file()` gates on
+  `_is_executable_file` and shows an "Open Executable?" confirm
+  (`widgets.py:860-866`). **What remains missing** is the recognised-field
+  *inspector* — the hex tab shows raw bytes with no decoded structure.
+- **Why.** Investigators do not leave the tool to inspect bytes; a raw hex pane
+  is table stakes, but the differentiator is decoding the byte under the cursor
+  to a named header field.
 - **How.**
-  - New `ui/widgets/hexview.py::HexView(QWidget)` — 16-byte grid, offset gutter, hex in the middle, ASCII on the right. Lazy-loads 64 KB pages from disk on scroll.
-  - Inspector pane shows the magic-byte interpretation of the bytes under the cursor — extend `file_signatures.py::identify_file_type` with field-offset annotation for the top 10 file types (PNG IHDR, JPEG SOI/APP0, ZIP local file header, PDF header, MFT entry, registry hive cell, E01 header, ELF header, MZ/PE, GZIP).
-  - Replace the "Open File" context menu entry with "Inspect Bytes" — eliminates S11.
+  - Upgrade the Hex Viewer tab (or a new `ui/widgets/hexview.py::HexView`) to a
+    16-byte grid with an offset gutter and lazy 64 KB page loads on scroll.
+  - Add an inspector pane showing the magic-byte interpretation of the bytes
+    under the cursor — extend `file_signatures.py::identify_file_type` with
+    field-offset annotation for the top 10 file types (PNG IHDR, JPEG SOI/APP0,
+    ZIP local file header, PDF header, MFT entry, registry hive cell, E01 header,
+    ELF header, MZ/PE, GZIP).
+  - Add an "Inspect Bytes" context-menu entry that opens the file in the Hex tab
+    rather than the OS handler (the S11 executable-open confirm already covers
+    the residual risk).
   - Test: `tests/test_hex_view.py` — assert PNG IHDR width/height are decoded from cursor bytes.
 
 ### U5 — "Suspicious mismatches" filter (cheap, high-value)
@@ -703,9 +814,14 @@ The suggested ordering — by (impact × cost)^-1 — is:
 
 | Wave | Findings | Target release | Why this order |
 | --- | --- | --- | --- |
-| 1 (forensic soundness) | F1, F2, F3, F4, F9, F11, U1, U2 | v0.2.0 | Close the disqualifying gaps; everything else is incremental once these land |
-| 2 (engine correctness) | F6, F8, F10, F13, F14, F15, F16, F17, F18, F19, U5, U6, U7, U8, U11 | v0.2.0–v0.3.0 | Make the engine actually correct before adding new surface |
-| 3 (engine growth) | F5, F7, U3, U4, U9, U10 | v0.3.0 | Add raw-image, YARA/TLsh, and timeline UX — the features that move DataForge from "manager" to "investigative tool" |
+| 1 (forensic soundness) | F1, F2, F3, F4, F9, F11, F21, U1, U2 | v0.2.0 | Close the disqualifying gaps; everything else is incremental once these land |
+| 2 (engine correctness) | F6, F8, F10, F13, F14, F15, F16, F17, F18, F19, F20 (detection half), U5, U6, U7, U8, U11 | v0.2.0–v0.3.0 | Make the engine actually correct before adding new surface |
+| 3 (engine growth) | F5, F7, F20 (VSS/raw half), U3, U4, U9, U10 | v0.3.0 | Add raw-image, VSS/locked-file acquisition, YARA/TLsh, and timeline UX — the features that move DataForge from "manager" to "investigative tool" |
+
+These three waves are carried in [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md)
+as work-streams **WS-H** (Wave 1, v0.2.0), **WS-I** (Wave 2, v0.3.0), and **WS-J**
+(Wave 3, v0.3.0). F1/F3/F6 land on the WS-F service seams (ARCH.5 audit hook,
+ARCH.4 root-confinement, ARCH.6 stream carving) rather than duplicating them.
 
 The work-stream model of [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md)
 §2 (one PR per stream, alpha tag per stream close, single `develop`→`main`
@@ -750,12 +866,12 @@ must record the evidence that the finding is now resolved — per
 
 | Document | Section that links here |
 | --- | --- |
-| [`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md) | S4, S5, S6, S7, S9, S12, S13 (open items tracked here under F1, F4, F11, F12, F17-cluster) |
+| [`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md) | S4–S13 are **fixed in WS-B**; their architectural successors are tracked here as F4 (S6 secure_delete), F11/F1 (S12 report integrity), F12 (S5 plugin isolation), F13 (S13 parser isolation), F19 (S4 restore audit) |
 | [`IMPROVEMENT_PLAN.md`](./IMPROVEMENT_PLAN.md) | §1 (cross-cutting architecture), §2.4 (interaction problems — U2, U7 here extend 2c.5), §2.5 (accessibility — U6 here), §3.3/3.4 (iconography + motion — U6 here) |
-| [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) | §4 (work-streams) — a future revision intercalates the F1–F19 / U1–U11 work-streams from §5 above |
+| [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) | §3–§4, §7 — carries the F1–F21 / U1–U11 work-streams from §5 above as WS-H (v0.2.0), WS-I and WS-J (v0.3.0) |
 | [`EXECUTIVE_SUMMARY.md`](./EXECUTIVE_SUMMARY.md) | "Five things that matter most" — items 3 (security), 4 (UX) extended here into forensic-soundness and investigator-UX dimensions |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | §8 (where/why/why/how), §9 (security), §10 (implementation plans) |
-| [`../ARCHITECTURE.md`](../ARCHITECTURE.md) | Extension points: new `core/audit.py`, `core/case.py`, `core/image_io.py`, `core/parse_worker.py`, `core/streams.py`, `core/dt.py`, `modules/indicators.py`, `modules/sanitisation.py`; new views `ui/views/timeline.py`, new widget `ui/widgets/hexview.py` |
+| [`../ARCHITECTURE.md`](../ARCHITECTURE.md) | Extension points: new `core/audit.py`, `core/case.py`, `core/image_io.py`, `core/acquire.py`, `core/parse_worker.py`, `core/streams.py`, `core/dt.py`, `modules/indicators.py`, `modules/sanitisation.py`; new views `ui/views/timeline.py`, new widget `ui/widgets/hexview.py` |
 | [`../TECHNICAL_SOURCE_OF_TRUTH.md`](../TECHNICAL_SOURCE_OF_TRUTH.md) | `FileEntry` schema extension (F10, F14, F16); new entries for new modules to be added when work-streams land |
 | [`../GUI_WORKFLOWS.md`](../GUI_WORKFLOWS.md) | Built-in views table — add Timeline view row; EVIDENCE MODE chrome row in shell description |
 
@@ -763,8 +879,9 @@ must record the evidence that the finding is now resolved — per
 
 **End of review.**
 This document is the forensic / security / investigator-UX tracker. It feeds
-the next revision of [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md)
-and supersedes the "Forensic-soundness checklist" rows in
-[`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md) for items it covers (F1–F19). For
+[`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) and supersedes the
+"Forensic-soundness checklist" rows in
+[`AUDIT_FINDINGS.md`](./AUDIT_FINDINGS.md) for items it covers (F1–F21). For
 item-level commit mapping, version impact, and per-stream sequencing, see
-the next [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) revision.
+[`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) §3–§4 and §7
+(work-streams WS-H / WS-I / WS-J).
