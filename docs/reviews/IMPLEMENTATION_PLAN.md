@@ -435,7 +435,12 @@ feat(ui): add storage and devices view surfacing fm devices
 refactor: sweep residual file-manager naming across the app
 test(ui): smoke-mount every view with pytest-qt
 ```
-**Version impact:** MINOR.
+**Version impact:** MINOR. **Gate:** ✅ satisfied (276 passed — 270 → 276 over
+six incremental commits: 2 sidebar regroup, 2 Automations, 2 label renames, 1
+Storage & Devices, 1 name sweep, 1 smoke test. The new sidebar groups and
+view titles are stable; the new Storage & Devices and Automations views
+mount cleanly; the smoke test confirms every registered view is
+instantiable. Ready for the `v0.2.0-alpha.4` tag on `develop`).
 
 ### WS-E — Motion, Empty/Error, A11y (Phase 2e) → `v0.2.0-alpha.5`
 
@@ -681,7 +686,7 @@ Update the `WS` streams here as they close; the detailed per-item status stays i
 | WS-A | Stabilize & Doc Truth (CI, tooling, S2, doc audit) | `v0.2.0-alpha.1` | ✅ Done — tagged locally |
 | WS-B | Trust & Safety (S4–S13) | `v0.2.0-alpha.2` | ✅ Done — closed |
 | WS-C | Interaction Correctness (2c) | `v0.2.0-alpha.3` | ✅ Done — closed |
-| WS-D | IA, Naming & Parity (2d) | `v0.2.0-alpha.4` | ⏳ Not started |
+| WS-D | IA, Naming & Parity (2d) | `v0.2.0-alpha.4` | ✅ Done — closed |
 | WS-E | Motion, Empty/Error, A11y (2e) | `v0.2.0-alpha.5` | ⏳ Not started |
 | WS-F | Architecture Consolidation | `v0.2.0-alpha.6` | ⏳ Not started |
 | WS-G | Brand & Release Polish | `v0.2.0-alpha.7` | ⏳ Not started |

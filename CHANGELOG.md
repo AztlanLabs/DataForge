@@ -20,12 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `BaseView.whats_this_for()` — inline "What's this?" affordance helper
 - Status-bar busy message now names the running task (e.g. "Running: search files…")
 - `BaseView._humanize_callable_name()` — helper for the status bar
+- `StorageDevicesView` — GUI surface for `fm devices` (mount/type/filesystem/used/total table with a per-row details panel)
+- `AutomationsView` — single sidebar entry that merges Tools & Workflows and Action Builder into a 2-tab notebook (Action Builder / Tools)
+- pytest-qt smoke test that mounts every registered view and confirms the expected sidebar title
 
 ### Changed
 - Updated all documentation cross-references after review restructure
-- Migrated package metadata (name, version, dependencies, `fm` entry point) from `setup.py` into `pyproject.toml` (PEP 621); `setup.py` is now a thin `setup()` shim
+- Migrate package metadata (name, version, dependencies, `fm` entry point) from `setup.py` into `pyproject.toml` (PEP 621); `setup.py` is now a thin `setup()` shim
 - Pinned lower-bound versions for previously-unconstrained runtime dependencies (click, rich, tqdm, pandas, send2trash, pypdf, pymupdf, opencv-python-headless)
 - **WS-C Interaction Correctness**: settings now autosave on every change with a transient "Saved ✓" indicator instead of an interrupting dialog or hidden Save buttons; the Settings theme dropdown is now a read-only label that mirrors the sidebar Dark Mode checkbox (sidebar is the single source of truth); the sidebar shows every group regardless of Experience Level, and the tier now controls only in-view complexity; view help renders Markdown; destructive previews are scrollable checkable tables with running size totals and a danger-tinted Proceed button
+- **WS-D IA, Naming & Parity**: sidebar regrouped into task-oriented sections (Home / Find & Organize / Clean & Optimize / Recover & Investigate / System); Tools & Workflows and Action Builder merged into Automations; new Storage & Devices view in the Clean & Optimize group; labels renamed to user-facing names (Search, Duplicate Finder, Media Tools, Metadata & EXIF, Clean Up Space, Performance, File Recovery, Forensics, Hardware Info, Storage & Devices, Automations); the "Experience Level" setting is now "Detail level" with values Simple / Standard / Everything; the `_VALID_TIERS` config enum, TIER_RANK, and the `register_tiered` calls in settings.py all move to the new names in lockstep
 
 ### Fixed
 - Broken links in ARCHITECTURE.md and TECHNICAL_SOURCE_OF_TRUTH.md
@@ -37,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **2c.3**: The Settings theme `QComboBox` and the sidebar Dark Mode `QCheckBox` both wrote to the same key and could fall out of sync; the dropdown is now a read-only label that mirrors the checkbox
 - **2c.4**: The Experience Level setting hid entire sidebar groups (System Maintenance, Advanced Analysis) from Basic users, creating a discoverability cliff where users could not see that Forensics Lab existed; every group is now always visible
 - **2c.6**: The status bar showed a generic "Busy: please wait…" message that did not name the running task
+- **2d.4**: `fm devices` had no GUI path — the same `device_manager.list_storage_devices` API is now exposed in the GUI as the **Storage & Devices** view (Clean & Optimize group)
+- **2d.5**: Final name-sweep dropped the last stragglers of the old "Metadata Studio" / "Forensics Lab" / "Hardware Diagnostics" / "Search & Organize" / "Experience Level" labels from view module docstrings, code comments, README, ARCHITECTURE.md, GUI_WORKFLOWS.md, and TECHNICAL_SOURCE_OF_TRUTH.md; a regression test walks `dataforge/` and fails if any of the old names ever reappear in Python code
 
 ### Security
 - **S2 (Fixed)**: Forensic HTML report was vulnerable to stored HTML/JS injection — every interpolated value is now passed through `html.escape()`
