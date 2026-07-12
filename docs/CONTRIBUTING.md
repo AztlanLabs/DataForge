@@ -37,6 +37,7 @@ source .venv/bin/activate        # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt -r requirements-dev.txt
 pip install -e .
 git config core.hooksPath .githooks
+pre-commit install
 ```
 
 ### Verify
