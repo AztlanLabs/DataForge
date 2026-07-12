@@ -57,7 +57,7 @@ The codebase has six architectural layers:
 5. **Composable action pipeline** in `dataforge/core/actions/` — step-based workflow engine used by the GUI Action Builder.
 6. **GUI orchestration and widgets** in `dataforge/ui/` — desktop application shell, views, widgets, plugin loader.
 
-There is also a dual workflow pattern: modules provide direct function-call workflows (used by the CLI and parts of the GUI), while the action pipeline provides a step-chain model (used by the Action Builder view). Both now route filesystem mutations through `FileActionService` → `core/operations/files.py`, which means the mutation rules are centralized even though the orchestration models differ.
+There is also a dual workflow pattern: modules provide direct function-call workflows (used by the CLI and parts of the GUI), while the action pipeline provides a step-chain model (used by the Action Builder view). Both now route filesystem mutations through `FileActionService` → `dataforge/core/operations/files.py`, which means the mutation rules are centralized even though the orchestration models differ.
 
 ## Top-Level Control Flow
 
@@ -341,7 +341,7 @@ Re-exports: `BatchActionOutcome`, `BatchActionRecord`, `FileActionService`.
 
 #### `dataforge/core/services/file_actions.py`
 
-Central batch operations layer above `core/operations/files.py`. This is the primary dispatch layer used by modules, views, widgets, and action steps.
+Central batch operations layer above `dataforge/core/operations/files.py`. This is the primary dispatch layer used by modules, views, widgets, and action steps.
 
 Data:
 
@@ -885,12 +885,12 @@ The structural facts below are still accurate. Most *defects* from the 2026-07-1
 
 ### File mutation is centralized through two layers
 
-All filesystem mutations now flow through `FileActionService` → `core/operations/files.py`:
+All filesystem mutations now flow through `FileActionService` → `dataforge/core/operations/files.py`:
 
-- `modules/organizer.py` calls `FileActionService.transfer_items` / `delete_items`
-- `modules/renamer.py` calls `FileActionService.rename_items_with_regex`
-- `core/actions/io.py` calls `FileActionService.transfer_items` / `delete_items` / `archive_items`
-- `core/actions/modifications.py` calls `FileActionService.rename_items_with_template`
+- `dataforge/modules/organizer.py` calls `FileActionService.transfer_items` / `delete_items`
+- `dataforge/modules/renamer.py` calls `FileActionService.rename_items_with_regex`
+- `dataforge/core/actions/io.py` calls `FileActionService.transfer_items` / `delete_items` / `archive_items`
+- `dataforge/core/actions/modifications.py` calls `FileActionService.rename_items_with_template`
 - `ui/views/search.py` calls `FileActionService` for all bulk operations
 - `ui/views/duplicates.py` calls `FileActionService` for move/copy/delete
 - `ui/views/tools.py` calls `FileActionService` for batch rename and folder sync
@@ -904,11 +904,11 @@ While mutations are centralized, the **orchestration** still differs across call
 
 | Capability | Module path | Action pipeline path | GUI-direct path |
 |---|---|---|---|
-| Rename | `modules/renamer.py` → `FileActionService` | `RenameStep` → `FileActionService` | ToolsView batch renamer → `FileActionService` |
-| Move/Copy | `modules/organizer.py` → `FileActionService` | `MoveStep`/`CopyStep` → `FileActionService` | SearchView organize → `FileActionService` |
-| Delete | `modules/organizer.py` → `FileActionService` | `DeleteStep` → `FileActionService` | SearchView/DuplicatesView → `FileActionService` |
-| Search/filter | `modules/search.py` | `SearchFilter`/`SizeFilter`/`DateFilter` (independent) | SearchView (uses modules) |
-| Metadata clean | `modules/cleaner.py` | `MetaCleanStep` (uses modules) | ToolsView/CleanerPlugin (uses modules) |
+| Rename | `dataforge/modules/renamer.py` → `FileActionService` | `RenameStep` → `FileActionService` | ToolsView batch renamer → `FileActionService` |
+| Move/Copy | `dataforge/modules/organizer.py` → `FileActionService` | `MoveStep`/`CopyStep` → `FileActionService` | SearchView organize → `FileActionService` |
+| Delete | `dataforge/modules/organizer.py` → `FileActionService` | `DeleteStep` → `FileActionService` | SearchView/DuplicatesView → `FileActionService` |
+| Search/filter | `dataforge/modules/search.py` | `SearchFilter`/`SizeFilter`/`DateFilter` (independent) | SearchView (uses modules) |
+| Metadata clean | `dataforge/modules/cleaner.py` | `MetaCleanStep` (uses modules) | ToolsView/CleanerPlugin (uses modules) |
 
 The pipeline filters (`SearchFilter`, `SizeFilter`, `DateFilter`) are independent implementations, not wrappers over `SearchQuery`. This is a remaining structural overlap.
 
@@ -939,7 +939,7 @@ All GUI bulk operations follow: dry-run preview → user confirmation → execut
 
 ### `LocalProvider` is unused infrastructure
 
-`core/provider.py` defines `FileProvider` (ABC) and `LocalProvider`, but these are not used by any active code path. All code uses `os`, `shutil`, `scan_directory`, and `FileActionService` directly.
+`dataforge/core/provider.py` defines `FileProvider` (ABC) and `LocalProvider`, but these are not used by any active code path. All code uses `os`, `shutil`, `scan_directory`, and `FileActionService` directly.
 
 ## Practical Mental Model for Maintainers
 
@@ -961,9 +961,9 @@ If you need to understand the system quickly, use this reading order:
 When modifying this repository, assume these rules unless you verify otherwise:
 
 1. **Mutations go through FileActionService** — any new file operation should use `FileActionService` methods, not direct `shutil`/`os` calls.
-2. **Operations go through core/operations/files.py** — `FileActionService` delegates here. New mutation types should be added at this level.
+2. **Operations go through dataforge/core/operations/files.py** — `FileActionService` delegates here. New mutation types should be added at this level.
 3. **Rename exists in three orchestration patterns** — modules (regex), actions (template), tools (parts). All delegate to `FileActionService`.
-4. **Search/filter logic has two implementations** — `modules/search.py` (used by CLI/GUI) and `core/actions/filters.py` (independent, used by Action Builder).
+4. **Search/filter logic has two implementations** — `dataforge/modules/search.py` (used by CLI/GUI) and `dataforge/core/actions/filters.py` (independent, used by Action Builder).
 5. **Config and cache are persistent** on the user's machine under `~/.dataforge/`.
 6. **GUI views use preview → confirm → execute** — new views should follow the same pattern using `BaseView` helpers.
 7. **GUI threading uses run_workflow** — new background work should use `app.run_workflow(target, on_success)`, not raw threading.
@@ -977,5 +977,5 @@ The current repository is best understood as:
 - Built on a shared `FileEntry` → `scanner` → `operations` → `FileActionService` foundation.
 - With centralized filesystem mutation rules but multiple orchestration patterns (module-direct, pipeline-step, GUI-direct).
 - GUI threading, preview/confirm workflows, and batch outcome reporting are standardized through `DataForgeApp` and `BaseView` helpers.
-- The pipeline filters are the main remaining structural overlap with `modules/search.py`.
+- The pipeline filters are the main remaining structural overlap with `dataforge/modules/search.py`.
 - `LocalProvider` is the main dead abstraction.
