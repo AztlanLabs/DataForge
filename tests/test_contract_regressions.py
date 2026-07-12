@@ -1097,6 +1097,186 @@ class ContractRegressionTests(unittest.TestCase):
             {"Simple": 0, "Standard": 1, "Everything": 2},
         )
 
+    def test_sidebar_animations_use_dedicated_container_per_group(self):
+        """2e.1 — Sidebar group expand/collapse must animate the group's
+        ``maximumHeight`` rather than hide individual buttons. The
+        animation requires a dedicated per-group container widget so
+        PyQt5's ``QPropertyAnimation`` has a single property to drive."""
+        from PyQt5.QtWidgets import (
+            QApplication, QStackedWidget, QVBoxLayout, QWidget
+        )
+        from dataforge.ui.app import DataForgeApp
+        from unittest.mock import patch as _patch
+
+        _ = QApplication.instance() or QApplication([])
+
+        # Build a real app shell (not a MagicMock) so build_navigation_sidebar
+        # actually constructs the container widgets.
+        app = DataForgeApp.__new__(DataForgeApp)
+        QStackedWidget.__init__(app)
+        # Wire the minimum attributes ``build_navigation_sidebar`` touches.
+        app.theme_chk = type(
+            "FakeChk", (), {"isChecked": staticmethod(lambda: False)}
+        )()
+        nav_root = QWidget()
+        app.nav_btn_widget = nav_root
+        app.nav_btn_layout = QVBoxLayout(nav_root)
+        # Provide the bare helpers the builder calls.
+        from dataforge.ui.views.dashboard import DashboardView
+        app.content_stack = QStackedWidget()
+        app.views = {}
+        app.add_view(DashboardView)
+        app.nav_scroll = type(
+            "FakeScroll", (), {"setWidget": lambda self_, w: None}
+        )()
+        app.group_headers = {}
+        app._active_animations = []
+        app.update_sidebar_header_colors = lambda: None
+
+        with _patch("dataforge.ui.app.config") as mock_config:
+            mock_config.get.side_effect = lambda k, d=None: {
+                "settings_ui_tier": "Simple",
+                "collapsed_groups": [],
+            }.get(k, d)
+            app.build_navigation_sidebar()
+
+        # Every non-empty group must have a container with the expected
+        # object name and a button list of non-zero length.
+        self.assertTrue(app.group_containers, "No per-group containers were created")
+        for group_name, container in app.group_containers.items():
+            self.assertEqual(container.objectName(), "navGroup")
+            self.assertGreater(len(app.group_buttons[group_name]), 0,
+                               f"Group {group_name!r} has no buttons")
+        # Animation constants must exist with positive durations.
+        self.assertGreater(DataForgeApp.SIDEBAR_ANIM_MS, 0)
+        self.assertGreater(DataForgeApp.VIEW_ANIM_MS, 0)
+        # The active-animation list starts empty.
+        self.assertEqual(app._active_animations, [])
+
+    def test_view_crossfade_attaches_opacity_effect_to_every_view(self):
+        """2e.1 — ``add_view`` must attach a ``QGraphicsOpacityEffect`` to
+        every registered view at opacity 1.0 so ``switch_view`` can fade
+        the new view in."""
+        from PyQt5.QtWidgets import QApplication, QStackedWidget
+        from dataforge.ui.app import DataForgeApp
+
+        _ = QApplication.instance() or QApplication([])
+
+        app = DataForgeApp.__new__(DataForgeApp)
+        stack = QStackedWidget()
+        app.content_stack = stack
+        app.views = {}
+        app._active_animations = []
+
+        from dataforge.ui.views.dashboard import DashboardView
+        from dataforge.ui.views.search import SearchView
+
+        app.add_view(DashboardView)
+        app.add_view(SearchView)
+
+        for title, view in app.views.items():
+            effect = view.graphicsEffect()
+            self.assertIsNotNone(effect, f"{title} has no graphics effect")
+            self.assertEqual(effect.opacity(), 1.0,
+                             f"{title} should start at opacity 1.0")
+
+    def test_switch_view_fades_in_new_view(self):
+        """2e.1 — ``switch_view`` must start a ``QPropertyAnimation`` on
+        the new view's opacity effect; the animation lives in
+        ``_active_animations`` so the Python wrapper isn't GC'd mid-run."""
+        from PyQt5.QtWidgets import QApplication
+        from dataforge.ui.app import DataForgeApp
+        from unittest.mock import patch as _patch
+
+        _ = QApplication.instance() or QApplication([])
+
+        # The real constructor builds the sidebar and registers every
+        # view. We use a fresh app and snapshot the animations list to
+        # assert against after the switch.
+        with _patch("dataforge.ui.app.config") as mock_config:
+            mock_config.get.side_effect = lambda k, d=None: {
+                "theme": "cosmo",
+                "settings_ui_tier": "Simple",
+                "plugins_enabled": False,
+                "collapsed_groups": [],
+            }.get(k, d)
+            mock_config.set = lambda *a, **k: None
+            app = DataForgeApp()
+
+        baseline = len(app._active_animations)
+        app.switch_view("Search")
+        # After switching, at least one new animation was scheduled.
+        self.assertGreater(len(app._active_animations), baseline)
+        last_anim = app._active_animations[-1]
+        self.assertEqual(last_anim.targetObject(), app.views["Search"].graphicsEffect())
+        self.assertEqual(last_anim.propertyName(), b"opacity")
+        self.assertAlmostEqual(last_anim.startValue(), 0.0, places=3)
+        self.assertAlmostEqual(last_anim.endValue(), 1.0, places=3)
+
+    def test_toggle_sidebar_group_animates_container_height(self):
+        """2e.1 — ``toggle_sidebar_group`` must animate the group's
+        container ``maximumHeight`` between 0 and the natural sizeHint
+        rather than hide individual buttons. The animation lands in
+        ``_active_animations``."""
+        from PyQt5.QtWidgets import (
+            QApplication, QStackedWidget, QVBoxLayout, QWidget
+        )
+        from dataforge.ui.app import DataForgeApp
+        from unittest.mock import patch as _patch
+
+        _ = QApplication.instance() or QApplication([])
+
+        app = DataForgeApp.__new__(DataForgeApp)
+        app.content_stack = QStackedWidget()
+        app.theme_chk = type(
+            "FakeChk", (), {"isChecked": staticmethod(lambda: False)}
+        )()
+        nav_root = QWidget()
+        app.nav_btn_widget = nav_root
+        app.nav_btn_layout = QVBoxLayout(nav_root)
+        app.nav_scroll = type(
+            "FakeScroll", (), {"setWidget": lambda self_, w: None}
+        )()
+        app.group_headers = {}
+        app.views = {}
+        app._active_animations = []
+        app.update_sidebar_header_colors = lambda: None
+
+        from dataforge.ui.views.dashboard import DashboardView
+        app.add_view(DashboardView)
+        with _patch("dataforge.ui.app.config") as mock_config:
+            mock_config.get.side_effect = lambda k, d=None: {
+                "settings_ui_tier": "Simple",
+                "collapsed_groups": [],
+            }.get(k, d)
+            app.build_navigation_sidebar()
+
+        container = app.group_containers["Home"]
+        # Ensure the container has a real laid-out size so sizeHint() is
+        # non-zero (needed for the expand animation to have a target).
+        for btn in app.group_buttons["Home"]:
+            btn.adjustSize()
+        container.layout().invalidate()
+        container.layout().activate()
+        container.adjustSize()
+
+        header = app.group_headers["Home"]
+        app.toggle_sidebar_group("Home", header)
+        # First toggle: collapse → animation 0 → 0 (the buttons started
+        # visible, the container is at full height, so the target is 0).
+        self.assertGreaterEqual(len(app._active_animations), 1)
+        last_anim = app._active_animations[-1]
+        self.assertEqual(last_anim.targetObject(), container)
+        self.assertEqual(last_anim.propertyName(), b"maximumHeight")
+        self.assertEqual(last_anim.endValue(), 0)
+
+        # Toggle again — the target flips to the natural size.
+        app.toggle_sidebar_group("Home", header)
+        last_anim = app._active_animations[-1]
+        self.assertEqual(last_anim.targetObject(), container)
+        self.assertEqual(last_anim.propertyName(), b"maximumHeight")
+        self.assertGreater(last_anim.endValue(), 0)
+
     def test_storage_devices_view_surfaces_fm_devices_in_gui(self):
         """``fm devices`` had no GUI path; the new ``Storage & Devices``
         view wires the same ``device_manager.list_storage_devices`` API

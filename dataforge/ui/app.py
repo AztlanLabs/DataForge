@@ -7,9 +7,9 @@ import os
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QCheckBox, QStackedWidget, QProgressBar,
-    QStatusBar, QMessageBox, QScrollArea, QFrame
+    QStatusBar, QMessageBox, QScrollArea, QFrame, QGraphicsOpacityEffect
 )
-from PyQt5.QtCore import QThread, pyqtSignal, Qt, QTimer
+from PyQt5.QtCore import QThread, pyqtSignal, Qt, QTimer, QPropertyAnimation, QEasingCurve
 
 from .views.base import BaseView
 from .views.dashboard import DashboardView
@@ -139,6 +139,13 @@ class DataForgeApp(QMainWindow):
     # controls stay hidden behind "More options" expanders per view.
     TIER_RANK = {"Simple": 0, "Standard": 1, "Everything": 2}
 
+    # 2e.1 motion constants — every animated transition reads its duration
+    # from here so a single call (2e.3's reduce-motion setting) can shorten
+    # or skip them all in one place.
+    SIDEBAR_ANIM_MS = 180
+    VIEW_ANIM_MS = 160
+    ANIM_EASING = QEasingCurve.OutCubic
+
     def __init__(self, on_progress: Callable[[int, int, str], None] | None = None):
         super().__init__()
         self.setWindowTitle("DataForge")
@@ -249,6 +256,12 @@ class DataForgeApp(QMainWindow):
         self.nav_buttons = []
         self.group_headers = {}
         self.group_buttons = {}
+        self.group_containers = {}
+        # Hold active QPropertyAnimation objects so they don't get GC'd
+        # mid-flight — Qt deletes the animation when its Python wrapper
+        # is collected, which used to freeze the animation at the start
+        # value and leave the sidebar half-collapsed (2e.1).
+        self._active_animations: list[QPropertyAnimation] = []
         self.views: Dict[str, BaseView] = {}
         self.current_view = None
 
@@ -322,7 +335,14 @@ class DataForgeApp(QMainWindow):
     def add_view(self, view_cls: Type[BaseView]):
         view_instance = view_cls(self.content_stack, app=self)
         title = view_instance.get_title()
-        
+        # 2e.1 view crossfade — every view gets an opacity effect so
+        # ``switch_view`` can fade it in from 0→1. Setting the effect after
+        # the view is parented ensures PyQt5 picks it up before the
+        # first paint; opacity is left at 1.0 so the very first view
+        # (Dashboard) renders normally until ``switch_view`` overrides it.
+        view_instance.setGraphicsEffect(QGraphicsOpacityEffect(view_instance))
+        view_instance.graphicsEffect().setOpacity(1.0)
+
         self.content_stack.addWidget(view_instance)
         self.views[title] = view_instance
 
@@ -330,6 +350,7 @@ class DataForgeApp(QMainWindow):
         self.nav_buttons = []
         self.group_headers = {}
         self.group_buttons = {}
+        self.group_containers = {}
 
         # Group definitions — task-oriented sidebar (IMPROVEMENT_PLAN §2.2).
         # The labels are stable across the rename in 2d.3 and the view merge
@@ -397,31 +418,49 @@ class DataForgeApp(QMainWindow):
             # Collapse state
             is_collapsed = (group_name in collapsed_groups)
             arrow = "▶ " if is_collapsed else "▼ "
-            
+
             # Group Header Button
             header_btn = QPushButton(f"{arrow}{group_name.upper()}", self.nav_btn_widget)
             header_btn.setObjectName("groupHeader")
             color = HEADER_COLORS[theme_key].get(group_name, "#6b7280")
             header_btn.setStyleSheet(f"color: {color};")
-            
+
             header_btn.setCheckable(False)
             header_btn.clicked.connect(
                 lambda checked, g=group_name, b=header_btn: self.toggle_sidebar_group(g, b)
             )
-            
+
             self.nav_btn_layout.addWidget(header_btn)
             self.group_headers[group_name] = header_btn
             self.group_buttons[group_name] = []
-            
-            # Group Buttons (no icons)
+
+            # Per-group container (2e.1) — the buttons live inside a
+            # dedicated QWidget so we can animate its ``maximumHeight``
+            # for the collapse/expand transition. A flat layout of all
+            # buttons cannot be height-animated as a unit.
+            group_container = QWidget(self.nav_btn_widget)
+            group_container.setObjectName("navGroup")
+            container_layout = QVBoxLayout(group_container)
+            container_layout.setContentsMargins(0, 0, 0, 0)
+            container_layout.setSpacing(0)
+            self.group_containers[group_name] = group_container
+
             for title in available:
-                btn = QPushButton(title, self.nav_btn_widget)
+                btn = QPushButton(title, group_container)
                 btn.setCheckable(True)
                 btn.clicked.connect(lambda checked, t=title: self.switch_view(t))
-                btn.setVisible(not is_collapsed)
-                self.nav_btn_layout.addWidget(btn)
+                container_layout.addWidget(btn)
                 self.nav_buttons.append((btn, title))
                 self.group_buttons[group_name].append(btn)
+
+            if is_collapsed:
+                group_container.setMaximumHeight(0)
+                group_container.setVisible(False)
+            else:
+                group_container.setMaximumHeight(16777215)
+                group_container.setVisible(True)
+
+            self.nav_btn_layout.addWidget(group_container)
 
     def toggle_sidebar_group(self, group_name, header_button):
         collapsed_groups = config.get("collapsed_groups", [])
@@ -431,19 +470,58 @@ class DataForgeApp(QMainWindow):
         else:
             collapsed_groups.append(group_name)
             is_collapsed = True
-            
+
         config.set("collapsed_groups", collapsed_groups)
-        
+
         # Update text/arrow
         is_dark = self.theme_chk.isChecked()
         theme_key = "dark" if is_dark else "light"
         color = HEADER_COLORS[theme_key].get(group_name, "#6b7280")
         header_button.setText(f"{'▶' if is_collapsed else '▼'}  {group_name.upper()}")
         header_button.setStyleSheet(f"color: {color};")
-        
-        # Show/hide buttons
-        for btn in self.group_buttons.get(group_name, []):
-            btn.setVisible(not is_collapsed)
+
+        container = self.group_containers.get(group_name)
+        if container is not None:
+            if is_collapsed:
+                container.setVisible(True)
+                self._animate_max_height(container, container.maximumHeight(), 0, restore_to=None)
+            else:
+                target = max(container.sizeHint().height(), container.minimumSizeHint().height())
+                if target <= 0:
+                    # sizeHint not yet realised — give the layout a turn
+                    container.adjustSize()
+                    target = max(container.sizeHint().height(), container.minimumSizeHint().height())
+                self._animate_max_height(
+                    container,
+                    container.maximumHeight(),
+                    target,
+                    restore_to=16777215,
+                )
+
+    def _animate_max_height(self, widget, start, end, restore_to=None):
+        """Run a ``maximumHeight`` animation on *widget*.
+
+        ``restore_to`` is the value the constraint snaps back to once the
+        animation finishes; pass ``None`` to leave the animated value in
+        place. The animation object is kept alive in
+        :attr:`_active_animations` so PyQt5 does not garbage-collect it
+        mid-flight."""
+        anim = QPropertyAnimation(widget, b"maximumHeight")
+        anim.setDuration(self.SIDEBAR_ANIM_MS)
+        anim.setEasingCurve(self.ANIM_EASING)
+        anim.setStartValue(start)
+        anim.setEndValue(end)
+        if restore_to is not None:
+            anim.finished.connect(lambda w=widget, v=restore_to: w.setMaximumHeight(v))
+        self._active_animations.append(anim)
+        anim.finished.connect(lambda a=anim: self._drop_finished_animation(a))
+        anim.start()
+
+    def _drop_finished_animation(self, anim):
+        try:
+            self._active_animations.remove(anim)
+        except ValueError:
+            pass
 
     def update_sidebar_header_colors(self):
         is_dark = self.theme_chk.isChecked()
@@ -463,14 +541,25 @@ class DataForgeApp(QMainWindow):
     def switch_view(self, title):
         if self.current_view:
             self.current_view.unmount()
-            
+
         view = self.views.get(title)
         if view:
+            same_view = (view is self.current_view)
             self.content_stack.setCurrentWidget(view)
             view.mount()
             self.current_view = view
             self.setWindowTitle(f"DataForge - {title}")
-            
+
+            # 2e.1 view crossfade — start the new view at opacity 0 and
+            # animate to 1. The first switch at startup is also faded in
+            # so the dashboard reveal is consistent with the rest of the
+            # app. ``switch_view`` is the only call that mutates the
+            # effect's opacity.
+            if not same_view:
+                effect = view.graphicsEffect()
+                if isinstance(effect, QGraphicsOpacityEffect):
+                    self._animate_opacity(effect, 0.0, 1.0)
+
             # Highlight active nav button
             for btn, btn_title in self.nav_buttons:
                 if btn_title == title:
@@ -478,6 +567,17 @@ class DataForgeApp(QMainWindow):
                     self._active_nav_btn = btn
                 else:
                     btn.setChecked(False)
+
+    def _animate_opacity(self, effect, start, end):
+        """Fade a ``QGraphicsOpacityEffect`` from *start* to *end*."""
+        anim = QPropertyAnimation(effect, b"opacity")
+        anim.setDuration(self.VIEW_ANIM_MS)
+        anim.setEasingCurve(self.ANIM_EASING)
+        anim.setStartValue(start)
+        anim.setEndValue(end)
+        self._active_animations.append(anim)
+        anim.finished.connect(lambda a=anim: self._drop_finished_animation(a))
+        anim.start()
 
 
 
