@@ -5,6 +5,7 @@ import datetime
 import os
 import re
 import shutil
+import threading
 from typing import Optional, Set
 
 from send2trash import send2trash
@@ -31,23 +32,74 @@ def normalize_path(path: str | os.PathLike | None) -> str:
     return os.path.normpath(os.path.abspath(os.path.expanduser(raw_path)))
 
 
+# -- collision handling (R-OPS-1 / R-OPS-6) ---------------------------------
+# Lock-protected single normalization of reserved_paths per batch + normcase
+# awareness for case-insensitive filesystems.  The cache maps id(reserved_paths)
+# -> set of normcased entries so the per-call cost is O(1) after the first
+# O(N) pre-normalization, achieving O(N) total for N calls instead of O(N²).
+
+_collision_lock = threading.Lock()
+_makedirs_lock = threading.Lock()
+_reserved_normcase_cache: dict[int, set[str]] = {}
+_reserved_normalized_ids: set[int] = set()
+
+
+def _ensure_reserved_normalized(reserved_paths: Set[str]) -> set[str]:
+    """Ensure *reserved_paths* is normalized and return its normcase set.
+
+    Called with ``_collision_lock`` held.  First call for a given set id
+    normalizes the set in-place (O(N) once) and builds the normcase cache;
+    subsequent calls are O(1).
+    """
+    rid = id(reserved_paths)
+    if rid not in _reserved_normalized_ids and reserved_paths:
+        # One-time O(N) normalization of whatever the caller passed in.
+        normalized = {normalize_path(p) for p in reserved_paths}
+        if normalized != reserved_paths:
+            reserved_paths.clear()
+            reserved_paths.update(normalized)
+        _reserved_normalized_ids.add(rid)
+        _reserved_normcase_cache[rid] = {os.path.normcase(p) for p in reserved_paths}
+        return _reserved_normcase_cache[rid]
+    if rid not in _reserved_normcase_cache:
+        _reserved_normcase_cache[rid] = {os.path.normcase(p) for p in reserved_paths}
+        # Mark empty sets as normalized so we don't re-check
+        if rid not in _reserved_normalized_ids:
+            _reserved_normalized_ids.add(rid)
+    return _reserved_normcase_cache[rid]
+
+
 def resolve_collision_path(destination_path: str, reserved_paths: Optional[Set[str]] = None, current_path: Optional[str] = None) -> str:
     if reserved_paths is None:
         reserved_paths = set()
     candidate = normalize_path(destination_path)
     normalized_current_path = normalize_path(current_path)
-    normalized_reserved_paths = {normalize_path(path) for path in reserved_paths}
     base_name = os.path.basename(candidate)
     folder = os.path.dirname(candidate)
     stem, extension = os.path.splitext(base_name)
     counter = 1
 
-    while candidate in normalized_reserved_paths or (os.path.exists(candidate) and candidate != normalized_current_path):
-        candidate = os.path.join(folder, f"{stem}_{counter}{extension}")
-        counter += 1
+    # normcase variants for case-insensitive FS handling (R-OPS-6/R-OPS-1)
+    candidate_normcase = os.path.normcase(candidate)
+    current_normcase = os.path.normcase(normalized_current_path) if normalized_current_path else ""
 
-    reserved_paths.add(candidate)
-    return candidate
+    with _collision_lock:
+        normcase_set = _ensure_reserved_normalized(reserved_paths)
+
+        # Use both exact and normcase membership so case-only collisions in the
+        # batch are detected on case-insensitive filesystems without O(N²) scans.
+        while (
+            candidate in reserved_paths
+            or candidate_normcase in normcase_set
+            or (os.path.exists(candidate) and candidate_normcase != current_normcase)
+        ):
+            candidate = os.path.join(folder, f"{stem}_{counter}{extension}")
+            candidate_normcase = os.path.normcase(candidate)
+            counter += 1
+
+        reserved_paths.add(candidate)
+        normcase_set.add(candidate_normcase)
+        return candidate
 
 
 def format_operation_message(result: OperationResult) -> str:
@@ -99,7 +151,21 @@ def transfer_path(
     if dry_run:
         return OperationResult(action_name, source_path, destination_path, True, message, dry_run=True)
 
-    os.makedirs(destination_dir, exist_ok=True)
+    # Lazily create destination_dir only when needed and remember if we created
+    # it so an empty dir can be pruned on failure (R-OPS-4).
+    dest_existed_before = os.path.exists(destination_dir)
+    created_here = False
+    if not dest_existed_before:
+        with _makedirs_lock:
+            # Double-check under lock
+            if not os.path.exists(destination_dir):
+                try:
+                    os.makedirs(destination_dir, exist_ok=True)
+                    created_here = True
+                except OSError:
+                    # Will surface as transfer failure below
+                    pass
+
     try:
         if action_name == "move":
             shutil.move(source_path, destination_path)
@@ -107,6 +173,13 @@ def transfer_path(
             shutil.copy2(source_path, destination_path)
         return OperationResult(action_name, source_path, destination_path, True, message)
     except OSError as exc:
+        # Prune empty destination dir that we created if transfer failed (R-OPS-4)
+        if created_here:
+            try:
+                if os.path.isdir(destination_dir) and not os.listdir(destination_dir):
+                    os.rmdir(destination_dir)
+            except OSError:
+                pass
         return OperationResult(action_name, source_path, destination_path, False, f"ERROR: Could not {action_name} {source_path}: {exc}")
 
 
