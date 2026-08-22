@@ -208,7 +208,7 @@ If a new feature starts from file discovery, it should usually build on:
 - `setup.py` only lists a minimal dependency set, while `requirements.txt` contains the full GUI/media/test toolchain. Treat `requirements.txt` as the authoritative development environment definition.
 - Some feature overlap is intentional but real: metadata cleaning exists both inside the Automations view and as a standalone plugin view (and in two different implementations — `dataforge/modules/cleaner.py::MetadataCleaner` vs `dataforge/modules/metadata.py::MetadataEngine`).
 - The Action Builder filters (`dataforge/core/actions/filters.py`) are an independent implementation of the same size/date/name filtering as `dataforge/modules/search.py::SearchQuery`; the two can drift.
-- `dataforge/core/provider.py` (`FileProvider`/`LocalProvider`) is defined but unused — dead abstraction.
+- `dataforge/core/provider.py` (`FileProvider`/`LocalProvider`) carries the TICK-002 seven-method contract (cancel/progress aware) but no active caller yet — engine integration pending.
 - Generated build output exists in-repo (`build/`, `dist/`), but it is not maintained source.
 
 Correctness and security caveats from the 2026-07-10 review are tracked in [`docs/reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md) and [`AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md). Key points: the scanner no longer follows symlinks, the cache is thread-safe, integrity/dedup default to SHA-256, and the forensic-report HTML injection (S2) is fixed. S1–S13 are **fixed** as of WS-B, including trash-restore path confinement (S4, `recovery.py:205`) and System Cleanup safeguards (S7, `system_cleanup.py:267`); residual forensic-soundness work is tracked as F1–F21 in [`FORENSIC_REVIEW.md`](./reviews/FORENSIC_REVIEW.md).

@@ -246,8 +246,8 @@ Convenience re-export module. Imports `paths` first (running the legacy migratio
 
 Shared data model definitions.
 
-- `FileEntry` dataclass — fields: `path`, `filename`, `extension`, `size`, `created_at`, `modified_at`, `is_dir` (default False), `md5`, `sha1`, `sha256` (optional).
-- Properties: `created_dt`, `modified_dt` — return `datetime.fromtimestamp()`.
+- `FileEntry` dataclass — fields: `path`, `filename`, `extension`, `size`, `created_at`, `modified_at`, `is_dir` (default False), `md5`, `sha1`, `sha256` (optional), and OS-identity fields `st_ino`, `st_dev`, `st_blocks` (default 0 = "not populated"; TICK-002).
+- Properties: `created_dt`, `modified_dt` — return `datetime.fromtimestamp()`. `hardlink_key` — returns `(st_dev, st_ino)` so downstream dedup can group hardlinks; equal pairs are the same underlying file. `st_blocks` carries allocated-block counts for sparse-file awareness.
 
 This is the shared metadata contract used across scanner, search, duplicates, organizer, services, and the action pipeline.
 
@@ -304,10 +304,11 @@ Central logging setup.
 
 #### `dataforge/core/provider.py`
 
-File-provider abstraction for future alternate backends.
+File-provider abstraction for alternate backends (TICK-002 expanded contract).
 
-- `FileProvider` (ABC) — abstract methods: `list_files`, `move`, `copy`.
-- `LocalProvider(FileProvider)` — wraps `scan_directory`, `shutil.move`, `shutil.copy2`.
+- `FileProvider` (ABC) — abstract: `list_files`, `move`, `copy`. Optional with default shims (so legacy three-method subclasses stay instantiable): `list_files_parallel` (falls back to `list_files`), `hash_many` (loops `hash`; cancelled/unreadable paths map to `""`), `exists` (via `stat`). Primitives a remote backend must supply: `stat`, `open`, `hash`. Every method takes `cancel_token: Optional[threading.Event]`; incremental ones also take `progress_callback(done, total)` (`total == -1` while unknown). Type aliases: `CancelToken`, `ProgressCallback`.
+- `LocalProvider(FileProvider)` — thin shim over `scan_directory`, `os.stat`, builtins `open`, `get_file_hash`, `shutil.move`, `shutil.copy2`.
+- `default_provider()` — returns `LocalProvider`; backend selection (image/SSH/S3) lands with the engine.
 
 Reality: this abstraction is not the primary path through the system. Most code uses `os`, `shutil`, and `scan_directory` directly.
 
@@ -983,7 +984,7 @@ All GUI bulk operations follow: dry-run preview → user confirmation → execut
 
 ### `LocalProvider` is unused infrastructure
 
-`dataforge/core/provider.py` defines `FileProvider` (ABC) and `LocalProvider`, but these are not used by any active code path. All code uses `os`, `shutil`, `scan_directory`, and `FileActionService` directly.
+`dataforge/core/provider.py` defines `FileProvider` (ABC) and `LocalProvider`, but these are not used by any active code path. All code uses `os`, `shutil`, `scan_directory`, and `FileActionService` directly. The ABC now carries the TICK-002 seven-method contract (`list_files`, `list_files_parallel`, `stat`, `open`, `hash`, `hash_many`, `exists` — cancel/progress aware) so engine tickets can adopt it without another flag day; `LocalProvider.list_files` still delegates to `scan_directory`, keeping current behavior unchanged.
 
 ## Practical Mental Model for Maintainers
 

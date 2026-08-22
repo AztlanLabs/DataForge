@@ -51,7 +51,8 @@ Action Builder (core/actions/*) is a second orchestration (pipeline) over the sa
   path: str; filename: str; extension: str; size: int
   created_at: float; modified_at: float; is_dir: bool = False
   md5/sha1/sha256: Optional[str]
-  # proposed: st_ino, st_dev, st_blocks (for hardlink/sparse awareness)
+  st_ino/st_dev/st_blocks: int = 0  # TICK-002 landed — hardlink/sparse awareness
+  hardlink_key -> (st_dev, st_ino)  # equal pairs are hardlinked
 ```
 
 ### Config (`core/config.py:16` → proposed `core/paths.py` + `CONFIG_SCHEMA_VERSION`)

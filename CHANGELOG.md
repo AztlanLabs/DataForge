@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- TICK-002: `FileProvider` ABC expanded to a seven-method, cancel/progress-aware contract (`list_files`, `list_files_parallel`, `stat`, `open`, `hash`, `hash_many`, `exists`) with `LocalProvider` as thin scanner/hasher shim and a `default_provider()` entry point
+- TICK-002: `FileEntry` OS-identity fields `st_ino`/`st_dev`/`st_blocks` (default 0) plus `hardlink_key` for hardlink grouping and sparse-file awareness
 - Commit convention enforcement via `.githooks/commit-msg`
 - Documentation maintenance rules in CONTRIBUTING.md
 - GitHub Actions CI (`.github/workflows/ci.yml`): pytest + coverage, ruff, mypy, and pip-audit on every push/PR to `develop`/`main`
