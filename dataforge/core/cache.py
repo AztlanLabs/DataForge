@@ -43,9 +43,21 @@ class CacheManager:
             parent = os.path.dirname(self.db_path)
             if parent:
                 os.makedirs(parent, exist_ok=True)
-            self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            self.conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=30.0)
             try:
                 self.conn.execute("PRAGMA journal_mode=WAL")
+            except sqlite3.Error:
+                pass
+            try:
+                self.conn.execute("PRAGMA synchronous=NORMAL")
+            except sqlite3.Error:
+                pass
+            try:
+                self.conn.execute("PRAGMA cache_size=-64000")
+            except sqlite3.Error:
+                pass
+            try:
+                self.conn.execute("PRAGMA busy_timeout=30000")
             except sqlite3.Error:
                 pass
             self.conn.execute("""
@@ -57,6 +69,12 @@ class CacheManager:
                     algo TEXT
                 )
             """)
+            try:
+                self.conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_hash_lookup ON file_hashes(algo, size, mtime)"
+                )
+            except sqlite3.Error:
+                pass
             self.conn.commit()
             try:
                 cur = self.conn.execute("PRAGMA user_version")
@@ -129,6 +147,17 @@ class CacheManager:
                 raise TypeError(f"row {idx} hash must be str, got {type(hash_val).__name__}")
             if not isinstance(algo, str):
                 raise TypeError(f"row {idx} algo must be str, got {type(algo).__name__}")
+        if not rows:
+            return None
+        try:
+            with self._lock:
+                self.conn.executemany(
+                    "INSERT OR REPLACE INTO file_hashes (path, size, mtime, hash, algo) VALUES (?, ?, ?, ?, ?)",
+                    rows,
+                )
+                self.conn.commit()
+        except sqlite3.Error as e:
+            logger.error(f"Failed to batch cache hashes: {e}")
         return None
 
     def clear(self):
