@@ -25,7 +25,7 @@ class TestBuildExeProfiles(unittest.TestCase):
         """GIVEN build_exe.py WHEN inspected THEN onedir_args function exists."""
         build_exe_path = PROJECT_ROOT / "build_exe.py"
         content = build_exe_path.read_text()
-        self.assertIn("def onedir_args()", content)
+        self.assertIn("def onedir_args(platform_name: str)", content)
 
     def test_build_exe_parse_args_includes_onedir(self):
         """GIVEN build_exe.py WHEN parse_args called THEN onedir is valid choice."""
@@ -40,7 +40,7 @@ class TestBuildExeProfiles(unittest.TestCase):
         build_exe_path = PROJECT_ROOT / "build_exe.py"
         content = build_exe_path.read_text()
         self.assertIn("elif profile == 'onedir':", content)
-        self.assertIn("args = onedir_args()", content)
+        self.assertIn("args = onedir_args(platform_name)", content)
 
     def test_build_exe_main_handles_all_profile(self):
         """GIVEN build_exe.py WHEN main called with 'all' THEN onedir included."""
@@ -48,29 +48,112 @@ class TestBuildExeProfiles(unittest.TestCase):
         content = build_exe_path.read_text()
         # Verify onedir is in the 'all' profile sequence
         all_section = content[content.index("if args.profile == 'all':"):]
-        self.assertIn("run_build('onedir')", all_section)
+        self.assertIn("run_build('onedir'", all_section)
 
     def test_onedir_args_uses_windowed_and_onedir(self):
         """GIVEN onedir_args() WHEN called THEN returns --windowed --onedir flags."""
         build_exe_path = PROJECT_ROOT / "build_exe.py"
         content = build_exe_path.read_text()
         # Find onedir_args function
-        start = content.index("def onedir_args()")
+        start = content.index("def onedir_args(platform_name: str)")
         end = content.index("\ndef ", start + 1)
         onedir_func = content[start:end]
-        self.assertIn("'--windowed'", onedir_func)
         self.assertIn("'--onedir'", onedir_func)
 
     def test_onedir_output_dir_is_onedir(self):
         """GIVEN onedir_args() WHEN called THEN dist path is 'onedir'."""
         build_exe_path = PROJECT_ROOT / "build_exe.py"
         content = build_exe_path.read_text()
-        # onedir_args uses build_common_args('onedir', 'DataForge')
+        # onedir_args uses build_common_args('onedir', 'DataForge', platform_name)
         # which sets distpath to dist/onedir
-        start = content.index("def onedir_args()")
+        start = content.index("def onedir_args(platform_name: str)")
         end = content.index("\ndef ", start + 1)
         onedir_func = content[start:end]
         self.assertIn("'onedir'", onedir_func)
+
+
+class TestBuildExePlatformSupport(unittest.TestCase):
+    """Test build_exe.py platform selection support."""
+
+    def test_build_exe_has_platform_argument(self):
+        """GIVEN build_exe.py WHEN inspected THEN --platform argument exists."""
+        build_exe_path = PROJECT_ROOT / "build_exe.py"
+        content = build_exe_path.read_text()
+        self.assertIn("'--platform'", content)
+        self.assertIn("choices=('auto', 'linux', 'windows', 'macos')", content)
+
+    def test_build_exe_has_detect_platform_function(self):
+        """GIVEN build_exe.py WHEN inspected THEN detect_platform function exists."""
+        build_exe_path = PROJECT_ROOT / "build_exe.py"
+        content = build_exe_path.read_text()
+        self.assertIn("def detect_platform()", content)
+
+    def test_build_exe_has_platform_hidden_imports(self):
+        """GIVEN build_exe.py WHEN inspected THEN platform-specific imports defined."""
+        build_exe_path = PROJECT_ROOT / "build_exe.py"
+        content = build_exe_path.read_text()
+        self.assertIn("PLATFORM_HIDDEN_IMPORTS", content)
+        self.assertIn("'windows'", content)
+        self.assertIn("'darwin'", content)
+        self.assertIn("'linux'", content)
+
+    def test_build_exe_has_platform_excludes(self):
+        """GIVEN build_exe.py WHEN inspected THEN platform-specific excludes defined."""
+        build_exe_path = PROJECT_ROOT / "build_exe.py"
+        content = build_exe_path.read_text()
+        self.assertIn("PLATFORM_EXCLUDES", content)
+
+    def test_build_exe_run_build_accepts_platform(self):
+        """GIVEN build_exe.py WHEN run_build called THEN accepts platform parameter."""
+        build_exe_path = PROJECT_ROOT / "build_exe.py"
+        content = build_exe_path.read_text()
+        self.assertIn("def run_build(profile: str, platform_name: str)", content)
+
+    def test_build_exe_main_resolves_platform(self):
+        """GIVEN build_exe.py WHEN main called THEN resolves platform from args."""
+        build_exe_path = PROJECT_ROOT / "build_exe.py"
+        content = build_exe_path.read_text()
+        main_section = content[content.index("def main()"):]
+        self.assertIn("args.platform", main_section)
+        self.assertIn("detect_platform()", main_section)
+
+    def test_build_exe_warns_on_cross_compile(self):
+        """GIVEN build_exe.py WHEN cross-platform build requested THEN warns user."""
+        build_exe_path = PROJECT_ROOT / "build_exe.py"
+        content = build_exe_path.read_text()
+        self.assertIn("cannot cross-compile", content.lower())
+
+    def test_release_args_accepts_platform(self):
+        """GIVEN release_args() WHEN called THEN accepts platform parameter."""
+        build_exe_path = PROJECT_ROOT / "build_exe.py"
+        content = build_exe_path.read_text()
+        self.assertIn("def release_args(platform_name: str)", content)
+
+    def test_onedir_args_accepts_platform(self):
+        """GIVEN onedir_args() WHEN called THEN accepts platform parameter."""
+        build_exe_path = PROJECT_ROOT / "build_exe.py"
+        content = build_exe_path.read_text()
+        self.assertIn("def onedir_args(platform_name: str)", content)
+
+    def test_debug_args_accepts_platform(self):
+        """GIVEN debug_args() WHEN called THEN accepts platform parameter."""
+        build_exe_path = PROJECT_ROOT / "build_exe.py"
+        content = build_exe_path.read_text()
+        self.assertIn("def debug_args(platform_name: str)", content)
+
+    def test_windowed_only_on_windows_macos(self):
+        """GIVEN build_exe.py WHEN inspected THEN --windowed only for Windows/macOS."""
+        build_exe_path = PROJECT_ROOT / "build_exe.py"
+        content = build_exe_path.read_text()
+        # Check that --windowed is conditionally added
+        self.assertIn("if platform_name in ('windows', 'macos')", content)
+        self.assertIn("args.append('--windowed')", content)
+
+    def test_platform_included_in_dist_path(self):
+        """GIVEN build_exe.py WHEN inspected THEN dist path includes platform."""
+        build_exe_path = PROJECT_ROOT / "build_exe.py"
+        content = build_exe_path.read_text()
+        self.assertIn("profile_name}-{platform_name}", content)
 
 
 class TestNfpmYaml(unittest.TestCase):
