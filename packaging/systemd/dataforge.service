@@ -1,0 +1,23 @@
+[Unit]
+Description=DataForge Engine
+Documentation=https://github.com/AztlanLabs/DataForge
+Requires=dataforge.socket
+After=network.target
+
+[Service]
+Type=notify
+ExecStart=/opt/dataforge/DataForge --engine
+Restart=on-failure
+RestartSec=5
+WatchdogSec=60
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+ReadWritePaths=%h/.config/DataForge %h/.cache/DataForge %h/.local/state/DataForge
+
+[Install]
+WantedBy=default.target
