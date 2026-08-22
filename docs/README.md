@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-08-22 — see [`DOCUMENTATION_AUDIT_2026-08-22.md`](./DOCUMENTATION_AUDIT_2026-08-22.md) for the full audit vs. code.
 
-> **New (principal review):** [`CONSOLIDATED_SPEC.md`](./CONSOLIDATED_SPEC.md) is the single authoritative spec (reconciles all of `docs/` + proposals + reviews). [`PARALLEL_BACKLOG.md`](./PARALLEL_BACKLOG.md) is the DAG backlog for simultaneous agents — start there if you are picking a ticket.
+> **New (principal review):** [`CONSOLIDATED_SPEC.md`](./CONSOLIDATED_SPEC.md) is the single authoritative spec (reconciles all of `docs/` + proposals + reviews). [`PARALLEL_BACKLOG.md`](./PARALLEL_BACKLOG.md) is the DAG backlog for simultaneous agents — start there if you are picking a ticket. Generic parallel-agent prompt: [`.github/prompts/parallel-ticket-agent.prompt.md`](../.github/prompts/parallel-ticket-agent.prompt.md) — copy, set `{{TICKET_ID}}`, and run (one ticket = one branch = one PR, disjoint writes per wave).
 
 ## Current truth — read these
 
@@ -52,4 +52,4 @@ Historical audits that produced the current code. Keep as records; don’t edit 
 - Proposals: `Status: PROPOSAL — not yet implemented`.
 - History: frozen dates are the record.
 
-Full audit that produced this reorganization: [`DOCUMENTATION_AUDIT_2026-08-22.md`](./DOCUMENTATION_AUDIT_2026-08-22.md).
+Full audit that produced this reorganization: [`DOCUMENTATION_AUDIT_2026-08-22.md`](./DOCUMENTATION_AUDIT_2026-08-22.md). Hardened audit fixing hallucinations, collisions, and missing contracts: [`AUDIT_HARDENED_2026-08-22.md`](./AUDIT_HARDENED_2026-08-22.md) — required reading before parallel execution.
