@@ -3,7 +3,7 @@ import os
 import sys
 from logging.handlers import RotatingFileHandler
 
-def setup_logger(name: str = "dataforge", log_file: str = None, level: int = logging.INFO):
+def setup_logger(name: str = "dataforge", log_file: str | None = None, level: int = logging.INFO):
     """
     Configure and return a standard logger.
     """
@@ -19,19 +19,32 @@ def setup_logger(name: str = "dataforge", log_file: str = None, level: int = log
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
 
-    # Console Handler
-    ch = logging.StreamHandler(sys.stdout)
+    # Console Handler — routed to stderr so CLI JSON on stdout stays clean (R-CORE-1)
+    ch = logging.StreamHandler(sys.stderr)
     ch.setLevel(level)
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
     # File Handler
     if log_file:
-        os.makedirs(os.path.dirname(log_file), exist_ok=True)
+        _dirname = os.path.dirname(log_file)
+        if _dirname:
+            os.makedirs(_dirname, exist_ok=True)
+        # Ensure file exists with 0o600 before handler opens it (handler creates file on first emit)
+        if not os.path.exists(log_file):
+            try:
+                fd = os.open(log_file, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+                os.close(fd)
+            except OSError:
+                pass
         fh = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3)
         fh.setLevel(level)
         fh.setFormatter(formatter)
         logger.addHandler(fh)
+        try:
+            os.chmod(log_file, 0o600)
+        except OSError:
+            pass
         
     return logger
 
