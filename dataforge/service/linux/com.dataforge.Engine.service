@@ -1,0 +1,24 @@
+<!-- DataForge engine D-Bus service: session bus discovery
+     Install to: ~/.local/share/dbus-1/services/com.dataforge.Engine.service
+     Or system-wide: /usr/share/dbus-1/services/com.dataforge.Engine.service
+
+     Enables: busctl call com.dataforge.Engine /com/dataforge/Engine
+              d-feet introspection of the DataForge engine interface.
+
+     The D-Bus service is a secondary discoverable transport (see NATIVE_OS_API_REVIEW.md section 2).
+     Primary local IPC is UDS (dataforge.socket): D-Bus wraps the same engine for scriptability.
+
+     See: docs/proposals/NATIVE_OS_API_REVIEW.md section 2, section 3.2
+     See: docs/proposals/INSTALL_UPGRADE_LIFECYCLE.md section 3.2
+-->
+
+<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <!-- Only the owning user's session bus -->
+  <type>session</type>
+
+  <service name="com.dataforge.Engine">
+    <executable>%h/.local/bin/dataforge-engine --dbus</executable>
+  </service>
+</busconfig>

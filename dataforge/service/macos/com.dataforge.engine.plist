@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  DataForge engine — macOS LaunchAgent plist
+
+  Install to: ~/Library/LaunchAgents/com.dataforge.engine.plist
+  Load:       launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.dataforge.engine.plist
+  Status:     launchctl list | grep dataforge
+  Unload:     launchctl bootout gui/$UID/com.dataforge.engine
+
+  Socket activation: the engine starts on first connect to the socket at
+  ~/Library/Application Support/DataForge/engine.sock (0700).
+
+  See: docs/proposals/NATIVE_OS_API_REVIEW.md §3.2
+  See: docs/proposals/INSTALL_UPGRADE_LIFECYCLE.md §3.2
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.dataforge.engine</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/dataforge-engine</string>
+        <string>--socket</string>
+        <string>/Users/USERNAME/Library/Application Support/DataForge/engine.sock</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <key>StandardOutPath</key>
+    <string>/Users/USERNAME/Library/Logs/DataForge/engine-stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/USERNAME/Library/Logs/DataForge/engine-stderr.log</string>
+
+    <key>Sockets</key>
+    <dict>
+        <key>EngineSocket</key>
+        <dict>
+            <key>SockPathName</key>
+            <string>/Users/USERNAME/Library/Application Support/DataForge/engine.sock</string>
+            <key>SockPathMode</key>
+            <integer>448</integer>
+        </dict>
+    </dict>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>DATAFORGE_ENGINE_SOCK</key>
+        <string>/Users/USERNAME/Library/Application Support/DataForge/engine.sock</string>
+    </dict>
+</dict>
+</plist>

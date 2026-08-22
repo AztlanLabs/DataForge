@@ -1,0 +1,28 @@
+# DataForge engine service — systemd user unit
+# Install to: ~/.config/systemd/user/dataforge.service
+# Enable:     systemctl --user enable --now dataforge.service
+# Status:     systemctl --user status dataforge.service
+#
+# The engine is started on demand by dataforge.socket (socket activation).
+# Restart=on-failure ensures the engine recovers from crashes.
+# RuntimeDirectory creates /run/user/$UID/dataforge/ with correct perms.
+#
+# See: docs/proposals/NATIVE_OS_API_REVIEW.md §3.2
+# See: docs/proposals/INSTALL_UPGRADE_LIFECYCLE.md §3.2
+
+[Unit]
+Description=DataForge Engine
+Documentation=https://github.com/AztlanLabs/DataForge
+After=network.target
+Requires=dataforge.socket
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/dataforge-engine --socket %t/dataforge/engine.sock --dbus
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=dataforge
+RuntimeDirectoryMode=0700
+
+[Install]
+WantedBy=default.target
