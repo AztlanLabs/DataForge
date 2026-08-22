@@ -275,10 +275,12 @@ class SettingsView(BaseView):
         d_btns_layout.setContentsMargins(0, 0, 0, 0)
 
         self.dash_add_button = QPushButton("Add Folder", d_btns)
+        self.dash_add_button.setProperty("variant", "info")
         self.dash_add_button.clicked.connect(self.add_dash_path)
         d_btns_layout.addWidget(self.dash_add_button)
 
         self.dash_remove_button = QPushButton("Remove Selected", d_btns)
+        self.dash_remove_button.setProperty("variant", "danger")
         self.dash_remove_button.clicked.connect(self.remove_dash_path)
         d_btns_layout.addWidget(self.dash_remove_button)
 

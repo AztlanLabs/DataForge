@@ -48,7 +48,6 @@ class HardwareView(BaseView):
 
         self.btn_scan = QPushButton("🔍 Run Hardware Scan", header)
         self.btn_scan.setProperty("variant", "primary")
-        self.btn_scan.setStyleSheet("font-weight: bold; padding: 8px 16px;")
         self.btn_scan.clicked.connect(self._run_scan)
         h_layout.addWidget(self.btn_scan)
 

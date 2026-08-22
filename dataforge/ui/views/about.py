@@ -41,25 +41,26 @@ class AboutView(BaseView):
         # 1. Header Banner
         banner_frame = QFrame(scroll_content)
         banner_frame.setFrameShape(QFrame.StyledPanel)
-        banner_frame.setStyleSheet(
-            "QFrame { background-color: #1e1b4b; border-radius: 8px; border: 1px solid #312e81; }"
-        )
+        banner_frame.setProperty("variant", "primary")
         banner_layout = QVBoxLayout(banner_frame)
         banner_layout.setContentsMargins(20, 20, 20, 20)
 
         lbl_app_title = QLabel("DataForge — File & System Intelligence", banner_frame)
-        lbl_app_title.setStyleSheet(f"color: #e0e7ff; font-size: {TYPE_SCALE['display']}px; font-weight: bold; background: transparent;")
+        lbl_app_title.setStyleSheet(f"font-size: {TYPE_SCALE['display']}px; font-weight: bold; background: transparent;")
+        lbl_app_title.setProperty("variant", "primary")
         banner_layout.addWidget(lbl_app_title)
 
         lbl_app_version = QLabel("Development build (release 1.0, 64-bit)", banner_frame)
-        lbl_app_version.setStyleSheet(f"color: #818cf8; font-size: {TYPE_SCALE['body']}px; background: transparent;")
+        lbl_app_version.setStyleSheet(f"font-size: {TYPE_SCALE['body']}px; background: transparent;")
+        lbl_app_version.setProperty("class", "muted")
         banner_layout.addWidget(lbl_app_version)
 
         lbl_app_desc = QLabel(
             "An all-in-one system diagnostics, file organizer, storage structures analyzer, "
             "metadata studio, and digital forensics application.", banner_frame
         )
-        lbl_app_desc.setStyleSheet(f"color: #c7d2fe; font-size: {TYPE_SCALE['body']}px; background: transparent;")
+        lbl_app_desc.setStyleSheet(f"font-size: {TYPE_SCALE['body']}px; background: transparent;")
+        lbl_app_desc.setProperty("class", "muted")
         lbl_app_desc.setWordWrap(True)
         banner_layout.addWidget(lbl_app_desc)
 

@@ -1,3 +1,5 @@
+> **Status: ✅ COMPLETED 2026-08-22 — Wave 3 DONE, verified (see docs/PARALLEL_BACKLOG.md Wave 3 Review). This ticket is closed — do not re-run.**
+
 # Ticket TICK-302 — Install service lifecycle files (systemd user service + socket, launchd plist, Windows Service)
 
 > ✅ **DONE 2026-08-22** — Merged to `develop`. Tests: `tests/test_service_lifecycle.py` 392/392 passed.
