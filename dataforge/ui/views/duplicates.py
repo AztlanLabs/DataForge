@@ -271,14 +271,17 @@ class DuplicatesView(BaseView):
         buttons_layout.setContentsMargins(0, 0, 0, 0)
         
         self.btn_copy = QPushButton("Copy Selected", action_buttons)
+        self.btn_copy.setProperty("variant", "info")
         self.btn_copy.clicked.connect(lambda: self.run_duplicate_action("copy"))
         buttons_layout.addWidget(self.btn_copy)
 
         self.btn_move = QPushButton("Move Selected", action_buttons)
+        self.btn_move.setProperty("variant", "warning")
         self.btn_move.clicked.connect(lambda: self.run_duplicate_action("move"))
         buttons_layout.addWidget(self.btn_move)
 
         self.btn_delete = QPushButton("Delete Selected", action_buttons)
+        self.btn_delete.setProperty("variant", "danger")
         self.btn_delete.clicked.connect(lambda: self.run_duplicate_action("delete"))
         buttons_layout.addWidget(self.btn_delete)
         buttons_layout.addStretch()

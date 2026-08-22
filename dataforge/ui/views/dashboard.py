@@ -38,6 +38,7 @@ class DashboardView(BaseView):
         hdr_layout.addStretch()
         
         self.btn_refresh = QPushButton("\u21BB Refresh", hdr)
+        self.btn_refresh.setProperty("variant", "info")
         self.btn_refresh.clicked.connect(self.refresh_stats)
         hdr_layout.addWidget(self.btn_refresh)
         self.main_layout.addWidget(hdr)

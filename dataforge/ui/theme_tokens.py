@@ -319,6 +319,7 @@ QPushButton[variant="danger"] {
     background-color: $danger;
     color: $text_on_semantic;
     border: none;
+    font-weight: bold;
 }
 QPushButton[variant="danger"]:hover {
     background-color: $danger_hover;
@@ -327,21 +328,25 @@ QPushButton[variant="success"] {
     background-color: $success;
     color: $text_on_semantic;
     border: none;
+    font-weight: bold;
 }
 QPushButton[variant="warning"] {
     background-color: $warning;
     color: $text_on_semantic;
     border: none;
+    font-weight: bold;
 }
 QPushButton[variant="info"] {
     background-color: $info;
     color: $text_on_semantic;
     border: none;
+    font-weight: bold;
 }
 QPushButton[variant="primary"] {
     background-color: $primary;
     color: $text_on_semantic;
     border: none;
+    font-weight: bold;
 }
 QGroupBox {
     font-weight: 600;

@@ -76,6 +76,7 @@ class PerformanceView(BaseView):
         header_layout.setContentsMargins(0, 0, 0, 5)
 
         self.btn_refresh = QPushButton("🔄 Refresh", header)
+        self.btn_refresh.setProperty("variant", "info")
         self.btn_refresh.clicked.connect(self._refresh_overview)
         header_layout.addWidget(self.btn_refresh)
 
@@ -204,10 +205,12 @@ class PerformanceView(BaseView):
         proc_header_layout.addWidget(self.sort_combo)
 
         self.btn_refresh_proc = QPushButton("🔄 Refresh", proc_header)
+        self.btn_refresh_proc.setProperty("variant", "info")
         self.btn_refresh_proc.clicked.connect(self._refresh_processes)
         proc_header_layout.addWidget(self.btn_refresh_proc)
 
         self.btn_heavy = QPushButton("🔥 Heavy Only", proc_header)
+        self.btn_heavy.setProperty("variant", "warning")
         self.btn_heavy.clicked.connect(self._show_heavy_processes)
         proc_header_layout.addWidget(self.btn_heavy)
 
@@ -255,6 +258,7 @@ class PerformanceView(BaseView):
         sh_layout.setContentsMargins(0, 0, 0, 5)
 
         self.btn_refresh_startup = QPushButton("🔄 Refresh Startup Items", startup_header)
+        self.btn_refresh_startup.setProperty("variant", "info")
         self.btn_refresh_startup.clicked.connect(self._refresh_startup)
         sh_layout.addWidget(self.btn_refresh_startup)
         sh_layout.addStretch()
@@ -290,6 +294,7 @@ class PerformanceView(BaseView):
         hh_layout.setContentsMargins(0, 0, 0, 5)
 
         self.btn_refresh_health = QPushButton("🔄 Check Disk Health", health_header)
+        self.btn_refresh_health.setProperty("variant", "info")
         self.btn_refresh_health.clicked.connect(self._refresh_disk_health)
         hh_layout.addWidget(self.btn_refresh_health)
         hh_layout.addStretch()

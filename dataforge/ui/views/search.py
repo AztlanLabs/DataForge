@@ -160,6 +160,7 @@ Once files are found, use the 'Bulk Actions' card to:
         grep_layout.addWidget(self.lbl_results_slice)
         
         self.btn_search = QPushButton("Search", frame_grep)
+        self.btn_search.setProperty("variant", "primary")
         self.btn_search.clicked.connect(self.start_search)
         grep_layout.addWidget(self.btn_search)
         ctrl_layout.addWidget(frame_grep)
@@ -277,6 +278,7 @@ Once files are found, use the 'Bulk Actions' card to:
         ren_layout.addWidget(self.entry_ren_repl)
         
         self.btn_rename = QPushButton("Rename All Matches", f_ren)
+        self.btn_rename.setProperty("variant", "warning")
         self.btn_rename.clicked.connect(self.bulk_rename)
         ren_layout.addWidget(self.btn_rename)
         
@@ -301,10 +303,12 @@ Once files are found, use the 'Bulk Actions' card to:
         zip_layout.addWidget(self.zip_comp_combo)
         
         self.btn_zip_sel = QPushButton("Zip Selected", f_zip)
+        self.btn_zip_sel.setProperty("variant", "info")
         self.btn_zip_sel.clicked.connect(lambda: self.archive_files('selected'))
         zip_layout.addWidget(self.btn_zip_sel)
         
         self.btn_zip_all = QPushButton("Zip All Found", f_zip)
+        self.btn_zip_all.setProperty("variant", "info")
         self.btn_zip_all.clicked.connect(lambda: self.archive_files('all'))
         zip_layout.addWidget(self.btn_zip_all)
         
