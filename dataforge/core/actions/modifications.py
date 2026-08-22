@@ -55,7 +55,8 @@ class MetaCleanStep(ActionStep):
             if context.should_cancel(): return
             
             if not context.is_dry_run:
-                if MetadataCleaner.remove_metadata(f.path):
+                result = MetadataCleaner.remove_metadata(f.path)
+                if result.get("success", False):
                     context.log(f.path, "Clean Metadata", "Cleaned")
                 else:
                     context.log(f.path, "Clean Metadata", "Skipped/Failed")

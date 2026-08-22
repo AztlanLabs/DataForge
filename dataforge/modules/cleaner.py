@@ -1,6 +1,7 @@
 import os
 from PIL import Image
 from ..core.logger import logger
+from .metadata import MetadataEngine
 
 Image.MAX_IMAGE_PIXELS = 100_000_000
 
@@ -74,66 +75,7 @@ class MetadataCleaner:
     def remove_metadata(path, dry_run=False):
         """
         Removes metadata from file.
-        Returns success: bool
+        Delegates to MetadataEngine.remove_metadata.
+        Returns dict with 'success' key (bool) and 'message' key (str).
         """
-        try:
-            ext = os.path.splitext(path)[1].lower()
-            if ext in ['.jpg', '.jpeg', '.png', '.tiff', '.webp']:
-                if dry_run:
-                    return True
-
-                with Image.open(path) as img:
-                    # Force load data to avoid lazy loading issues
-                    img.load()
-                    
-                    # Create a clean copy by converting to same mode (strips most info)
-                    # For strict cleaning, we create a new image.
-                    clean_img = Image.new(img.mode, img.size)
-                    clean_img.paste(img)
-                    
-                    # Clear info dict (important for PNG chunks)
-                    clean_img.info = {}
-                    
-                    head, tail = os.path.split(path)
-                    temp_path = os.path.join(head, "tmp_clean_" + tail)
-                    
-                    save_kwargs = {}
-                    if ext in ['.jpg', '.jpeg']:
-                         save_kwargs['quality'] = 100
-                         save_kwargs['subsampling'] = 0
-                         save_kwargs['exif'] = b"" # Explicitly drop EXIF
-                         
-                    clean_img.save(temp_path, **save_kwargs)
-                    
-                os.replace(temp_path, path)
-                return True
-            
-            elif ext == '.pdf':
-                if dry_run:
-                    return True
-
-                from pypdf import PdfReader, PdfWriter
-                reader = PdfReader(path)
-                writer = PdfWriter()
-                
-                # Copy pages
-                for page in reader.pages:
-                    writer.add_page(page)
-                    
-                # Clear metadata
-                writer.add_metadata({})
-                
-                head, tail = os.path.split(path)
-                temp_path = os.path.join(head, "tmp_clean_" + tail)
-                
-                with open(temp_path, "wb") as f:
-                    writer.write(f)
-                    
-                os.replace(temp_path, path)
-                return True
-
-        except Exception as e:
-            logger.error(f"Failed to clean {path}: {e}")
-            return False
-
-        return False
+        return MetadataEngine.remove_metadata(path, dry_run=dry_run)

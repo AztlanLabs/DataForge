@@ -247,7 +247,8 @@ class MetadataCleanerPlugin(BaseView):
             if cancel_token and cancel_token.is_set():
                 return {"cancelled": True, "cleaned": cleaned, "failed": failed}
 
-            if MetadataCleaner.remove_metadata(target["path"]):
+            result = MetadataCleaner.remove_metadata(target["path"])
+            if result.get("success", False):
                 cleaned.append(target)
             else:
                 failed.append(target)
