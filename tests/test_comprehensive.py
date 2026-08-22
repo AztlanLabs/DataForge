@@ -1127,7 +1127,8 @@ class TestMetadataCleaner(unittest.TestCase):
             path = f.name
         try:
             result = MetadataCleaner.remove_metadata(path)
-            self.assertFalse(result)
+            self.assertIsInstance(result, dict)
+            self.assertFalse(result.get("success", False))
         finally:
             os.unlink(path)
 
@@ -1139,7 +1140,8 @@ class TestMetadataCleaner(unittest.TestCase):
 
             result = MetadataCleaner.remove_metadata(str(path), dry_run=True)
 
-            self.assertTrue(result)
+            self.assertIsInstance(result, dict)
+            self.assertTrue(result.get("success", False))
             self.assertTrue(path.exists())
 
 
