@@ -6,7 +6,6 @@ redundant logs, and browser artifacts for storage reclamation.
 """
 import os
 import platform
-import glob
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -209,6 +208,9 @@ def scan_junk_files(
     """
     Scan for junk/temporary files across system directories.
 
+    Walks each unique directory once (O(categories) not O(categories×patterns))
+    and classifies entries into categories by path matching.
+
     Args:
         paths: Optional list of additional paths to scan.
         categories: Optional list of category names to include (None = all).
@@ -225,77 +227,111 @@ def scan_junk_files(
     if categories:
         platform_paths = {k: v for k, v in platform_paths.items() if k in categories}
 
-    results = {}
     cutoff_time = None
     if min_age_days > 0:
         cutoff_time = (datetime.now() - timedelta(days=min_age_days)).timestamp()
 
-    all_categories = list(platform_paths.keys())
-    total_categories = len(all_categories)
+    now_ts = datetime.now().timestamp()
+    one_day_ts = timedelta(days=1).total_seconds()
 
-    for idx, category in enumerate(all_categories):
+    # Build mapping: unique_dir -> list of (category, is_user_path, is_sys_temp)
+    dir_category_map: dict[str, list[tuple[str, bool, bool]]] = {}
+    user_supplied = set()
+
+    for category, cat_dirs in platform_paths.items():
+        for scan_dir in cat_dirs:
+            if scan_dir not in dir_category_map:
+                dir_category_map[scan_dir] = []
+            dir_category_map[scan_dir].append((category, False, False))
+
+    # User paths are associated with the first category (preserving original behavior)
+    first_category = next(iter(platform_paths), None)
+    if paths and first_category:
+        for p in paths:
+            user_supplied.add(p)
+            if p not in dir_category_map:
+                dir_category_map[p] = []
+            dir_category_map[p].append((first_category, True, False))
+
+    # Walk each unique directory once, collect entries with their dir context
+    dir_entries: dict[str, list] = {}
+    unique_dirs = list(dir_category_map.keys())
+    total_dirs = len(unique_dirs)
+
+    for idx, scan_dir in enumerate(unique_dirs):
         if cancel_token and cancel_token.is_set():
             break
 
         if progress_callback:
-            progress_callback(idx, total_categories, f"Scanning: {category}")
+            progress_callback(idx, total_dirs, f"Scanning: {scan_dir}")
 
-        category_files = []
-        scan_dirs = list(platform_paths[category])
-        user_supplied = set()
+        if not os.path.isdir(scan_dir):
+            continue
 
-        if paths and idx == 0:
-            for p in paths:
-                scan_dirs.append(p)
-                user_supplied.add(p)
+        entries = []
+        try:
+            for entry in scan_directory(scan_dir, recursive=True, max_depth=5, cancel_token=cancel_token):
+                if entry.is_dir:
+                    continue
+                if _is_socket_or_fifo(entry.path):
+                    continue
+                entries.append(entry)
+        except (PermissionError, OSError) as exc:
+            logger.debug(f"Cannot scan {scan_dir}: {exc}")
 
-        for scan_dir in scan_dirs:
-            if cancel_token and cancel_token.is_set():
-                break
+        if entries:
+            dir_entries[scan_dir] = entries
 
-            if not os.path.isdir(scan_dir):
+    # Classify entries into categories
+    results: dict[str, list] = {}
+
+    for scan_dir, entries in dir_entries.items():
+        if cancel_token and cancel_token.is_set():
+            break
+
+        dir_contexts = dir_category_map.get(scan_dir, [])
+        is_user_path = any(ctx[1] for ctx in dir_contexts)
+        is_sys_temp = any(
+            _is_under_system_temp(scan_dir) and not ctx[1] for ctx in dir_contexts
+        )
+
+        for entry in entries:
+            if cutoff_time and entry.modified_at > cutoff_time:
                 continue
 
-            is_user_path = scan_dir in user_supplied
-            is_sys_temp = _is_under_system_temp(scan_dir) and not is_user_path
+            if is_sys_temp and entry.modified_at > (now_ts - one_day_ts):
+                continue
 
-            try:
-                for entry in scan_directory(scan_dir, recursive=True, max_depth=5, cancel_token=cancel_token):
-                    if entry.is_dir:
-                        continue
+            if is_user_path:
+                is_junk = (
+                    entry.extension.lower() in JUNK_EXTENSIONS
+                    or entry.filename.lower() in JUNK_FILENAMES
+                )
+            else:
+                is_junk = (
+                    entry.extension.lower() in JUNK_EXTENSIONS
+                    or entry.filename.lower() in JUNK_FILENAMES
+                )
 
-                    if _is_socket_or_fifo(entry.path):
-                        continue
-
-                    if cutoff_time and entry.modified_at > cutoff_time:
-                        continue
-
-                    if is_sys_temp:
-                        if entry.modified_at > (datetime.now() - timedelta(days=1)).timestamp():
-                            continue
-
+            if is_junk:
+                for category, _, _ in dir_contexts:
+                    # For non-user paths, only add to categories where
+                    # the category type accepts all files (System Temp, etc.)
                     if is_user_path:
-                        is_junk = (
-                            entry.extension.lower() in JUNK_EXTENSIONS
-                            or entry.filename.lower() in JUNK_FILENAMES
-                        )
-                    else:
-                        is_junk = (
-                            entry.extension.lower() in JUNK_EXTENSIONS
-                            or entry.filename.lower() in JUNK_FILENAMES
-                            or category in ("System Temp", "User Cache", "Thumbnails", "Trash", "Crash Reports")
-                        )
-
-                    if is_junk:
-                        category_files.append(entry)
-            except (PermissionError, OSError) as exc:
-                logger.debug(f"Cannot scan {scan_dir}: {exc}")
-
-        if category_files:
-            results[category] = category_files
+                        results.setdefault(category, []).append(entry)
+                    elif category in (
+                        "System Temp",
+                        "User Cache",
+                        "Thumbnails",
+                        "Trash",
+                        "Crash Reports",
+                    ):
+                        results.setdefault(category, []).append(entry)
+                    elif is_junk:
+                        results.setdefault(category, []).append(entry)
 
     if progress_callback:
-        progress_callback(total_categories, total_categories, "Scan complete")
+        progress_callback(total_dirs, total_dirs, "Scan complete")
 
     return results
 
@@ -307,6 +343,9 @@ def scan_browser_artifacts(
 ):
     """
     Detect browser tracking artifacts (cookies, history, cache, sessions).
+
+    Walks each browser profile once (O(profiles) not O(profiles×patterns))
+    and matches all artifact patterns against collected entries.
 
     Args:
         browsers: Optional list of browser names to scan (None = all detected).
@@ -339,36 +378,41 @@ def scan_browser_artifacts(
         if not os.path.isdir(base_path) and not os.path.isdir(cache_path):
             continue
 
-        browser_artifacts = {}
+        # Collect all entries from both base and cache paths in one walk each
+        all_entries: list[str] = []
+        for search_base in [base_path, cache_path]:
+            if not os.path.isdir(search_base):
+                continue
+            try:
+                for entry in scan_directory(
+                    search_base, recursive=True, max_depth=4, cancel_token=cancel_token
+                ):
+                    all_entries.append(entry.path)
+            except (PermissionError, OSError):
+                pass
+
+        if not all_entries:
+            continue
+
+        # Match all artifact patterns against collected entries
+        browser_artifacts: dict[str, list[str]] = {}
 
         for artifact_type, patterns in BROWSER_ARTIFACT_PATTERNS.items():
-            found_paths = []
+            found_paths: list[str] = []
 
-            for search_base in [base_path, cache_path]:
-                if not os.path.isdir(search_base):
-                    continue
+            for pattern in patterns:
+                if "*" in pattern:
+                    # Glob pattern: match against collected entry paths
+                    import fnmatch
 
-                for pattern in patterns:
-                    if "*" in pattern:
-                        # Glob pattern
-                        for match in glob.glob(os.path.join(search_base, "**", pattern), recursive=True):
-                            if os.path.exists(match):
-                                found_paths.append(match)
-                    else:
-                        # Walk and find exact name matches
-                        try:
-                            for root, dirs, files in os.walk(search_base):
-                                # Limit depth to 4 levels
-                                depth = root[len(search_base):].count(os.sep)
-                                if depth > 4:
-                                    dirs.clear()
-                                    continue
-
-                                for name in files + dirs:
-                                    if name == pattern:
-                                        found_paths.append(os.path.join(root, name))
-                        except (PermissionError, OSError):
-                            pass
+                    for entry_path in all_entries:
+                        if fnmatch.fnmatch(os.path.basename(entry_path), pattern):
+                            found_paths.append(entry_path)
+                else:
+                    # Exact name match: check basename of collected entries
+                    for entry_path in all_entries:
+                        if os.path.basename(entry_path) == pattern:
+                            found_paths.append(entry_path)
 
             if found_paths:
                 browser_artifacts[artifact_type] = sorted(set(found_paths))
