@@ -94,7 +94,6 @@ class MetadataView(BaseView):
             QPushButton, text="SCAN METADATA",
         )
         self.btn_scan.setProperty("variant", "primary")
-        self.btn_scan.setStyleSheet("font-weight: bold;")
         self.btn_scan.clicked.connect(self._start_scan)
 
         self.lbl_scan_summary = QLabel("No metadata scan run yet.", c_body)
@@ -223,6 +222,7 @@ class MetadataView(BaseView):
         action_layout.addWidget(self.btn_strip_all)
 
         self.btn_strip_gps = QPushButton("📍 Strip GPS Only", action_frame)
+        self.btn_strip_gps.setProperty("variant", "warning")
         self.btn_strip_gps.clicked.connect(self._strip_gps_selected)
         action_layout.addWidget(self.btn_strip_gps)
 
@@ -237,11 +237,13 @@ class MetadataView(BaseView):
         self.edit_value.setMaximumWidth(150)
         action_layout.addWidget(self.edit_value)
         self.btn_edit = QPushButton("✏️ Write", action_frame)
+        self.btn_edit.setProperty("variant", "info")
         self.btn_edit.clicked.connect(self._write_field)
         action_layout.addWidget(self.btn_edit)
 
         # Export
         self.btn_export = QPushButton("💾 Export Report", action_frame)
+        self.btn_export.setProperty("variant", "info")
         self.btn_export.clicked.connect(self._export_metadata)
         action_layout.addWidget(self.btn_export)
 

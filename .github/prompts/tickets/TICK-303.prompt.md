@@ -1,3 +1,5 @@
+> **Status: ✅ COMPLETED 2026-08-22 — Wave 3 DONE, verified (see docs/PARALLEL_BACKLOG.md Wave 3 Review). This ticket is closed — do not re-run.**
+
 # Ticket TICK-303 — Produce onefile (portable) + onedir (package) + nfpm deb/rpm
 
 > **Wave 3** | **Domain:** Build / Packaging | **Depends on:** "TICK-001"

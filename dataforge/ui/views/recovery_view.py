@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 
 from .base import BaseView
-from ..theme_tokens import TOKENS, TYPE_SCALE
+from ..theme_tokens import TYPE_SCALE
 from .. import dialogs
 from ..widgets import EnhancedTreeview, CollapsibleCard, attach_tooltips, FilePreviewPanel
 from ...core.utils import format_size
@@ -81,7 +81,6 @@ class RecoveryView(BaseView):
             QPushButton, text="SCAN TRASH",
         )
         self.btn_scan_trash.setProperty("variant", "success")
-        self.btn_scan_trash.setStyleSheet("font-weight: bold;")
         self.btn_scan_trash.clicked.connect(self._start_trash_scan)
 
         # Summary bar
@@ -90,7 +89,8 @@ class RecoveryView(BaseView):
         sf_layout = QHBoxLayout(summary_frame)
         sf_layout.setContentsMargins(10, 8, 10, 8)
         self.lbl_trash_count = QLabel("Files in trash: —")
-        self.lbl_trash_count.setStyleSheet(f"font-size: {TYPE_SCALE['subheading']}px; font-weight: bold; color: {TOKENS['light']['accent_focus']};")
+        self.lbl_trash_count.setProperty("variant", "primary")
+        self.lbl_trash_count.setStyleSheet(f"font-size: {TYPE_SCALE['subheading']}px; font-weight: bold;")
         sf_layout.addWidget(self.lbl_trash_count)
         self.lbl_trash_size = QLabel("Total size: —")
         self.lbl_trash_size.setProperty("class", "muted")
@@ -133,11 +133,11 @@ class RecoveryView(BaseView):
 
         self.btn_restore_selected = QPushButton("♻️ Restore Selected", trash_actions)
         self.btn_restore_selected.setProperty("variant", "success")
-        self.btn_restore_selected.setStyleSheet("font-weight: bold;")
         self.btn_restore_selected.clicked.connect(self._restore_selected)
         ta_layout.addWidget(self.btn_restore_selected)
 
         self.btn_restore_all = QPushButton("♻️ Restore All", trash_actions)
+        self.btn_restore_all.setProperty("variant", "success")
         self.btn_restore_all.clicked.connect(self._restore_all)
         ta_layout.addWidget(self.btn_restore_all)
 
@@ -222,7 +222,6 @@ class RecoveryView(BaseView):
 
         self.btn_carve = QPushButton("🔍 Carve Files (Built-in)", btn_frame)
         self.btn_carve.setProperty("variant", "warning")
-        self.btn_carve.setStyleSheet("font-weight: bold;")
         self.btn_carve.clicked.connect(self._start_carve)
         btn_layout.addWidget(self.btn_carve)
 
@@ -230,7 +229,6 @@ class RecoveryView(BaseView):
         photorec_available = check_photorec_available()
         if photorec_available:
             self.btn_photorec.setProperty("variant", "primary")
-            self.btn_photorec.setStyleSheet("font-weight: bold;")
         else:
             self.btn_photorec.setEnabled(False)
             self.btn_photorec.setToolTip("photorec not installed. Install testdisk: sudo apt install testdisk")

@@ -48,11 +48,11 @@ class StorageDevicesView(BaseView):
 
         self.btn_refresh = QPushButton("\U0001f504 Refresh", header)
         self.btn_refresh.setProperty("variant", "primary")
-        self.btn_refresh.setStyleSheet("font-weight: bold; padding: 6px 14px;")
         self.btn_refresh.clicked.connect(self._refresh)
         h_layout.addWidget(self.btn_refresh)
 
         self.btn_details = QPushButton("\U0001f4c4 Show Details", header)
+        self.btn_details.setProperty("variant", "info")
         self.btn_details.clicked.connect(self._show_details)
         h_layout.addWidget(self.btn_details)
 

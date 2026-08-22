@@ -96,12 +96,14 @@ TOKENS: dict[str, dict[str, str]] = {
         "text_on_semantic":   "#ffffff",
 
         # --- Checkbox / spinbox / combo indicators ---
-        "indicator_border":   "#d1d5db",
-        "indicator_bg":       "#ffffff",
-        "indicator_accent":   "#3b82f6",
-        "indicator_btn_bg":   "#ffffff",
-        "indicator_arrow":    "#374151",
-        "indicator_disabled": "#f3f4f6",
+        "indicator_border":       "#d1d5db",
+        "indicator_bg":           "#ffffff",
+        "indicator_hover_bg":     "#f0f4ff",
+        "indicator_accent":       "#3b82f6",
+        "indicator_accent_hover": "#2563eb",
+        "indicator_btn_bg":       "#ffffff",
+        "indicator_arrow":        "#374151",
+        "indicator_disabled":     "#f3f4f6",
 
         # --- Palette (QPalette values) ---
         "pal_window":          "#f3f4f6",
@@ -167,12 +169,14 @@ TOKENS: dict[str, dict[str, str]] = {
         "text_on_semantic":   "#1c1c20",
 
         # --- Checkbox / spinbox / combo indicators ---
-        "indicator_border":   "#3f3f46",
-        "indicator_bg":       "#242429",
-        "indicator_accent":   "#6366f1",
-        "indicator_btn_bg":   "#1f1f23",
-        "indicator_arrow":    "#e2e8f0",
-        "indicator_disabled": "#1c1c20",
+        "indicator_border":       "#3f3f46",
+        "indicator_bg":           "#242429",
+        "indicator_hover_bg":     "#2a2a30",
+        "indicator_accent":       "#6366f1",
+        "indicator_accent_hover": "#818cf8",
+        "indicator_btn_bg":       "#1f1f23",
+        "indicator_arrow":        "#e2e8f0",
+        "indicator_disabled":     "#1c1c20",
 
         # --- Palette (QPalette values) ---
         "pal_window":          "#1c1c20",
@@ -319,6 +323,7 @@ QPushButton[variant="danger"] {
     background-color: $danger;
     color: $text_on_semantic;
     border: none;
+    font-weight: bold;
 }
 QPushButton[variant="danger"]:hover {
     background-color: $danger_hover;
@@ -327,21 +332,25 @@ QPushButton[variant="success"] {
     background-color: $success;
     color: $text_on_semantic;
     border: none;
+    font-weight: bold;
 }
 QPushButton[variant="warning"] {
     background-color: $warning;
     color: $text_on_semantic;
     border: none;
+    font-weight: bold;
 }
 QPushButton[variant="info"] {
     background-color: $info;
     color: $text_on_semantic;
     border: none;
+    font-weight: bold;
 }
 QPushButton[variant="primary"] {
     background-color: $primary;
     color: $text_on_semantic;
     border: none;
+    font-weight: bold;
 }
 QGroupBox {
     font-weight: 600;
@@ -538,39 +547,45 @@ QCheckBox {
     spacing: 8px;
 }
 QCheckBox:focus {
-    /* 2e.4 — focus ring on the label area (the box itself gets the
-       accent border when focused via the indicator below). */
     outline: none;
 }
 QCheckBox::indicator {
-    width: 16px;
-    height: 16px;
-    border: 1px solid $indicator_border;
-    border-radius: 3px;
+    width: 18px;
+    height: 18px;
+    border: 2px solid $indicator_border;
+    border-radius: 4px;
     background-color: $indicator_bg;
 }
 QCheckBox::indicator:hover {
     border-color: $indicator_accent;
+    background-color: $indicator_hover_bg;
 }
 QCheckBox::indicator:checked {
     background-color: $indicator_accent;
     border-color: $indicator_accent;
     image: url(data:image/svg+xml;base64,$check_svg_b64);
 }
+QCheckBox::indicator:checked:hover {
+    background-color: $indicator_accent_hover;
+    border-color: $indicator_accent_hover;
+}
 QCheckBox::indicator:disabled {
     background-color: $indicator_disabled;
     border-color: $indicator_border;
+    opacity: 0.6;
+}
+QCheckBox:disabled {
+    color: $text_muted;
 }
 QCheckBox:focus::indicator {
-    border: 2px solid $focus_ring;
-    /* keep the 16px box stable by compensating for the 1px→2px border */
-    width: 14px;
-    height: 14px;
+    border-color: $focus_ring;
+    outline: 2px solid $focus_ring;
+    outline-offset: 1px;
 }
 QSpinBox::up-button, QSpinBox::down-button {
     background-color: $indicator_btn_bg;
     border: 1px solid $indicator_border;
-    width: 16px;
+    width: 18px;
 }
 QSpinBox::up-button {
     subcontrol-origin: border;
@@ -598,7 +613,7 @@ QSpinBox::down-arrow {
 QComboBox::drop-down {
     subcontrol-origin: padding;
     subcontrol-position: top right;
-    width: 20px;
+    width: 22px;
     border-left: 1px solid $indicator_border;
     border-top-right-radius: 6px;
     border-bottom-right-radius: 6px;
@@ -606,6 +621,7 @@ QComboBox::drop-down {
 }
 QComboBox::drop-down:hover {
     border-left-color: $indicator_accent;
+    background-color: $indicator_hover_bg;
 }
 QComboBox::down-arrow {
     width: 10px;
@@ -620,7 +636,7 @@ QComboBox::down-arrow {
 
 def _build_indicator_qss(tokens: dict[str, str]) -> str:
     """Build the checkbox/spinbox/combo indicator rules from tokens + inline-SVG glyphs."""
-    check_svg = _stroke_svg_b64("M3 8.5l3 3 7-7", "#ffffff")
+    check_svg = _stroke_svg_b64("M4 8.5l2.5 2.5L12 6", "#ffffff")
     up_arrow_svg = _fill_svg_b64("M4 10l4-5 4 5z", tokens["indicator_arrow"])
     down_arrow_svg = _fill_svg_b64("M4 6l4 5 4-5z", tokens["indicator_arrow"])
     return _INDICATOR_TEMPLATE.substitute(

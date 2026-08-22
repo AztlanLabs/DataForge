@@ -1,3 +1,5 @@
+> **Status: ✅ COMPLETED 2026-08-22 — Wave 3 DONE, verified (see docs/PARALLEL_BACKLOG.md Wave 3 Review). This ticket is closed — do not re-run.**
+
 # Ticket TICK-302 — Install service lifecycle files (systemd user service + socket, launchd plist, Windows Service)
 
 > **Wave 3** | **Domain:** Service / Lifecycle | **Depends on:** "TICK-301"
