@@ -23,7 +23,7 @@ The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5**, and new modules (ha
 | **🔍 Go deep into data** | Forensic file carving, GPS metadata stripping, disk SMART health, password strength analysis, trash recovery — extract what's hidden |
 | **⚡ Unified interface** | Terminal and desktop — shared core where applicable, with GUI-only features (Action Builder, media tools) called out — no tool switching |
 | **🧩 Extensible** | Action Builder pipeline for custom multi-step workflows; plugin system for custom views; scriptable CLI — build your own workflows |
-| **🛡️ Production-ready** | 340 passing tests, thread-safe batch operations, dry-run previews, cancellation support, detailed logging — trust the tool |
+| **🛡️ Production-ready** | 723 passing tests, thread-safe batch operations, dry-run previews, cancellation support, detailed logging — trust the tool |
 | **🚀 Automation at scale** | Parallel hashing, batch operations on thousands of files, configurable worker threads, progress tracking, cancellation — process like a pro |
 | **🔐 Enterprise features** | Detail level (Simple/Standard/Everything), audit logging, integrity verification, forensic reports — audit-ready |
 
@@ -76,7 +76,7 @@ The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5**, and new modules (ha
 | **Cache** | `~/.dataforge/cache.db` (SQLite hash cache, thread-safe with WAL, parallel hashing) |
 | **Logging** | `~/.dataforge/app.log` (rotating, 5 MB / 3 backups, full audit trail) |
 | **Architecture** | Layered: core primitives → operations → service layer → modules → GUI/CLI orchestration (shared logic, zero duplication) |
-| **Tests** | 340 passing (`pytest`, full coverage across all feature layers, production-grade quality) |
+| **Tests** | 723 passing (`pytest`, full coverage across all feature layers, production-grade quality) |
 | **Build** | `pyproject.toml` (CLI/core packaging), `build_exe.py` (PyInstaller → standalone desktop bundles, one-file release mode) |
 
 ## Quick Start
@@ -118,10 +118,10 @@ PYTHONPATH=. python -m dataforge.cli --help
 ### Verify the Build
 
 ```bash
-PYTHONPATH=. pytest -q  # 340 tests pass
+PYTHONPATH=. pytest -q  # 723 tests pass
 ```
 
-Full test suite passes — 340 tests. All correctness fixes are verified. See [`docs/reviews/AUDIT_REPORT.md`](./docs/reviews/AUDIT_REPORT.md) and [`docs/reviews/AUDIT_REPORT.md`](./docs/reviews/AUDIT_REPORT.md) for the full audit.
+Full test suite passes — 723 tests. All correctness fixes are verified. See [`docs/reviews/AUDIT_REPORT.md`](./docs/reviews/AUDIT_REPORT.md) and [`docs/reviews/FORENSIC_REVIEW.md`](./docs/reviews/FORENSIC_REVIEW.md) for the full audit.
 
 ### Build desktop executables
 
@@ -191,7 +191,7 @@ python build_exe.py debug
 | **`dataforge/ui/views/`** | Dashboard, Search, Duplicates, Media Tools, Metadata & EXIF, Automations (Action Builder + Tools), Clean Up Space, Storage & Devices, Performance, File Recovery, Forensics, Hardware Info, Settings, About & Help |
 | **`dataforge/ui/resources/icons.py`** | 18 stroke-only monochrome SVGs (sidebar icons, expand/collapse chevrons, sun/moon theme toggle) — 2e.7 |
 | **`dataforge/ui/plugins/`** | Plugin system; bundled example: Metadata Cleaner plugin |
-| **`tests/`** | 340 passing tests: comprehensive, integration, contract, new-modules suites, token-regression guard |
+| **`tests/`** | 723 passing tests: comprehensive, integration, contract, new-modules suites, token-regression guard |
 | **`docs/`** | Architecture, CLI reference, GUI workflows, development guide, audit reviews |
 | **`build/`, `dist/`** | Generated build artifacts (output only, not maintained source) |
 
@@ -236,17 +236,19 @@ The **two user interfaces are thin adapters** — all the real superpowers live 
 
 ### ✅ Fixed in the 2026-07-10 Audit Pass
 
-- **Correctness** — 340 tests pass. All correctness bugs fixed: MD5→SHA-256 defaults, symlink-loop scope escape, thread-safe cache, JSON error handling, SHA-512 crash, etc.
+- **Correctness** — 723 tests pass. All correctness bugs fixed: MD5→SHA-256 defaults, symlink-loop scope escape, thread-safe cache, JSON error handling, SHA-512 crash, etc.
 - **UI/UX overhaul** — Phase 2a/2b/2c/2d/2e shipped: surface brightness fix, themed checkboxes/combos, design-token module (`ui/theme_tokens.py`) with AA-validated colours replacing three legacy colour vocabularies, type-scale constants, per-widget colour migration, file-vs-folder riddle removed (2c.1), settings autosave (2c.2), dark-mode dedup (2c.3), progressive disclosure (2c.4), destructive checklist (2c.5), named busy task (2c.6), rich help (2c.7), task-oriented sidebar (2d.1), Automations merge (2d.2), label renames (2d.3), `fm devices` GUI (2d.4), stray-name sweep (2d.5), animated sidebar/view transitions (2e.1), native indeterminate `QProgressBar` busy indicator (2e.2), Reduce motion setting (2e.3), `focus_ring` token + `:focus` QSS for every interactive widget (2e.4), purposeful `EmptyState` + `friendly_error_message` (2e.5), screen-reader `accessibleName`/`accessibleDescription` + colour-blind `⚠` glyph on destructive Proceed (2e.6), and an 18-icon monochrome SVG sidebar set (2e.7).
-- **Security findings** — S1–S13 are all fixed. The residual forensic-soundness work (chain-of-custody, Evidence Mode, provenance, UTC timestamps) lives in [`FORENSIC_REVIEW.md`](./docs/reviews/FORENSIC_REVIEW.md) and is the v0.2.0 WS-H / v0.3.0 WS-I/WS-J backlog.
-- **Documentation** — ARCHITECTURE, CLI_REFERENCE, GUI_WORKFLOWS, DEVELOPMENT_GUIDE, TECHNICAL_SOURCE_OF_TRUTH all verified against current PyQt5 source (2026-07-12 pass; post-WS-E pass updated the 2e cross-references and added the new `dataforge/ui/resources/icons.py` file map).
-- **Packaging** — pyproject.toml and build_exe.py verified; release bundle working.
+- **Security findings** — S1–S13 are all fixed. R-CORE-1, R-OPS-1/2/3/4 are fixed. Forensic-soundness findings F1–F3/U2/F9 are fixed (hash-chained audit log, CaseContext, Evidence Mode, UTC provenance). Residual work (F4/F21 `secure_delete` move, F13 parser isolation) is in [`FORENSIC_REVIEW.md`](./docs/reviews/FORENSIC_REVIEW.md).
+- **Engine & packaging** — Wave 0–3 of the parallel backlog complete (23/25 tickets): canonical paths, FileProvider ABC, API schemas, parallel scanner/hasher/cache, streaming modules, parallel batch ops, UDS/Named Pipe transports, daemon+client integration, systemd/launchd/Windows lifecycle, nfpm deb/rpm packaging, audit log + Evidence Mode.
+- **Documentation** — ARCHITECTURE, CLI_REFERENCE, GUI_WORKFLOWS, DEVELOPMENT_GUIDE, TECHNICAL_SOURCE_OF_TRUTH all verified against current source.
+- **Packaging** — pyproject.toml and build_exe.py verified; onefile+onedir profiles; nfpm deb/rpm packaging; release bundle working.
 
 ### 🔄 Open / Future
 
 - **CI** — `.github/workflows/ci.yml` now runs pytest + coverage, ruff, mypy, and pip-audit on every push/PR.
-- **Numbered release** — No public release number yet. `pyproject.toml` has internal version `0.1.0`; the v0.2.0 release PR opens after WS-A through WS-H are all closed (`v0.2.0-alpha.1` through `v0.2.0-alpha.5` are tagged on `develop` so far; WS-F, WS-G, WS-H remain).
+- **Numbered release** — No public release number yet. `pyproject.toml` has internal version `0.1.0`; the v0.2.0 release PR opens after WS-G closes (`v0.2.0-alpha.1` through `v0.2.0-alpha.5` are tagged on `develop`; WS-G remains).
 - **Debug build artifacts** — `build/debug` and `dist/debug` predate the PyQt5 migration; `build/release` is current. Run `python build_exe.py debug` to refresh.
+- **Remaining backlog** — Wave 4 (TICK-401 UI job manager, TICK-402 version sync) is the final wave. F4/F21 (`secure_delete` move), F13 (parser isolation) remain for v0.3.0.
 
 ### 📋 Security & Audit
 
@@ -263,7 +265,7 @@ See [`docs/reviews/AUDIT_REPORT.md`](./docs/reviews/AUDIT_REPORT.md) for severit
 - **Dependency split** — `pyproject.toml` = CLI + core only. `requirements.txt` = full stack (GUI/media). Install both for development.
 - **User data** — `~/.dataforge/config.json`, cache.db, app.log — all created on first run, no migration needed.
 - **Build artifacts** — `build/` and `dist/` are generated; don't maintain them. `release` profile is current; refresh `debug` via `python build_exe.py debug`.
-- **Next milestone** — WS-A through WS-E are all done (CI/CD, linting, packaging, S1–S13 security, design tokens, interaction correctness, IA/label/parity, motion/empty-error/a11y polish). Next is WS-F (architecture consolidation), WS-G (brand/release polish), and WS-H (forensic soundness) — the v0.2.0 release PR opens after WS-A through WS-H close. See [`docs/reviews/ROADMAP.md`](./docs/reviews/ROADMAP.md) and [`docs/reviews/ROADMAP.md`](./docs/reviews/ROADMAP.md).
+- **Next milestone** — WS-A through WS-F and WS-H are all done (CI/CD, linting, packaging, S1–S13 security, design tokens, interaction correctness, IA/label/parity, motion/empty-error/a11y polish, architecture consolidation, forensic soundness). Next is WS-G (brand/release polish) — the v0.2.0 release PR opens after WS-G closes. See [`docs/reviews/ROADMAP.md`](./docs/reviews/ROADMAP.md).
 
 ---
 

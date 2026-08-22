@@ -17,15 +17,15 @@ Both surfaces ultimately depend on the same lower-level modules and services, wh
 
 | Layer | Main files | Responsibility |
 | --- | --- | --- |
-| Entry points | `run_ui.py`, `dataforge/cli.py`, `setup.py` | Start the desktop app, expose CLI commands, package the console script |
-| Core primitives | `dataforge/core/common.py`, `paths.py`, `scanner.py`, `config.py`, `cache.py`, `logger.py` | Represent files, resolve canonical per-OS locations (platformdirs + legacy migration), scan disk state, persist settings, cache hashes, log runtime activity |
+| Entry points | `run_ui.py`, `dataforge/cli.py`, `dataforge/service/__main__.py`, `setup.py` | Start the desktop app, expose CLI commands, run the engine daemon, package the console script |
+| Core primitives | `dataforge/core/common.py`, `paths.py`, `scanner.py`, `config.py`, `cache.py`, `logger.py`, `audit.py`, `case.py` | Represent files, resolve canonical per-OS locations (platformdirs + legacy migration), scan disk state, persist settings, cache hashes, log runtime activity, hash-chained audit log, case/evidence context |
 | Low-level filesystem operations | `dataforge/core/operations/files.py` | Rename, move, copy, delete, collision handling, archive creation, template naming |
 | Shared service layer | `dataforge/core/services/file_actions.py` | Central batch-oriented mutation API used by features and UI views |
 | Feature modules | `dataforge/modules/*.py` | Search, duplicates, organize, rename, cleaner, integrity, usage, reporting, plus the newer batch: `system_cleanup`, `performance`, `recovery`, `metadata`, `hardware`, `forensics`, `password_tools`, `device_manager`, `file_signatures` |
 | Workflow engine | `dataforge/core/actions/*.py` | Action Builder context, filters, and step execution |
 | GUI shell and views | `dataforge/ui/app.py`, `dataforge/ui/views/*.py`, `dataforge/ui/widgets.py` | Desktop shell (**PyQt5**), background execution, view rendering, previews, plugins |
 | Design tokens / theming | `dataforge/ui/theme_tokens.py` | Single-source-of-truth colour table (WCAG AA validated), template-driven QSS/palette generation (`generate_qss`, `generate_palette`), type-scale constants, variant-QSS rules |
-| Tests | `tests/*.py` | End-to-end, contract, and feature coverage |
+| Tests | `tests/*.py` | End-to-end, contract, and feature coverage (723 passing) |
 
 ## Key abstractions
 
@@ -49,6 +49,14 @@ It also returns structured outcomes (`BatchActionOutcome`, `BatchActionRecord`) 
 ### `ActionContext` and `ActionStep`
 
 Defined in `dataforge/core/actions/base.py`, these types power **Action Builder**. They provide a composable pipeline model where steps filter or transform the current working set of `FileEntry` records and append execution results to a shared context object.
+
+### `AuditLog`
+
+Defined in `dataforge/core/audit.py`, this provides an append-only, 0o600 SQLite WAL audit log with SHA-256 hash chaining (`hash(prev||canonical_json)`). It supports `append()`, `verify()` (tamper detection), `tail_hash()`, and `count()`. Used by the forensic report writer to seal chain-of-custody records.
+
+### `CaseContext`
+
+Defined in `dataforge/core/case.py`, this dataclass carries case metadata (`case_id`, `operator`, `host`, `source_sha256`) and an `evidence_mode` flag. When `evidence_mode=True`, `FileActionService` blocks destructive operations (transfer/delete) and `secure_delete` refuses to run. A module-level singleton provides `set_context()`, `get_context()`, `clear_context()`, and `is_evidence_mode()`.
 
 ### `BaseView`
 
@@ -206,12 +214,14 @@ If a new feature starts from file discovery, it should usually build on:
 
 - The repository root contains a nested application root (`DataForge/`), so command examples and tooling must be explicit about where they run.
 - `setup.py` only lists a minimal dependency set, while `requirements.txt` contains the full GUI/media/test toolchain. Treat `requirements.txt` as the authoritative development environment definition.
-- Some feature overlap is intentional but real: metadata cleaning exists both inside the Automations view and as a standalone plugin view (and in two different implementations — `dataforge/modules/cleaner.py::MetadataCleaner` vs `dataforge/modules/metadata.py::MetadataEngine`).
+- Some feature overlap is intentional but real: metadata cleaning exists both inside the Automations view and as a standalone plugin view. As of TICK-204 (Wave 2), `cleaner.py::MetadataCleaner` is a thin shim delegating to `metadata.py::MetadataEngine` — the duality is resolved at the code level.
 - The Action Builder filters (`dataforge/core/actions/filters.py`) are an independent implementation of the same size/date/name filtering as `dataforge/modules/search.py::SearchQuery`; the two can drift.
 - `dataforge/core/provider.py` (`FileProvider`/`LocalProvider`) carries the TICK-002 seven-method contract (cancel/progress aware) but no active caller yet — engine integration pending.
+- `dataforge/client/` provides `DataForge.connect()` for auto-discovering the engine daemon via UDS/Named Pipe/HTTP, with an `in_process` fallback (TICK-301).
+- `dataforge/service/` ships lifecycle files for systemd (Linux), launchd (macOS), and Windows Service (TICK-302), plus `__main__.py` as the `dataforge-engine` entrypoint.
 - Generated build output exists in-repo (`build/`, `dist/`), but it is not maintained source.
 
-Correctness and security caveats from the 2026-07-10 review are tracked in [`docs/reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md) and [`AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md). Key points: the scanner no longer follows symlinks, the cache is thread-safe, integrity/dedup default to SHA-256, and the forensic-report HTML injection (S2) is fixed. S1–S13 are **fixed** as of WS-B, including trash-restore path confinement (S4, `recovery.py:205`) and System Cleanup safeguards (S7, `system_cleanup.py:267`); residual forensic-soundness work is tracked as F1–F21 in [`FORENSIC_REVIEW.md`](./reviews/FORENSIC_REVIEW.md).
+Correctness and security caveats from the 2026-07-10 review are tracked in [`docs/reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md) and [`AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md). Key points: the scanner no longer follows symlinks, the cache is thread-safe, integrity/dedup default to SHA-256, and the forensic-report HTML injection (S2) is fixed. S1–S13 are **fixed** as of WS-B, including trash-restore path confinement (S4, `recovery.py:205`) and System Cleanup safeguards (S7, `system_cleanup.py:267`). Forensic-soundness findings F1–F3/U2/F9 are **fixed** as of TICK-304 (hash-chained audit log, CaseContext, Evidence Mode, UTC provenance). Residual forensic work (F4/F21 `secure_delete` move, F13 parser isolation) is tracked as F4–F21 in [`FORENSIC_REVIEW.md`](./reviews/FORENSIC_REVIEW.md).
 
 ## Related documents
 

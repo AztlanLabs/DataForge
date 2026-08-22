@@ -81,7 +81,7 @@
 
 | ID | Severity | Title | Status |
 |---|---|---|---|
-| R-CORE-1 | 🟠 | Logger to `stdout` corrupts `fm … --format json` (`logger.py:23` `StreamHandler(sys.stdout)`) | ⏳ Open — `\| jq` workflow fails (repro shown) |
+| R-CORE-1 | 🟠 | Logger to `stdout` corrupts `fm … --format json` (`logger.py:23` `StreamHandler(sys.stdout)`) | ✅ Fixed (TICK-101) |
 | R-CORE-2 | 🟠 | Config `excluded_extensions`/`excluded_folders` validate `list` only, not items → `endswith`/set crash on every `scan_directory` | ⏳ Open |
 | R-CORE-3 | 🟡 | `collapsed_groups` dropped on reload (`config.py:77` iterates `DEFAULT_CONFIG` only) → sidebar state never persists | ⏳ Open |
 | R-CORE-4 | 🟡 | `cache.py:43` `conn=None` crash if init failed (`AttributeError` in worker) | ⏳ Open |
@@ -89,10 +89,10 @@
 | R-CORE-6 | 🟡 | `scanner.py:80` swallows `FileNotFoundError` → “no results” vs “no such path” indistinguishable | ⏳ Open |
 | R-CORE-7 | 🟡 | `logger.py:30` `makedirs("")` crash on bare filename | ⏳ Open |
 | R-CORE-8 | 🔵 | `hasher.py:32` `get_hashes()` no algo allow-list | Info — latent |
-| R-OPS-1 | 🟡 | `operations/files.py:39` `normalized_reserved_paths` rebuilt per item → O(N²) on large batches | ⏳ Open |
-| R-OPS-2 | 🟠 | `services/file_actions.py:357` single-mode zip: one bad file aborts whole batch, partial `.zip` left, remaining items no records, cancel leaves partial | ⏳ Open |
-| R-OPS-3 | 🟡 | `archive_items` truncates existing zip without collision check | ⏳ Open |
-| R-OPS-4 | 🟡 | `files.py:102` `makedirs` before first success → empty dest dirs on failure | ⏳ Open |
+| R-OPS-1 | 🟡 | `operations/files.py:39` `normalized_reserved_paths` rebuilt per item → O(N²) on large batches | ✅ Fixed (TICK-105) |
+| R-OPS-2 | 🟠 | `services/file_actions.py:357` single-mode zip: one bad file aborts whole batch, partial `.zip` left, remaining items no records, cancel leaves partial | ✅ Fixed (TICK-201) |
+| R-OPS-3 | 🟡 | `archive_items` truncates existing zip without collision check | ✅ Fixed (TICK-105) |
+| R-OPS-4 | 🟡 | `files.py:102` `makedirs` before first success → empty dest dirs on failure | ✅ Fixed (TICK-105) |
 
 **Not yet reviewed:** R-sections 3+ (modules, UI, packaging, tests) — see `drafts/FULL_APP_REVIEW.md`. Remaining forensic gaps F1–F21/U1–U11 are in `FORENSIC_REVIEW.md`.
 
@@ -100,4 +100,4 @@
 
 ## Recommended order
 
-S1–S13 are **done**. Next tranche is forensic soundness (WS-H) — chain-of-custody F1, provenance F2, Evidence Mode F3/U2, parser isolation F13 — sequenced in `ROADMAP.md` WS-H/WS-I/WS-J. R-CORE-1/2 and R-OPS-2 are the highest-leverage fixes outside the forensic track.
+S1–S13 are **done**. R-CORE-1, R-OPS-1/2/3/4 are **done** (TICK-101, TICK-105, TICK-201). F1–F3/U2/F9 are **done** (TICK-304). Next tranche is WS-G (brand/release polish) and remaining forensic gaps F4/F21/F13 (WS-I/J) — sequenced in `ROADMAP.md`.

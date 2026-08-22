@@ -13,10 +13,12 @@ This directory is the historical audit trail. Current user docs live in `docs/` 
 
 ## Status at a glance (2026-08-22)
 
-- **Correctness:** H1/M1–M6/L1–L9 + S1–S13 → **all fixed**, 301 tests green (`AUDIT_REPORT:Part 1–2`).
+- **Correctness:** H1/M1–M6/L1–L9 + S1–S13 → **all fixed**, 723 tests green (`AUDIT_REPORT:Part 1–2`).
 - **Doc defects:** D1–D7 → fixed (`AUDIT_REPORT:Part 3`).
-- **Forensic backlog:** F1–F6/F9 narrow the “forensic product” gap; F/U rest open (`FORENSIC_REVIEW`).
-- **Next ship:** WS-F (architecture consolidation: filter engines, metadata duality, `FileProvider`) — first open phase in `ROADMAP`.
+- **Line-level findings:** R-CORE-1, R-OPS-1/2/3/4 → **fixed** (TICK-101, TICK-105, TICK-201). R-CORE-2 remains.
+- **Forensic backlog:** F1–F3/U2/F9 → **fixed** (TICK-304: audit log, CaseContext, Evidence Mode, UTC provenance). F4/F21/F13 remain (`FORENSIC_REVIEW`).
+- **Parallel backlog:** Wave 0–3 complete (23/25 tickets, 92%). Wave 4 (TICK-401/402) pending.
+- **Next ship:** WS-G (brand/release polish) — last phase before v0.2.0 in `ROADMAP`.
 
 ## How findings are written
 

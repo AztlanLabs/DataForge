@@ -28,6 +28,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `dataforge/core/paths.py` (TICK-001) — canonical per-OS locations via platformdirs (XDG on Linux, `~/Library` on macOS, `%LocalAppData%` on Windows) for config/cache/state/logs/runtime/exports, with a one-shot legacy `~/.dataforge` migration shim that backs up to `~/.dataforge.backup.<ts>` and logs `migrated_from_legacy`; opt out via `DATAFORGE_SKIP_LEGACY_MIGRATION=1`
 - `dataforge.__version__` (TICK-001) — single version source: `importlib.metadata` with fallback to the `pyproject.toml` `[project] version`
 - 13 contract tests in `tests/test_paths_contract.py` covering the paths contract on all three OSes and the migration/version behavior
+- TICK-301: `dataforge/engine/daemon.py` — full asyncio event loop + `JobQueue` with `ThreadPoolExecutor`/`ProcessPoolExecutor` for hash work
+- TICK-301: `dataforge/client/` — `DataForge.connect()` wrapping `Transport.auto_discover` with `in_process` fallback + synchronous wrapper
+- TICK-301: `dataforge/service/__main__.py` — `dataforge-engine` entrypoint for the daemon
+- TICK-302: systemd user socket+service (`dataforge/service/linux/`), D-Bus service file, launchd plist (`dataforge/service/macos/`), Windows ServiceFramework (`dataforge/service/windows/`)
+- TICK-303: `build_exe.py` `onedir` profile for nfpm packaging; `packaging/nfpm.yaml` + `packaging/README.md` + `packaging/scripts/{postinst,prerm}.sh`
+- TICK-303: `packaging/assets/dataforge.desktop` + `dataforge.svg` for Linux desktop integration
+- TICK-304: `dataforge/core/audit.py` — append-only 0o600 SQLite WAL audit log with SHA-256 hash chain (`hash(prev||canonical_json)`)
+- TICK-304: `dataforge/core/case.py` — `CaseContext` dataclass (case_id, operator, host, source_sha256, evidence_mode) with thread-safe singleton
+- TICK-304: `generate_forensic_report` now includes provenance fields (operator, host, source_sha256, case_id, audit_tail_hash, tool_version) and UTC ISO-8601 timestamps
+- TICK-304: `FileActionService.transfer_items`/`delete_items` gated by Evidence Mode (returns `success=False` with no FS change)
+- TICK-304: `secure_delete` gated by Evidence Mode (refuses to run when `CaseContext.evidence_mode=True`)
 
 ### Changed
 - Updated all documentation cross-references after review restructure

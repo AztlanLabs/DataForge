@@ -124,18 +124,18 @@ Threading: `run_workflow`/`run_background` → single `BackgroundWorker(QThread)
 
 ## 7. Functional Spec Matrix (inventory)
 
-### Shipped & green (301 tests)
-- Scanner symlink-safe, cache WAL+lock, integrity `sha256` self-describing snapshots, XSS fixed (`html.escape`), config validation + autosave “Saved ✓”, sidebar always-visible + task-oriented groups + Automations merge, WS-E Motion/Empty/Error/A11y polish (animations gated by `ui_reduce_motion`, `focus_ring`, `EmptyState`, `friendly_error_message`, `accessibleName`+`⚠` glyph, 18 SVG icons).
+### Shipped & green (723 tests)
+- Scanner symlink-safe, cache WAL+lock, integrity `sha256` self-describing snapshots, XSS fixed (`html.escape`), config validation + autosave “Saved ✓”, sidebar always-visible + task-oriented groups + Automations merge, WS-E Motion/Empty/Error/A11y polish (animations gated by `ui_reduce_motion`, `focus_ring`, `EmptyState`, `friendly_error_message`, `accessibleName`+`⚠` glyph, 18 SVG icons). Parallel scanner/hasher/cache, streaming modules, parallel batch ops, UDS/Named Pipe transports, daemon+client integration, systemd/launchd/Windows lifecycle, nfpm packaging, hash-chained audit log, CaseContext, Evidence Mode, UTC provenance.
 
 ### Open — correctness/performance (from `reviews/AUDIT_REPORT:Part 4` + `proposals/PERFORMANCE`)
-- **R-CORE-1/2, R-OPS-2** are highest-leverage outside forensic track (logger stdout, config list items, zip abort/partial). Then R-CORE-3…8, R-OPS-1/3/4.
+- **R-CORE-2** (config list items) remains. R-CORE-1 fixed (TICK-101), R-OPS-1/3/4 fixed (TICK-105), R-OPS-2 fixed (TICK-201). Then R-CORE-3…8.
 
 ### Open — forensic / investigator UX (from `reviews/FORENSIC_REVIEW`)
-- **Narrow the forensic gap:** F1 (hash-chained `core/audit.py` + `FileActionService` hook), F2 (provenance: operator/host/image-hash/case ID), F3/U2 (Evidence Mode read-only gate + `CaseContext`), F9 (UTC ISO-8601), F4/F21 (`secure_delete` out of `forensics.py` + hardlink-aware), F13 (parser isolation). Rest: F5 raw image, F6 carving, F7 YARA/SSDEEP/NSRL, F8 ADS/xattrs, F14 streaming + `FileEntry` MACB, F15 budget, F16 sparse, F20 VSS, U1 case context, U3–U9 UX (virtualised timeline, hex inspector, mismatch filter, etc.), U10/U11 cross-platform marketing.
+- **Narrow the forensic gap:** F1 (hash-chained `core/audit.py` + `FileActionService` hook), F2 (provenance: operator/host/image-hash/case ID), F3/U2 (Evidence Mode read-only gate + `CaseContext`), F9 (UTC ISO-8601) — **all fixed in TICK-304 (Wave 3)**. Remaining: F4/F21 (`secure_delete` out of `forensics.py` + hardlink-aware), F13 (parser isolation). Rest: F5 raw image, F6 carving, F7 YARA/SSDEEP/NSRL, F8 ADS/xattrs, F14 streaming + `FileEntry` MACB, F15 budget, F16 sparse, F20 VSS, U3–U9 UX (virtualised timeline, hex inspector, mismatch filter, etc.), U10/U11 cross-platform marketing.
 
 ### Open — proposals that become the v0.2–v0.3 engine
-- **I0** `core/paths.py` (platformdirs) + `CONFIG_SCHEMA_VERSION` + `PRAGMA user_version` + `__version__` + legacy `~/.dataforge` migration (**must land first**, 3–4 days).
-- **N0–N4** UDS/Named Pipes + D-Bus/XPC/COM + `engine/daemon.py` + `FileProvider` expansion + parallel scanner/batched cache/mmap + HTTP gateway for remote + native FS/Rust helper + packaging (`deb/rpm/msi/dmg`) — see `proposals/` trio for line-level seams and `proposals/README.md` for order.
+- **I0** `core/paths.py` (platformdirs) + `CONFIG_SCHEMA_VERSION` + `PRAGMA user_version` + `__version__` + legacy `~/.dataforge` migration — **DONE (TICK-001, Wave 0)**.
+- **N0–N4** UDS/Named Pipes + D-Bus/XPC/COM + `engine/daemon.py` + `FileProvider` expansion + parallel scanner/batched cache/mmap + HTTP gateway for remote + native FS/Rust helper + packaging (`deb/rpm/msi/dmg`) — **N0 done (TICK-205), daemon done (TICK-301), lifecycle done (TICK-302), packaging done (TICK-303)**. Remaining: HTTP gateway, native FS/Rust helper. See `proposals/` trio for line-level seams.
 
 ---
 

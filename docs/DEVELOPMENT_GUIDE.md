@@ -56,7 +56,7 @@ PYTHONPATH=. pytest -q
 
 The nested project layout means plain `pytest -q` may not resolve `dataforge` unless the package is installed or the project root is placed on `PYTHONPATH`.
 
-The full suite passes — 340 tests (contract suites cover `core/paths.py`, the version source, and the `FileProvider` contract). The earlier collection failure (a stale `rename_with_regex` import) has been fixed. See [`docs/reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md) for verification details.
+The full suite passes — 723 tests (contract suites cover `core/paths.py`, the version source, the `FileProvider` contract, audit log, CaseContext, Evidence Mode, daemon/client integration, service lifecycle, and packaging). The earlier collection failure (a stale `rename_with_regex` import) has been fixed. See [`docs/reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md) for verification details.
 
 ## Packaging and distribution
 
@@ -109,12 +109,16 @@ Those folders should be treated as outputs, not maintained source.
 | Path | What to change there |
 | --- | --- |
 | `dataforge/core/common.py` | shared file metadata types |
+| `dataforge/core/audit.py` | hash-chained audit log (TICK-304) |
+| `dataforge/core/case.py` | CaseContext + Evidence Mode singleton (TICK-304) |
 | `dataforge/core/scanner.py` | scan behavior, traversal, and exclusion honoring |
 | `dataforge/core/config.py` | persistent settings |
 | `dataforge/core/cache.py` | hash cache behavior |
 | `dataforge/core/operations/files.py` | low-level rename/move/copy/delete/archive primitives |
 | `dataforge/core/services/file_actions.py` | centralized batch file actions |
 | `dataforge/modules/` | feature logic reusable across CLI and GUI |
+| `dataforge/client/` | engine client with auto-discover (TICK-301) |
+| `dataforge/service/` | daemon entrypoint + OS lifecycle files (TICK-301/302) |
 | `dataforge/core/actions/` | Action Builder pipeline steps |
 | `dataforge/ui/views/` | top-level desktop screens |
 | `dataforge/ui/plugins/` | plugin views |
@@ -158,6 +162,10 @@ New top-level screens and plugins should inherit from `BaseView` and use its sha
 | `tests/test_integration.py` | end-to-end workflows and packaging/plugin paths | passes (18) |
 | `tests/test_contract_regressions.py` | CLI and GUI-facing contract expectations | passes (~110 — including 21 added in WS-C/WS-D) |
 | `tests/test_new_modules.py` | newer modules (hardware, forensics, recovery, metadata, etc.) | passes (9) |
+| `tests/test_audit_evidence_mode.py` | audit log, CaseContext, Evidence Mode gate, forensic provenance | passes (21) |
+| `tests/test_daemon_client_integration.py` | daemon job queue, client auto-discover, in-process fallback | passes (21) |
+| `tests/test_service_lifecycle.py` | systemd/launchd/Windows lifecycle files | passes (34) |
+| `tests/test_packaging_nfpm.py` | nfpm deb/rpm packaging, postinst/prerm scripts | passes (51) |
 | `tests/verify_scenarios.py` | scenario-style validation helpers | standalone script |
 
 ## Practical maintenance notes

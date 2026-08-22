@@ -20,17 +20,17 @@ Scale/effort for F1–F4/U2 is S–M (one seam each: `FileActionService` gate + 
 
 | ID | Sev | Area | Title | Status | Seam |
 |---|---|---|---|---|---|
-| F1 | 🔴 | Soundness | No chain-of-custody / tamper-evident audit log | Open | `core/audit.py` + `FileActionService` hook |
-| F2 | 🔴 | Soundness | No acquisition provenance | Open | `forensics.py` report writer |
-| F3 | 🔴 | Soundness | No read-only Evidence Mode | Open | `FileActionService` gate + UI toggle |
+| F1 | 🔴 | Soundness | No chain-of-custody / tamper-evident audit log | ✅ Fixed | `core/audit.py` + `FileActionService` hook (TICK-304) |
+| F2 | 🔴 | Soundness | No acquisition provenance | ✅ Fixed | `forensics.py` report writer (TICK-304) |
+| F3 | 🔴 | Soundness | No read-only Evidence Mode | ✅ Fixed | `FileActionService` gate + `CaseContext` (TICK-304) |
 | F4 | 🔴 | Soundness | `secure_delete` in forensic module | Open | `modules/sanitisation.py` (move out) |
 | F5 | 🟠 | Engine | No raw image (E01/AFF4) lib; requires mount | Open | `core/image_io.py` + libewf/pyaff |
 | F6 | 🟠 | Engine | Carving sector-aligned only; misses mid-sector | Open | `recovery.py` rewrite |
 | F7 | 🟠 | Engine | No YARA / SSDEEP/TLsh / NSRL pivot | Open | `modules/indicators.py` |
 | F8 | 🟠 | Engine | ADS/xattrs/MotW not parsed | Open | `core/streams.py` |
-| F9 | 🔴 | Soundness | tz-naive timestamps mixed with UTC | Open | Timestamp standardisation (UTC ISO-8601) |
+| F9 | 🔴 | Soundness | tz-naive timestamps mixed with UTC | ✅ Fixed | UTC ISO-8601 (TICK-304) |
 | F10 | 🟠 | Engine | NFC/NFD + bidi not handled | Open | Scanner + duplicates |
-| F11 | 🟠 | Security | `app.log` not hash-chained | Open | `core/logger.py` rewrite (extends F1) |
+| F11 | 🟠 | Security | `app.log` not hash-chained | ✅ Fixed | `core/audit.py` hash chain (TICK-304) |
 | F12 | 🟠 | Security | Plugin loader full privileges | Partial | `ui/plugin_loader.py` — owner/world-writable + opt-in done (S5), isolation+signing remain |
 | F13 | 🟠 | Security | Parsers in-process, no isolation | Open | `multiprocessing` pool |
 | F14 | 🟡 | Perf | `ingest_disk_image` materialises list; double `stat` | Open | Streaming + `FileEntry` |
@@ -38,8 +38,8 @@ Scale/effort for F1–F4/U2 is S–M (one seam each: `FileActionService` gate + 
 | F16 | 🔴 | Soundness | Sparse files not detected | Open | Carve + hash pre-check |
 | F20 | 🟠 | Engine | Locked/in-use files skipped (no VSS) | Open | `core/acquire.py` |
 | F21 | 🟡 | Engine | Hardlink/reflink-unaware `secure_delete`/dedup | Open | F4 seam + dedup `(st_dev,st_ino)` |
-| U1 | 🟠 | UX | No case/evidence/operator context | Open | `CaseContext` |
-| U2 | 🔴 | UX | No EVIDENCE MODE toggle | Open | Top sticky + `FileActionService` gate (with F3) |
+| U1 | 🟠 | UX | No case/evidence/operator context | ✅ Fixed | `CaseContext` (TICK-304) |
+| U2 | 🔴 | UX | No EVIDENCE MODE toggle | ✅ Fixed | `CaseContext.evidence_mode` + `FileActionService` gate (TICK-304) |
 | U3 | 🟠 | UX | Timeline flat list, no virtualisation >5k | Partial | Virtualised `QTreeView` |
 | U4 | 🟠 | UX | Hex without field inspector | Partial | `widgets.HexView` |
 | U5 | 🟡 | UX | No magic-vs-ext mismatch filter | Open | `profile_directory_types` |

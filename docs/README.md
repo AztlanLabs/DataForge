@@ -4,7 +4,7 @@
 
 > **New (principal review):** [`CONSOLIDATED_SPEC.md`](./CONSOLIDATED_SPEC.md) is the single authoritative spec (reconciles all of `docs/` + proposals + reviews). [`PARALLEL_BACKLOG.md`](./PARALLEL_BACKLOG.md) is the DAG backlog for simultaneous agents — start there if you are picking a ticket. Generic parallel-agent prompt: [`.github/prompts/parallel-ticket-agent.prompt.md`](../.github/prompts/parallel-ticket-agent.prompt.md) — copy, set `{{TICKET_ID}}`, and run (one ticket = one branch = one PR, disjoint writes per wave).
 >
-> **Status 2026-08-22 19:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5 DONE (98 tests) → Wave 3 🔜 READY (4 parallel agents).** See `PARALLEL_BACKLOG.md` Wave 0 + Wave 1 + Wave 2 Reviews (5/5).
+> **Status 2026-08-22 23:30 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4 DONE (723 tests) → Wave 4 ⏳ Pending (2 tickets).** See `PARALLEL_BACKLOG.md` Wave 0–3 Reviews.
 
 ## Current truth — read these
 
@@ -20,19 +20,18 @@
 | `../README.md` | Project overview, superpowers, quick start, system-at-a-glance | Entry point |
 | `../CHANGELOG.md` | Keep-a-Changelog history | Release notes |
 
-All “current truth” docs above are green against `dataforge/` HEAD at 2026-08-22. They all still point at `~/.dataforge/` — that is correct for HEAD; the XDG migration is a *proposal* (next section) not yet merged.
+All “current truth” docs above are green against `dataforge/` HEAD at 2026-08-22. They all still point at `~/.dataforge/` — that is correct for HEAD; the XDG migration landed in TICK-001 (Wave 0) via `core/paths.py` with a legacy shim.
 
-## Proposals — future architecture (not yet implemented)
+## Proposals — future architecture (partially implemented)
 
-> Do not treat these as shipped. They are design docs against HEAD at 2026-08-22.
+> Some proposals below are now partially or fully implemented via the parallel backlog (Wave 0-3). Check `PARALLEL_BACKLOG.md` for current status.
 
-| Proposal | Proposes | File |
+| Proposal | Proposes | Status |
 |---|---|---|
-| Ridiculously fast | Parallel scanner, batched cache, pipelined engine, job queue | [`proposals/PERFORMANCE_INVESTIGATION.md`](./proposals/PERFORMANCE_INVESTIGATION.md) · tickets → [`proposals/PERFORMANCE_TICKETS.md`](./proposals/PERFORMANCE_TICKETS.md) |
-| Native OS service | UDS/Named Pipes + D-Bus/XPC/COM, hybrid HTTP for remote | [`proposals/NATIVE_OS_API_REVIEW.md`](./proposals/NATIVE_OS_API_REVIEW.md) |
-| Installable package | XDG/AppData, versioned migrations, deb/rpm/msi/dmg, auto-update | [`proposals/INSTALL_UPGRADE_LIFECYCLE.md`](./proposals/INSTALL_UPGRADE_LIFECYCLE.md) |
+| Ridiculously fast | Parallel scanner, batched cache, pipelined engine, job queue | **Partially done** (TICK-102/103/104/107/108/109/201/202/203) |
+| Native OS service | UDS/Named Pipes + D-Bus/XPC/COM, hybrid HTTP for remote | **Partially done** (TICK-205 UDS/Pipe, TICK-301 daemon, TICK-302 lifecycle; HTTP gateway pending) |
+| Installable package | XDG/AppData, versioned migrations, deb/rpm/msi/dmg, auto-update | **Partially done** (TICK-001 paths, TICK-303 nfpm deb/rpm; msi/dmg/auto-update pending) |
 
-Read in that order. Each carries a `Status: PROPOSAL` banner. `PERFORMANCE §3` FastAPI sketch is superseded by `NATIVE_OS_API §3`.
 
 ## History & reviews — frozen
 
@@ -42,8 +41,8 @@ Historical audits that produced the current code. Keep as records; don’t edit 
 |---|---|
 | [`reviews/README.md`](./reviews/README.md) | Overview, quick wins, Definition of Done |
 | [`reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md) | 15 correctness bugs (fixed) + 13 security findings S1–S13 (fixed) |
-| [`reviews/FORENSIC_REVIEW.md`](./reviews/FORENSIC_REVIEW.md) | Forensic backlog F1–F21 / U1–U11 (still open, WS-H … WS-J) |
-| [`reviews/ROADMAP.md`](./reviews/ROADMAP.md) | UX/engineering roadmap (2a–2e shipped, WS-F open) |
+| [`reviews/FORENSIC_REVIEW.md`](./reviews/FORENSIC_REVIEW.md) | Forensic backlog F1–F21 / U1–U11 (F1–F3/U2/F9 fixed, rest open, WS-I/WS-J) |
+| [`reviews/ROADMAP.md`](./reviews/ROADMAP.md) | UX/engineering roadmap (2a–2e shipped, WS-F/H done, WS-G next) |
 | [`reviews/ROADMAP.md`](./reviews/ROADMAP.md) | Sequenced work-streams WS-A … WS-J, release mapping |
 | [`reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md) | Doc-defect audit D1–D7 |
 | [`reviews/drafts/FULL_APP_REVIEW.md`](./reviews/drafts/FULL_APP_REVIEW.md) | **DRAFT** line-level review R-CORE/R-OPS (§3+ pending) — not a sign-off |
