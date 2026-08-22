@@ -1,3 +1,5 @@
+> **Status: ✅ COMPLETED 2026-08-22 — Wave 2 DONE, verified (see docs/PARALLEL_BACKLOG.md Wave 2 Review). This ticket is closed — do not re-run.**
+
 # Ticket TICK-205 — Implement UDS (Linux/macOS) + Named Pipes (Windows) transports
 
 > **Wave 2** | **Domain:** Engine / Transport | **Depends on:** "TICK-003", "TICK-005"

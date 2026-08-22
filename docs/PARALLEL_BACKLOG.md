@@ -5,13 +5,13 @@
 **Toolchain:** `pytest` (`requirements-dev.txt:4`), `pytest-cov`, `ruff`, `mypy` — all `validation_command` are `pytest`-based.  
 **Principles enforced:** Contract-first (Wave 0) → disjoint writes per wave (no file appears twice in same wave) → sequential re-entries documented → consolidation isolates central touchpoints.
 
-> **Wave Status — Updated 2026-08-22 17:15 UTC — Wave 0 ✅ 5/5 DONE, Wave 1 ✅ 9/9 DONE**
-> - **Wave 0 (Contracts): 5/5 DONE — 69 tests, 5/5 `validation_command` green, file parity verified.** Unblocks Wave 1. Reviewed below.
-> - **Wave 1 (Parallel Fixes): 9/9 DONE — 126 tests (`11+22+14+8+8` + `16+19+15+13` for 106–109), 9/9 `validation_command` green, file parity verified. Unblocks Wave 2.** Reviewed below.
-> - **Wave 2: 0/5 — 🔜 READY TO START** (Wave 1 gate green, all `depends_on` satisfied: `TICK-102`/`105` for 201, `102`/`103` for 202, etc., disjoint)
+> **Wave Status — Updated 2026-08-22 18:30 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 🔜 3/5 DONE**
+> - **Wave 0 (Contracts): 5/5 DONE — 69 tests.** Unblocks Wave 1.
+> - **Wave 1 (Parallel Fixes): 9/9 DONE — 126 tests.** Unblocks Wave 2.
+> - **Wave 2 (Service & Mutations): 3/5 DONE, 2 remaining — 🔜 IN PROGRESS (59 tests).** `TICK-202`, `TICK-204`, `TICK-205` verified (see Wave 2 Review). Remaining 2 tickets (`TICK-201` `file_actions.py`, `TICK-203` `system_cleanup.py`) disjoint and ready.
 > - **Wave 3: 0/4 — ⏳ Pending** (needs Wave 2)
 > - **Wave 4: 0/2 — ⏳ Pending** (needs Wave 3)
-> - **Overall: 14/25 tickets DONE (56%) — 11 remaining.** See `docs/prompts/tickets/README.md` for per-ticket prompts. Wave 1 full review below.
+> - **Overall: 17/25 tickets DONE (68%) — 8 remaining.** See `docs/prompts/tickets/README.md` for per-ticket prompts.
 
 > Read `CONSOLIDATED_SPEC.md` §2–7 for canonical definitions before picking a ticket. All `path:line` below verified at 2026-08-22.
 
@@ -35,11 +35,11 @@
 | Wave 1 | `TICK-107` | Modules / Duplicates | `dataforge/modules/duplicates.py` | `TICK-003` | Perf pipeline + verify | ✅ DONE 2026-08-22 — `tests/test_dupes_pipeline.py` 17/17, `queue.Queue` + `xxhash` + `streaming` verified |
 | Wave 1 | `TICK-108` | Modules / Integrity | `dataforge/modules/integrity.py` | `TICK-003` | Perf streaming | ✅ DONE 2026-08-22 — `tests/test_integrity_streaming.py` 14/14, `streaming` + `executemany` + `tmp+os.replace` verified |
 | Wave 1 | `TICK-109` | Modules / Forensics (hash/keyword) | `dataforge/modules/forensics.py` *(first writer; second sequential writer is TICK-304 Wave 3)* | `TICK-003` | Perf + F15 | ✅ DONE 2026-08-22 — `tests/test_forensics_streaming.py` 10/10, `byte budget` + `queue` + `no double stat` verified |
-| **Wave 2 — Service & Mutations 🔜 READY (Wave 1 ✅ 9/9 gate green)** | `TICK-201` | Service / Batch Actions | `dataforge/core/services/file_actions.py` | `TICK-105`, `TICK-102` | Parallel mutations + R-OPS-2 | 🔜 Ready (unblocked, disjoint) |
-| Wave 2 | `TICK-202` | Modules / Recovery | `dataforge/modules/recovery.py` | `TICK-102`, `TICK-103` | F6 carving (mmap + chunk) | ⏳ Pending |
-| Wave 2 | `TICK-203` | Modules / System Cleanup | `dataforge/modules/system_cleanup.py` | `TICK-102` | Perf + S7 follow-up | ⏳ Pending |
-| Wave 2 | `TICK-204` | Modules / Metadata | `dataforge/modules/metadata.py` | `TICK-003` | Consolidate vs cleaner | ⏳ Pending |
-| Wave 2 | `TICK-205` | Transport / UDS+Pipe | `dataforge/api/transport/uds.py [NEW FILE]`, `dataforge/api/transport/named_pipe.py [NEW FILE]` | `TICK-003`, `TICK-005` | Native IPC (N0) | ⏳ Pending |
+| **Wave 2 — Service & Mutations 🔜 IN PROGRESS (3/5 DONE)** | `TICK-201` | Service / Batch Actions | `dataforge/core/services/file_actions.py` | `TICK-105`, `TICK-102` | Parallel mutations + R-OPS-2 | 🔜 Ready (unblocked, distinct file) |
+| Wave 2 | `TICK-202` | Modules / Recovery | `dataforge/modules/recovery.py` | `TICK-102`, `TICK-103` | F6 carving (mmap + chunk) | ✅ DONE 2026-08-22 — `tests/test_recovery_parallel.py` 19/19, `mmap` + sliding-window + `ThreadPool` verified |
+| Wave 2 | `TICK-203` | Modules / System Cleanup | `dataforge/modules/system_cleanup.py` | `TICK-102` | Perf + S7 follow-up | 🔜 Ready (unblocked, distinct file) |
+| Wave 2 | `TICK-204` | Modules / Metadata | `dataforge/modules/metadata.py` | `TICK-003` | Consolidate vs cleaner | ✅ DONE 2026-08-22 — `tests/test_metadata_single_seam.py` 10/10, `MetadataEngine` shim + `cleaner.py` delegation verified |
+| Wave 2 | `TICK-205` | Transport / UDS+Pipe | `dataforge/api/transport/uds.py [NEW FILE]`, `dataforge/api/transport/named_pipe.py [NEW FILE]` | `TICK-003`, `TICK-005` | Native IPC (N0) | ✅ DONE 2026-08-22 — `tests/test_transport_uds_pipe.py` 30/30, `UdsTransport` + `NamedPipeTransport` + `auto_discover` verified |
 | **Wave 3 — Integration & Packaging ⏳ Pending** | `TICK-301` | Engine / Daemon + Client | `dataforge/engine/daemon.py` *(sequential overwrite of TICK-005 stub)*, `dataforge/client/__init__.py [NEW FILE]`, `dataforge/client/sync.py [NEW FILE]`, `dataforge/service/__main__.py [NEW FILE]` | `TICK-205`, `TICK-201` | Consolidation: job queue + auto-discover | ⏳ Pending |
 | Wave 3 | `TICK-302` | Service / Lifecycle | `dataforge/service/linux/dataforge.socket [NEW FILE]`, `dataforge/service/linux/dataforge.service [NEW FILE]`, `dataforge/service/linux/com.dataforge.Engine.service [NEW FILE]`, `dataforge/service/windows/service.py [NEW FILE]`, `dataforge/service/macos/com.dataforge.engine.plist [NEW FILE]` | `TICK-301` | `systemd`/`launchd`/Service | ⏳ Pending |
 | Wave 3 | `TICK-303` | Build / Packaging | `build_exe.py`, `packaging/nfpm.yaml [NEW FILE]`, `packaging/README.md [NEW FILE]` | `TICK-001` | Onefile+onedir, deb/rpm | ⏳ Pending |
@@ -86,6 +86,22 @@
 | `TICK-109` | `dataforge/modules/forensics.py` now `calculate_hashes` reuses `hasher.py` `mmap` path, `keyword_search` global byte budget `10MB×workers → bounded queue` (was `f.read(10MB)` per file unbounded), `ingest_disk_image` streaming `queue` to `hash+artifacts+keyword` (no `file_paths: list`), `build_timeline` reuses `FileEntry` `st_mtime` (no `os.stat` redo) | `pytest tests/test_forensics_streaming.py` 10/10 ✅ · `perf(modules): forensics streaming engine with byte budget` (`93b2fad` → `7cb454c` merge) · `RSS <100MB` for 4 workers, `grep -n file_paths` absent | Correct per `TICK-109`/`PERF-107`: `f.read(10MB)` unbounded → bounded `queue`, `file_paths` list removed, `os.stat` redo removed. Disjoint in Wave 1 (only writer to `forensics.py` in Wave 1; second writer is `TICK-304` Wave 3). | ✅ DONE 2026-08-22 — merged `feat/TICK-109-forensics-streaming` |
 
 **Wave 1 gate:** 9/9 DONE (126 tests: `11+22+14+8+8+22+17+14+10`), 9/9 `validation_command` green, file parity clean, 9 disjoint files, no collision. **Wave 1 is now fully green — Wave 2 is unblocked (all Wave 2 `depends_on` satisfied: `TICK-102`/`103`/`105`/`003`/`005` are DONE) and can start with 5 parallel agents on distinct files. Wave 1 → Wave 2 handoff verified via `git diff --name-only` (only `exclusive_write_files` + tests changed).**
+
+---
+
+## Wave 2 Review — Partial 2026-08-22 18:30 UTC (3/5 DONE, 2 remaining)
+
+> **Reviewer:** Principal Technical Auditor · **Method:** `Read` each `exclusive_write_files` + `Read` `tests/test_*` + `PYTHONPATH=. pytest` + `git log --oneline --grep=TICK-20` + `ls -l dataforge/...` file-time checks. Wave 2 now has 3 merged tickets (`TICK-202`, `TICK-204`, `TICK-205` — 59 tests) and 2 still open (`TICK-201`, `TICK-203`). All remaining are **disjoint, unblocked (Wave 1 green), and ready for parallel execution**.
+
+| Ticket | Implementation | Verification | Finding | Status |
+|---|---|---|---|---|
+| `TICK-201` | `dataforge/core/services/file_actions.py` still at `Jul 11 23:20` (sequential `for index, item in enumerate...`, no `ThreadPool`, no lock on `reserved_paths`, `archive_items` single-mode `try` outside loop) — **not yet implemented** | No `tests/test_file_actions_parallel.py` | **Open, ready** — depends on `TICK-105`/`102` (DONE), distinct file | 🔜 Ready |
+| `TICK-202` | `dataforge/modules/recovery.py` now `mmap` image, 64 MiB sliding windows with `overlap=max(header+footer)`, `ThreadPoolExecutor(min(32,cpu*4))` parallel signature scan, per-worker temp then `os.replace` atomic move, `_get_max_workers()` adaptive, `_carve_one`/`_scan_window` helpers | `pytest tests/test_recovery_parallel.py` 19/19 ✅ · `feat(modules): parallel carving mmap sliding-window chunked workers` (`f3968c7` → `327d14c` merge) · `mmap` + sliding window + `ThreadPool` verified | Correct per `TICK-202`/`PERF-108`: sector-alignment miss fixed (sliding window), `days→hours` on 500 GB, no partial on cancel. Disjoint (only writer to `recovery.py` in Wave 2). | ✅ DONE 2026-08-22 — merged `feat/TICK-202-parallel-carving` |
+| `TICK-203` | `dataforge/modules/system_cleanup.py` still at `Jul 12 00:30` (still per-pattern `os.walk`, `_is_socket_or_fifo` extra `stat`) — **not yet implemented** | No `tests/test_system_cleanup_walks.py` | **Open, ready** — depends on `TICK-102` (DONE), distinct file | 🔜 Ready |
+| `TICK-204` | `dataforge/modules/metadata.py` now `MetadataEngine` is single source (`exiftool→Pillow→pypdf→mutagen` tiered); `dataforge/modules/cleaner.py` `MetadataCleaner` is thin shim delegating `remove_metadata` to `MetadataEngine`; `cleaner.py:4` `from .metadata import MetadataEngine` | `pytest tests/test_metadata_single_seam.py` 10/10 ✅ · `refactor(modules): consolidate metadata cleaning to MetadataEngine shim` (`6be098a` → `2eee4e0` merge) · `grep MetadataCleaner` shows only shim | Correct per `TICK-204`: `cleaner.py` is now shim (was separate impl), return type unified to `dict`. Disjoint (only writer to `metadata.py` in Wave 2). | ✅ DONE 2026-08-22 — merged `feat/TICK-204-metadata-engine-consolidation` |
+| `TICK-205` | `dataforge/api/transport/uds.py [NEW]` `UdsTransport` `asyncio.start_unix_server` + `SO_PEERCRED` check + `0o700` socket + length-prefixed `msgpack` framing; `dataforge/api/transport/named_pipe.py [NEW]` `NamedPipeTransport` `win32pipe`/`Proactor` + SDDL + `auto_discover` order `$DATAFORGE_ENGINE_SOCK→XDG→~/Library→\\.\pipe→http://127.0.0.1:8765` | `pytest tests/test_transport_uds_pipe.py` 30/30 ✅ · `feat(engine): implement UDS and Named Pipe transports for native IPC` (`7a2e652` → `d9e1ed4` merge) · `auto_discover` order verified, `0o700` perms check | Correct per `TICK-205`/`PERF-110`: UDS primary local, Named Pipe Windows, `msgpack` framing, `SO_PEERCRED`/`LOCAL_PEERCRED` auth. Disjoint (only writer to `uds.py`+`named_pipe.py` in Wave 2). | ✅ DONE 2026-08-22 — merged `feat/TICK-205-uds-named-pipe-transport` |
+
+**Wave 2 gate:** 3/5 DONE (`TICK-202`, `TICK-204`, `TICK-205` — 59 tests: `19+10+30`), 2/9 remaining (`TICK-201` `file_actions.py`, `TICK-203` `system_cleanup.py`) are **all unblocked** (their `depends_on` are Wave 1 DONE) and **file-disjoint** (2 different files). They can run **in parallel on 2 agents** without collision. Wave 3 `TICK-301` needs `TICK-205` (DONE) + `TICK-201` (open) → **Wave 3 partially unblocked** but `TICK-301` needs `TICK-201` — finish Wave 2 remaining 2 first.
 
 ---
 
