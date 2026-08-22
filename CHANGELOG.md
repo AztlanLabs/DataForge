@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `StorageDevicesView` — GUI surface for `fm devices` (mount/type/filesystem/used/total table with a per-row details panel)
 - `AutomationsView` — single sidebar entry that merges Tools & Workflows and Action Builder into a 2-tab notebook (Action Builder / Tools)
 - pytest-qt smoke test that mounts every registered view and confirms the expected sidebar title
+- `dataforge/core/paths.py` (TICK-001) — canonical per-OS locations via platformdirs (XDG on Linux, `~/Library` on macOS, `%LocalAppData%` on Windows) for config/cache/state/logs/runtime/exports, with a one-shot legacy `~/.dataforge` migration shim that backs up to `~/.dataforge.backup.<ts>` and logs `migrated_from_legacy`; opt out via `DATAFORGE_SKIP_LEGACY_MIGRATION=1`
+- `dataforge.__version__` (TICK-001) — single version source: `importlib.metadata` with fallback to the `pyproject.toml` `[project] version`
+- 13 contract tests in `tests/test_paths_contract.py` covering the paths contract on all three OSes and the migration/version behavior
 
 ### Changed
 - Updated all documentation cross-references after review restructure

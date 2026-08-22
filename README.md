@@ -118,10 +118,10 @@ PYTHONPATH=. python -m dataforge.cli --help
 ### Verify the Build
 
 ```bash
-PYTHONPATH=. pytest -q  # 301 tests pass
+PYTHONPATH=. pytest -q  # 314 tests pass
 ```
 
-Full test suite passes — 301 tests. All correctness fixes are verified. See [`docs/reviews/AUDIT_REPORT.md`](./docs/reviews/AUDIT_REPORT.md) and [`docs/reviews/AUDIT_REPORT.md`](./docs/reviews/AUDIT_REPORT.md) for the full audit.
+Full test suite passes — 314 tests. All correctness fixes are verified. See [`docs/reviews/AUDIT_REPORT.md`](./docs/reviews/AUDIT_REPORT.md) and [`docs/reviews/AUDIT_REPORT.md`](./docs/reviews/AUDIT_REPORT.md) for the full audit.
 
 ### Build desktop executables
 
@@ -236,7 +236,7 @@ The **two user interfaces are thin adapters** — all the real superpowers live 
 
 ### ✅ Fixed in the 2026-07-10 Audit Pass
 
-- **Correctness** — 301 tests pass. All correctness bugs fixed: MD5→SHA-256 defaults, symlink-loop scope escape, thread-safe cache, JSON error handling, SHA-512 crash, etc.
+- **Correctness** — 314 tests pass. All correctness bugs fixed: MD5→SHA-256 defaults, symlink-loop scope escape, thread-safe cache, JSON error handling, SHA-512 crash, etc.
 - **UI/UX overhaul** — Phase 2a/2b/2c/2d/2e shipped: surface brightness fix, themed checkboxes/combos, design-token module (`ui/theme_tokens.py`) with AA-validated colours replacing three legacy colour vocabularies, type-scale constants, per-widget colour migration, file-vs-folder riddle removed (2c.1), settings autosave (2c.2), dark-mode dedup (2c.3), progressive disclosure (2c.4), destructive checklist (2c.5), named busy task (2c.6), rich help (2c.7), task-oriented sidebar (2d.1), Automations merge (2d.2), label renames (2d.3), `fm devices` GUI (2d.4), stray-name sweep (2d.5), animated sidebar/view transitions (2e.1), native indeterminate `QProgressBar` busy indicator (2e.2), Reduce motion setting (2e.3), `focus_ring` token + `:focus` QSS for every interactive widget (2e.4), purposeful `EmptyState` + `friendly_error_message` (2e.5), screen-reader `accessibleName`/`accessibleDescription` + colour-blind `⚠` glyph on destructive Proceed (2e.6), and an 18-icon monochrome SVG sidebar set (2e.7).
 - **Security findings** — S1–S13 are all fixed. The residual forensic-soundness work (chain-of-custody, Evidence Mode, provenance, UTC timestamps) lives in [`FORENSIC_REVIEW.md`](./docs/reviews/FORENSIC_REVIEW.md) and is the v0.2.0 WS-H / v0.3.0 WS-I/WS-J backlog.
 - **Documentation** — ARCHITECTURE, CLI_REFERENCE, GUI_WORKFLOWS, DEVELOPMENT_GUIDE, TECHNICAL_SOURCE_OF_TRUTH all verified against current PyQt5 source (2026-07-12 pass; post-WS-E pass updated the 2e cross-references and added the new `dataforge/ui/resources/icons.py` file map).

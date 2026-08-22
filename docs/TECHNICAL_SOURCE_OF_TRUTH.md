@@ -205,7 +205,7 @@ PyInstaller spec file. Entry script is `run_ui.py`. Includes `dataforge/ui/plugi
 
 #### `dataforge/__init__.py`
 
-Package marker only. Empty file.
+Single version source. Exposes `__version__`, resolved via `importlib.metadata.version("dataforge")` with a fallback to parsing `version = "..."` from the `[project]` section of `pyproject.toml` (hardcoded `"0.1.0"` last resort). Helpers: `_version_from_pyproject()`, `_resolve_version()`.
 
 #### `dataforge/cli.py`
 
@@ -240,7 +240,7 @@ How it works:
 
 #### `dataforge/core/__init__.py`
 
-Convenience re-export module. Exports: `FileEntry`, `get_file_hash`, `get_hashes`, `scan_directory`, `logger`, `config`.
+Convenience re-export module. Imports `paths` first (running the legacy migration before `config` loads), then exports: `FileEntry`, `get_file_hash`, `get_hashes`, `scan_directory`, `logger`, `config`, plus the paths contract (`paths`, `config_dir`, `config_file`, `cache_dir`, `cache_db`, `state_dir`, `jobs_db`, `log_dir`, `log_file`, `runtime_dir`, `exports_dir`, `LEGACY_DIR`, `ensure_dirs`, `migrate_from_legacy`).
 
 #### `dataforge/core/common.py`
 
@@ -276,6 +276,14 @@ Persistent file-hash cache using SQLite at `~/.dataforge/cache.db`.
 - `CacheManager` — methods: `_init_db`, `get_hash(path, size, mtime, algo)`, `set_hash(path, size, mtime, hash_val, algo)`, `clear`, `close`. All methods are serialized through a `threading.Lock`, and `_init_db` sets `PRAGMA journal_mode=WAL`, so the shared connection is safe under concurrent `BackgroundWorker(QThread)` access.
 - Schema: `file_hashes` table with columns `path` (PRIMARY KEY), `size`, `mtime`, `hash`, `algo`.
 - `clear` deletes all rows and runs `VACUUM`.
+
+#### `dataforge/core/paths.py`
+
+Canonical filesystem locations (single source of truth), implemented with `platformdirs.PlatformDirs("DataForge", "DataForge")`: `config_file`, `cache_db`, `jobs_db`, `log_file`, `runtime_dir`, `exports_dir` (`~/Documents/DataForge`). Linux resolves via XDG vars, macOS under `~/Library` (Application Support/Caches/Logs), Windows under `%LocalAppData%\DataForge\DataForge`. A minimal XDG fallback keeps imports working if the platformdirs dependency is missing (added to packaging by TICK-402).
+
+- Legacy migration shim: importing the module copies legacy `~/.dataforge/{config.json,cache.db,app.log}` into the canonical locations, preserves the whole legacy tree as `~/.dataforge.backup.<ts>`, logs `migrated_from_legacy=true`, and never deletes the original. One-shot: no-op when legacy config is absent or canonical config already exists. `migrate_from_legacy(legacy_dir=None)` is re-callable; set `DATAFORGE_SKIP_LEGACY_MIGRATION=1` to suppress the import-time run (used by tests).
+- `ensure_dirs()` best-effort creates config/cache/state/log/runtime directories.
+- Contract tests: `tests/test_paths_contract.py` (Linux XDG exact paths; macOS/Windows simulated via `sys.platform` + `WIN_PD_OVERRIDE_*`; migration copy/backup/log/idempotency).
 - Global instance: `file_cache`.
 
 #### `dataforge/core/hasher.py`

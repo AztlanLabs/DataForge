@@ -18,7 +18,7 @@ Both surfaces ultimately depend on the same lower-level modules and services, wh
 | Layer | Main files | Responsibility |
 | --- | --- | --- |
 | Entry points | `run_ui.py`, `dataforge/cli.py`, `setup.py` | Start the desktop app, expose CLI commands, package the console script |
-| Core primitives | `dataforge/core/common.py`, `scanner.py`, `config.py`, `cache.py`, `logger.py` | Represent files, scan disk state, persist settings, cache hashes, log runtime activity |
+| Core primitives | `dataforge/core/common.py`, `paths.py`, `scanner.py`, `config.py`, `cache.py`, `logger.py` | Represent files, resolve canonical per-OS locations (platformdirs + legacy migration), scan disk state, persist settings, cache hashes, log runtime activity |
 | Low-level filesystem operations | `dataforge/core/operations/files.py` | Rename, move, copy, delete, collision handling, archive creation, template naming |
 | Shared service layer | `dataforge/core/services/file_actions.py` | Central batch-oriented mutation API used by features and UI views |
 | Feature modules | `dataforge/modules/*.py` | Search, duplicates, organize, rename, cleaner, integrity, usage, reporting, plus the newer batch: `system_cleanup`, `performance`, `recovery`, `metadata`, `hardware`, `forensics`, `password_tools`, `device_manager`, `file_signatures` |
