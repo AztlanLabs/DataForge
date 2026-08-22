@@ -5,43 +5,67 @@
 **Toolchain:** `pytest` (`requirements-dev.txt:4`), `pytest-cov`, `ruff`, `mypy` — all `validation_command` are `pytest`-based.  
 **Principles enforced:** Contract-first (Wave 0) → disjoint writes per wave (no file appears twice in same wave) → sequential re-entries documented → consolidation isolates central touchpoints.
 
+> **Wave Status — Updated 2026-08-22 15:30 UTC — Wave 0 COMPLETED ✅**
+> - **Wave 0 (Contracts): 5/5 DONE — 69 tests, 5/5 `validation_command` green, file parity verified.** Unblocks Wave 1. Reviewed below.
+> - **Wave 1 (Parallel Fixes): 0/9 — 🔜 READY TO START** (Wave 0 gate green, disjoint, no file collision). Next.
+> - **Wave 2: 0/5 — ⏳ Pending** (needs Wave 1)
+> - **Wave 3: 0/4 — ⏳ Pending** (needs Wave 2)
+> - **Wave 4: 0/2 — ⏳ Pending** (needs Wave 3)
+> - **Overall: 5/25 tickets DONE (20%) — 20 remaining.** See `docs/prompts/tickets/README.md` for per-ticket prompts.
+
 > Read `CONSOLIDATED_SPEC.md` §2–7 for canonical definitions before picking a ticket. All `path:line` below verified at 2026-08-22.
 
 ---
 
 ## Concurrency Map (DAG) — Hardened
 
-| Wave | Ticket ID | Domain / Module | Target Write Scope (exclusive) | Depends On | Agent Scope |
-|---|---|---|---|---|---|
-| **Wave 0 — Contracts** | `TICK-001` | Core / Paths & Version | `dataforge/core/paths.py [NEW FILE]`, `dataforge/__init__.py`, `dataforge/core/__init__.py` | None | Scaffolding |
-| Wave 0 | `TICK-002` | Core / Provider & Models | `dataforge/core/provider.py`, `dataforge/core/common.py` | None | Interfaces |
-| Wave 0 | `TICK-003` | Engine / API Contracts | `dataforge/api/__init__.py [NEW FILE]`, `dataforge/api/schema.py [NEW FILE]`, `dataforge/api/transport/__init__.py [NEW FILE]`, `dataforge/api/transport/base.py [NEW FILE]` | None | Schemas & DTOs |
-| Wave 0 | `TICK-004` | Core / Persistence Contracts | `dataforge/core/config.py`, `dataforge/core/cache.py`, `dataforge/engine/__init__.py [NEW FILE]`, `dataforge/engine/migrations/README.md [NEW FILE]` | `TICK-001` | DB/Config contracts |
-| Wave 0 | `TICK-005` | Engine / Job Contract | `dataforge/engine/jobs.py [NEW FILE]`, `dataforge/engine/daemon.py [NEW FILE]` (stub) | `TICK-003` | Job model |
-| **Wave 1 — Parallel Fixes & Perf (all depend only on Wave 0 contracts, distinct files)** | `TICK-101` | Core / Logger | `dataforge/core/logger.py` | `TICK-004` | Bugfix R-CORE-1 |
-| Wave 1 | `TICK-102` | Core / Scanner | `dataforge/core/scanner.py` | `TICK-002` | Perf parallel BFS |
-| Wave 1 | `TICK-103` | Core / Hasher | `dataforge/core/hasher.py` | `TICK-002` | Perf mmap + block size |
-| Wave 1 | `TICK-104` | Core / Cache Impl | `dataforge/core/cache.py` *(sequential re-entry after TICK-004 — Wave 0 sig → Wave 1 impl: `set_hash_many`, `PRAGMA`s, index)* | `TICK-004` | Perf batch |
-| Wave 1 | `TICK-105` | Operations / Primitives | `dataforge/core/operations/files.py` | `TICK-002` | Bugfix R-OPS-1/3/4/6 |
-| Wave 1 | `TICK-106` | Modules / Search | `dataforge/modules/search.py` | `TICK-003` | Perf content search |
-| Wave 1 | `TICK-107` | Modules / Duplicates | `dataforge/modules/duplicates.py` | `TICK-003` | Perf pipeline + verify |
-| Wave 1 | `TICK-108` | Modules / Integrity | `dataforge/modules/integrity.py` | `TICK-003` | Perf streaming |
-| Wave 1 | `TICK-109` | Modules / Forensics (hash/keyword) | `dataforge/modules/forensics.py` *(first writer; second sequential writer is TICK-304 Wave 3)* | `TICK-003` | Perf + F15 |
-| **Wave 2 — Service & Mutations (depend on Wave 1, still disjoint)** | `TICK-201` | Service / Batch Actions | `dataforge/core/services/file_actions.py` | `TICK-105`, `TICK-102` | Parallel mutations + R-OPS-2 |
-| Wave 2 | `TICK-202` | Modules / Recovery | `dataforge/modules/recovery.py` | `TICK-102`, `TICK-103` | F6 carving (mmap + chunk) |
-| Wave 2 | `TICK-203` | Modules / System Cleanup | `dataforge/modules/system_cleanup.py` | `TICK-102` | Perf + S7 follow-up |
-| Wave 2 | `TICK-204` | Modules / Metadata | `dataforge/modules/metadata.py` | `TICK-003` | Consolidate vs cleaner |
-| Wave 2 | `TICK-205` | Transport / UDS+Pipe | `dataforge/api/transport/uds.py [NEW FILE]`, `dataforge/api/transport/named_pipe.py [NEW FILE]` | `TICK-003`, `TICK-005` | Native IPC (N0) |
-| **Wave 3 — Integration & Packaging** | `TICK-301` | Engine / Daemon + Client | `dataforge/engine/daemon.py` *(sequential overwrite of TICK-005 stub)*, `dataforge/client/__init__.py [NEW FILE]`, `dataforge/client/sync.py [NEW FILE]`, `dataforge/service/__main__.py [NEW FILE]` | `TICK-205`, `TICK-201` | Consolidation: job queue + auto-discover |
-| Wave 3 | `TICK-302` | Service / Lifecycle | `dataforge/service/linux/dataforge.socket [NEW FILE]`, `dataforge/service/linux/dataforge.service [NEW FILE]`, `dataforge/service/linux/com.dataforge.Engine.service [NEW FILE]`, `dataforge/service/windows/service.py [NEW FILE]`, `dataforge/service/macos/com.dataforge.engine.plist [NEW FILE]` | `TICK-301` | `systemd`/`launchd`/Service |
-| Wave 3 | `TICK-303` | Build / Packaging | `build_exe.py`, `packaging/nfpm.yaml [NEW FILE]`, `packaging/README.md [NEW FILE]` | `TICK-001` | Onefile+onedir, deb/rpm |
-| Wave 3 | `TICK-304` | Forensic / Audit & Evidence | `dataforge/core/audit.py [NEW FILE]`, `dataforge/core/case.py [NEW FILE]`, `dataforge/modules/forensics.py` *(sequential second writer after TICK-109)* | `TICK-005`, `TICK-109` | F1–F3/U2 + F9 — single seam, isolated |
-| **Wave 4 — Final Consolidation** | `TICK-401` | UI / Job Manager | `dataforge/ui/app.py`, `dataforge/ui/job_manager.py [NEW FILE]` | `TICK-301`, `TICK-304` | Replace `is_busy` + virtualize tables |
-| Wave 4 | `TICK-402` | Docs / Version Sync | `scripts/bump_version.py [NEW FILE]`, `pyproject.toml` *(sole writer this wave)* | `TICK-001`, `TICK-303` | Central version source |
+| Wave | Ticket ID | Domain / Module | Target Write Scope (exclusive) | Depends On | Agent Scope | Status |
+|---|---|---|---|---|---|---|
+| **Wave 0 — Contracts ✅ DONE** | `TICK-001` | Core / Paths & Version | `dataforge/core/paths.py [NEW FILE]`, `dataforge/__init__.py`, `dataforge/core/__init__.py` | None | Scaffolding | ✅ DONE 2026-08-22 — `tests/test_paths_contract.py` 11/11, `__version__` + XDG + legacy migration verified |
+| Wave 0 | `TICK-002` | Core / Provider & Models | `dataforge/core/provider.py`, `dataforge/core/common.py` | None | Interfaces | ✅ DONE 2026-08-22 — `tests/test_provider_contract.py` 14/14, `FileEntry` `st_ino/st_dev/st_blocks` + `FileProvider` 7 methods verified |
+| Wave 0 | `TICK-003` | Engine / API Contracts | `dataforge/api/__init__.py [NEW FILE]`, `dataforge/api/schema.py [NEW FILE]`, `dataforge/api/transport/__init__.py [NEW FILE]`, `dataforge/api/transport/base.py [NEW FILE]` | None | Schemas & DTOs | ✅ DONE 2026-08-22 — `tests/test_api_schema.py` 18/18, Pydantic DTOs + `Transport` `auto_discover` order verified |
+| Wave 0 | `TICK-004` | Core / Persistence Contracts | `dataforge/core/config.py`, `dataforge/core/cache.py`, `dataforge/engine/__init__.py [NEW FILE]`, `dataforge/engine/migrations/README.md [NEW FILE]` | `TICK-001` | DB/Config contracts | ✅ DONE 2026-08-22 — `tests/test_migration_contracts.py` 8/8, `CONFIG_SCHEMA_VERSION=2` + adaptive workers + `CACHE_SCHEMA_VERSION` + `set_hash_many` sig verified |
+| Wave 0 | `TICK-005` | Engine / Job Contract | `dataforge/engine/jobs.py [NEW FILE]`, `dataforge/engine/daemon.py [NEW FILE]` (stub) | `TICK-003` | Job model | ✅ DONE 2026-08-22 — `tests/test_jobs_contract.py` 18/18, `JobQueue` depth 8 + ULID + `is_cancelled()` + side-effect-free daemon verified |
+| **Wave 1 — Parallel Fixes & Perf 🔜 READY (Wave 0 green, 9 disjoint, unblocked)** | `TICK-101` | Core / Logger | `dataforge/core/logger.py` | `TICK-004` | Bugfix R-CORE-1 | 🔜 Ready |
+| Wave 1 | `TICK-102` | Core / Scanner | `dataforge/core/scanner.py` | `TICK-002` | Perf parallel BFS | 🔜 Ready |
+| Wave 1 | `TICK-103` | Core / Hasher | `dataforge/core/hasher.py` | `TICK-002` | Perf mmap + block size | 🔜 Ready |
+| Wave 1 | `TICK-104` | Core / Cache Impl | `dataforge/core/cache.py` *(sequential re-entry after TICK-004 — Wave 0 sig → Wave 1 impl: `set_hash_many`, `PRAGMA`s, index)* | `TICK-004` | Perf batch | 🔜 Ready |
+| Wave 1 | `TICK-105` | Operations / Primitives | `dataforge/core/operations/files.py` | `TICK-002` | Bugfix R-OPS-1/3/4/6 | 🔜 Ready |
+| Wave 1 | `TICK-106` | Modules / Search | `dataforge/modules/search.py` | `TICK-003` | Perf content search | 🔜 Ready |
+| Wave 1 | `TICK-107` | Modules / Duplicates | `dataforge/modules/duplicates.py` | `TICK-003` | Perf pipeline + verify | 🔜 Ready |
+| Wave 1 | `TICK-108` | Modules / Integrity | `dataforge/modules/integrity.py` | `TICK-003` | Perf streaming | 🔜 Ready |
+| Wave 1 | `TICK-109` | Modules / Forensics (hash/keyword) | `dataforge/modules/forensics.py` *(first writer; second sequential writer is TICK-304 Wave 3)* | `TICK-003` | Perf + F15 | 🔜 Ready |
+| **Wave 2 — Service & Mutations ⏳ Pending (needs Wave 1)** | `TICK-201` | Service / Batch Actions | `dataforge/core/services/file_actions.py` | `TICK-105`, `TICK-102` | Parallel mutations + R-OPS-2 | ⏳ Pending |
+| Wave 2 | `TICK-202` | Modules / Recovery | `dataforge/modules/recovery.py` | `TICK-102`, `TICK-103` | F6 carving (mmap + chunk) | ⏳ Pending |
+| Wave 2 | `TICK-203` | Modules / System Cleanup | `dataforge/modules/system_cleanup.py` | `TICK-102` | Perf + S7 follow-up | ⏳ Pending |
+| Wave 2 | `TICK-204` | Modules / Metadata | `dataforge/modules/metadata.py` | `TICK-003` | Consolidate vs cleaner | ⏳ Pending |
+| Wave 2 | `TICK-205` | Transport / UDS+Pipe | `dataforge/api/transport/uds.py [NEW FILE]`, `dataforge/api/transport/named_pipe.py [NEW FILE]` | `TICK-003`, `TICK-005` | Native IPC (N0) | ⏳ Pending |
+| **Wave 3 — Integration & Packaging ⏳ Pending** | `TICK-301` | Engine / Daemon + Client | `dataforge/engine/daemon.py` *(sequential overwrite of TICK-005 stub)*, `dataforge/client/__init__.py [NEW FILE]`, `dataforge/client/sync.py [NEW FILE]`, `dataforge/service/__main__.py [NEW FILE]` | `TICK-205`, `TICK-201` | Consolidation: job queue + auto-discover | ⏳ Pending |
+| Wave 3 | `TICK-302` | Service / Lifecycle | `dataforge/service/linux/dataforge.socket [NEW FILE]`, `dataforge/service/linux/dataforge.service [NEW FILE]`, `dataforge/service/linux/com.dataforge.Engine.service [NEW FILE]`, `dataforge/service/windows/service.py [NEW FILE]`, `dataforge/service/macos/com.dataforge.engine.plist [NEW FILE]` | `TICK-301` | `systemd`/`launchd`/Service | ⏳ Pending |
+| Wave 3 | `TICK-303` | Build / Packaging | `build_exe.py`, `packaging/nfpm.yaml [NEW FILE]`, `packaging/README.md [NEW FILE]` | `TICK-001` | Onefile+onedir, deb/rpm | ⏳ Pending |
+| Wave 3 | `TICK-304` | Forensic / Audit & Evidence | `dataforge/core/audit.py [NEW FILE]`, `dataforge/core/case.py [NEW FILE]`, `dataforge/modules/forensics.py` *(sequential second writer after TICK-109)* | `TICK-005`, `TICK-109` | F1–F3/U2 + F9 — single seam, isolated | ⏳ Pending |
+| **Wave 4 — Final Consolidation ⏳ Pending** | `TICK-401` | UI / Job Manager | `dataforge/ui/app.py`, `dataforge/ui/job_manager.py [NEW FILE]` | `TICK-301`, `TICK-304` | Replace `is_busy` + virtualize tables | ⏳ Pending |
+| Wave 4 | `TICK-402` | Docs / Version Sync | `scripts/bump_version.py [NEW FILE]`, `pyproject.toml` *(sole writer this wave)* | `TICK-001`, `TICK-303` | Central version source | ⏳ Pending |
 
 **Disjoint guarantee (hardened):** No two tickets in the **same wave** list the same `exclusive_write_files` path. Central touchpoints (`dataforge/ui/app.py`, `pyproject.toml`, `dataforge/engine/daemon.py`, `dataforge/modules/forensics.py`, `dataforge/core/cache.py`) appear in **different waves** sequentially and are documented as re-entries. Wave 0 contracts land before any Wave 1 impl that imports them (`TICK-004` now depends on `TICK-001`).
 
 *Alias:* `docs/proposals/PERFORMANCE_TICKETS.md` `PERF-*` tickets are **aliases** to `TICK-*` below — `PERF-100→TICK-004`, `PERF-101→TICK-102`, `PERF-102→TICK-103`, `PERF-103→TICK-104`, `PERF-104→TICK-107`, etc. Pick one set per run; never run twins same wave.
+
+---
+
+## Wave 0 Review — Completed 2026-08-22 (5/5 DONE, 69 tests)
+
+> **Reviewer:** Principal Technical Auditor · **Method:** `Read` each `exclusive_write_files` + `Read` `tests/test_*` + `PYTHONPATH=. pytest` + manual `python -c` import checks against `CONSOLIDATED_SPEC.md` §2–7 and hardened audit `docs/AUDIT_HARDENED_2026-08-22.md`. All 5 Wave 0 contracts are **file-parity clean, symbol-accurate, and disjoint per wave**.
+
+| Ticket | Implementation | Verification | Finding | Status |
+|---|---|---|---|---|
+| `TICK-001` | `dataforge/core/paths.py [NEW]` PlatformDirs + `_FallbackDirs` (XDG `~/.config`/`~/.cache`/`~/.local/state`/`/tmp`/`Logs`, macOS `~/Library`, Windows `AppData`), `LEGACY_DIR=~/.dataforge`, `migrate_from_legacy()` copies `config.json`/`cache.db`/`app.log` to `backup.<ts>`, `ensure_dirs()`, `dataforge/__init__.py` `__version__` via `importlib.metadata` → `pyproject.toml` fallback (`0.1.0` matches), `core/__init__.py` re-exports | `pytest tests/test_paths_contract.py` 11/11 ✅ · `python -c 'import dataforge; print(__version__)'` `0.1.0` · `paths.config_file==~/.config/DataForge/config.json` (XDG) | Adaptive `DATAFORGE_SKIP_LEGACY_MIGRATION` env, no `pyproject.toml` write (correct per hardened `TICK-001` — `pyproject` sole writer is `TICK-402` Wave 4). No hallucination. | ✅ DONE |
+| `TICK-002` | `dataforge/core/common.py` adds `st_ino:int=0, st_dev:int=0, st_blocks:int=0` + `hardlink_key` property; `provider.py` expands to 7 methods `list_files` (+`cancel_token`/`progress_callback`), `list_files_parallel` (shim), `stat`, `open`, `hash`, `hash_many`, `exists` + `move`/`copy` abstract, `LocalProvider` implements all via `scanner`/`hasher`/`os.stat`/`shutil`, `default_provider()` | `pytest tests/test_provider_contract.py` 14/14 ✅ · `mypy provider.py` clean (advisory) · `isinstance(LocalProvider(),FileProvider)` · `FileEntry(st_ino=123,st_dev=456).hardlink_key==(456,123)` | No redundant work (Wave 0 contract only — no parallel walk yet, that is `TICK-102`). `exists`/`hash_many` default shim added correctly (previous 3-method ABC → 7-method, backward compat). | ✅ DONE |
+| `TICK-003` | `dataforge/api/schema.py [NEW]` Pydantic `ApiRequest.to_jsonrpc()` + `ScanRequest`/`SearchRequest`/`DupesRequest`/`HashRequest`/`IntegrityRequest` + `JobStatus`/`JobEvent`/`JobEventType` with `field_validator` for `root`, `algo`; `transport/base.py [NEW]` `Transport` ABC `send`/`recv`/`subscribe`/`auto_discover` + `_discover_endpoints()` order `DATAFORGE_ENGINE_SOCK` → `XDG_RUNTIME_DIR` → `~/Library` → `\\.\pipe` → `http://127.0.0.1:8765` + `_probe_first_existing()` | `pytest tests/test_api_schema.py` 18/18 ✅ · `ScanRequest(root='/tmp').to_jsonrpc()=={'jsonrpc':'2.0',...}` · `Transport` subclass requires 4 methods · no circular import `core→api` | Correctly adds `pydantic` to `requirements` scope (new dep isolated to `api/`). `api/__init__.py` + `transport/__init__.py` added per hardened file parity. No hallucination (previously missing `api/` dir). | ✅ DONE |
+| `TICK-004` | `config.py` adds `CONFIG_SCHEMA_VERSION=2`, `MIGRATIONS={1:_migrate_v1_to_v2}`, adaptive `_default_max_thread_workers()=min(32,cpu*4)`, `hash_block_size=1<<20`, `cache_batch_size=1000`, `_schema_version` handling + backup `config.json.bak.v1`; `cache.py` adds `CACHE_SCHEMA_VERSION=2`, `MIGRATIONS_DIR`, `get_user_version()`, `get_pending_migrations()`/`pending_migrations`, `set_hash_many(rows: list[tuple[str,int,float,str,str]])` shape validation (Wave 0 stub, impl is `TICK-104`) + `PRAGMA user_version` read | `pytest tests/test_migration_contracts.py` 8/8 ✅ · `config.CONFIG_SCHEMA_VERSION==2` · `cache.CACHE_SCHEMA_VERSION==2` · `set_hash_many` validates 5-tuple shape · `test_config_adaptive_workers_12_core` mocked `cpu_count=12` → 32 workers | `depends_on: ["TICK-001"]` correctly added (needs `paths.py`). `cache.py` `set_hash_many` is **stub** per contract (returns `None` after validation) — impl deferred to `TICK-104` Wave 1, so no redundant work. | ✅ DONE |
+| `TICK-005` | `engine/jobs.py [NEW]` `Job` (ULID 26-char, `provider`/`params`/`cancel_token`/`progress_callback`/`status`→`JobStatus.QUEUED`→`RUNNING`→`DONE`/`CANCELLED`/`FAILED`, `is_cancelled()`, `to_dict()`/`json_safe()`), `JobQueue` depth 8 `ThreadPoolExecutor` + `_run_job`/`submit`/`get`/`cancel`/`list_jobs`/`subscribe`, `EngineDaemon` stub `daemon.py [NEW]` side-effect-free `Daemon` wrapping `JobQueue` (`is_running` false on import) | `pytest tests/test_jobs_contract.py` 18/18 ✅ · `JobQueue().submit(dummy)` → `DONE` · `job.is_cancelled()` after `cancel_token.set()` · `job.json_safe()` JSON dumps · `from dataforge.engine.daemon import Daemon` no server start | `engine/__init__.py` + `migrations/README.md` added per hardened parity. Stub correctly defers real `asyncio`+`ProcessPool` loop to `TICK-301` Wave 3 (sequential re-entry). | ✅ DONE |
+
+**Wave 0 gate:** 5/5 contracts landed, `69 passed` (`11+14+18+8+18`), no file appears twice in Wave 0 (disjoint), `depends_on` satisfied (`TICK-004→001`, `TICK-005→003`), `git diff --name-only origin/develop` shows only `exclusive_write_files` + tests. **Wave 1 is now unblocked — 9 agents may start in parallel on distinct files.**
 
 ---
 

@@ -4,15 +4,19 @@
 
 **Generic prompt:** `../parallel-ticket-agent.md` / `../../../.github/prompts/parallel-ticket-agent.prompt.md` — set `{{TICKET_ID}}`.
 
+> **Status 2026-08-22 15:30 UTC — Wave 0 ✅ DONE (5/5, 69 tests) → Wave 1 🔜 READY**
+> Wave 0 contracts unblock Wave 1 — 9 Wave 1 tickets now have `depends_on` satisfied and can run in parallel. See `docs/PARALLEL_BACKLOG.md` Wave 0 Review for verification.
+> **Overall: 5/25 DONE (20%) — 20 remaining.**
+
 ## Execution Order (Wave DAG)
 
-### Wave 0
+### Wave 0 ✅ DONE 2026-08-22 (5/5 — `tests/test_*_contract.py` 69/69, verified)
 
-- **TICK-001** — Define canonical paths (platformdirs) and single version source | depends: — | writes: `dataforge/core/paths.py [NEW FILE]`, `dataforge/__init__.py`, `dataforge/core/__init__.py` → [`TICK-001.prompt.md`](./TICK-001.prompt.md)
-- **TICK-002** — Expand FileProvider ABC and FileEntry for hardlink/sparse/inode awareness | depends: — | writes: `dataforge/core/provider.py`, `dataforge/core/common.py` → [`TICK-002.prompt.md`](./TICK-002.prompt.md)
-- **TICK-003** — Define engine API schemas (Scan/Search/Dupes/Hash/Integrity) and transport ABC | depends: — | writes: `dataforge/api/__init__.py [NEW FILE]`, `dataforge/api/schema.py [NEW FILE]`, `dataforge/api/transport/__init__.py [NEW FILE]`, `dataforge/api/transport/base.py [NEW FILE]` → [`TICK-003.prompt.md`](./TICK-003.prompt.md)
-- **TICK-004** — Add CONFIG_SCHEMA_VERSION, cache PRAGMA user_version, set_hash_many sig, and adaptive worker defaults | depends: "TICK-001" | writes: `dataforge/core/config.py`, `dataforge/core/cache.py`, `dataforge/engine/__init__.py [NEW FILE]`, `dataforge/engine/migrations/README.md [NEW FILE]` → [`TICK-004.prompt.md`](./TICK-004.prompt.md)
-- **TICK-005** — Define Job model (id, provider, params, cancel_token, progress_callback, results) | depends: "TICK-003" | writes: `dataforge/engine/jobs.py [NEW FILE]`, `dataforge/engine/daemon.py [NEW FILE]` → [`TICK-005.prompt.md`](./TICK-005.prompt.md)
+- **TICK-001** ✅ DONE — Define canonical paths (platformdirs) and single version source | depends: — | writes: `dataforge/core/paths.py [NEW FILE]`, `dataforge/__init__.py`, `dataforge/core/__init__.py` → [`TICK-001.prompt.md`](./TICK-001.prompt.md)
+- **TICK-002** ✅ DONE — Expand FileProvider ABC and FileEntry for hardlink/sparse/inode awareness | depends: — | writes: `dataforge/core/provider.py`, `dataforge/core/common.py` → [`TICK-002.prompt.md`](./TICK-002.prompt.md)
+- **TICK-003** ✅ DONE — Define engine API schemas (Scan/Search/Dupes/Hash/Integrity) and transport ABC | depends: — | writes: `dataforge/api/__init__.py [NEW FILE]`, `dataforge/api/schema.py [NEW FILE]`, `dataforge/api/transport/__init__.py [NEW FILE]`, `dataforge/api/transport/base.py [NEW FILE]` → [`TICK-003.prompt.md`](./TICK-003.prompt.md)
+- **TICK-004** ✅ DONE — Add CONFIG_SCHEMA_VERSION, cache PRAGMA user_version, set_hash_many sig, and adaptive worker defaults | depends: "TICK-001" | writes: `dataforge/core/config.py`, `dataforge/core/cache.py`, `dataforge/engine/__init__.py [NEW FILE]`, `dataforge/engine/migrations/README.md [NEW FILE]` → [`TICK-004.prompt.md`](./TICK-004.prompt.md)
+- **TICK-005** ✅ DONE — Define Job model (id, provider, params, cancel_token, progress_callback, results) | depends: "TICK-003" | writes: `dataforge/engine/jobs.py [NEW FILE]`, `dataforge/engine/daemon.py [NEW FILE]` → [`TICK-005.prompt.md`](./TICK-005.prompt.md)
 
 ### Wave 1
 

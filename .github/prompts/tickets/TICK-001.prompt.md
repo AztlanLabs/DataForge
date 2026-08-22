@@ -1,3 +1,5 @@
+> **Status: ✅ COMPLETED 2026-08-22 — Wave 0 DONE, verified 69 tests (see docs/PARALLEL_BACKLOG.md Wave 0 Review). This ticket is closed — do not re-run.**
+
 # Ticket TICK-001 — Define canonical paths (platformdirs) and single version source
 
 > **Wave 0** | **Domain:** Core / Infrastructure | **Depends on:** None — can start with Wave 0 peers after previous wave merges

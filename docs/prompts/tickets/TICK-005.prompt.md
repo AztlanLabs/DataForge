@@ -1,3 +1,5 @@
+> **Status: ✅ COMPLETED 2026-08-22 — Wave 0 DONE, verified 69 tests (see docs/PARALLEL_BACKLOG.md Wave 0 Review). This ticket is closed — do not re-run.**
+
 # Ticket TICK-005 — Define Job model (id, provider, params, cancel_token, progress_callback, results)
 
 > **Wave 0** | **Domain:** Engine / Jobs | **Depends on:** "TICK-003"
