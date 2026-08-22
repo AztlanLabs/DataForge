@@ -1,3 +1,5 @@
+> **Status: ✅ COMPLETED 2026-08-22 — Wave 1 DONE, verified (see docs/PARALLEL_BACKLOG.md Wave 1 Review). This ticket is closed — do not re-run.**
+
 # Ticket TICK-109 — Make forensics calc_hashes/keyword_search share streaming engine + byte budget
 
 > **Wave 1** | **Domain:** Modules / Forensics | **Depends on:** "TICK-003"

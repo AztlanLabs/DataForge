@@ -4,7 +4,7 @@
 
 > **New (principal review):** [`CONSOLIDATED_SPEC.md`](./CONSOLIDATED_SPEC.md) is the single authoritative spec (reconciles all of `docs/` + proposals + reviews). [`PARALLEL_BACKLOG.md`](./PARALLEL_BACKLOG.md) is the DAG backlog for simultaneous agents — start there if you are picking a ticket. Generic parallel-agent prompt: [`.github/prompts/parallel-ticket-agent.prompt.md`](../.github/prompts/parallel-ticket-agent.prompt.md) — copy, set `{{TICKET_ID}}`, and run (one ticket = one branch = one PR, disjoint writes per wave).
 >
-> **Status 2026-08-22 16:45 UTC — Wave 0 ✅ 5/5 DONE, Wave 1 🔜 5/9 DONE (TICK-101,102,103,104,105) → 4 remaining (`TICK-106`–`109`) can run in parallel.** See `PARALLEL_BACKLOG.md` Wave 0 + Wave 1 Reviews (5/9, 63 tests).
+> **Status 2026-08-22 17:15 UTC — Wave 0 ✅ 5/5 DONE, Wave 1 ✅ 9/9 DONE (126 tests) → Wave 2 🔜 READY (5 parallel agents).** See `PARALLEL_BACKLOG.md` Wave 0 + Wave 1 Reviews (9/9).
 
 ## Current truth — read these
 

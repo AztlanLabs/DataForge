@@ -1,3 +1,5 @@
+> **Status: ✅ COMPLETED 2026-08-22 — Wave 1 DONE, verified (see docs/PARALLEL_BACKLOG.md Wave 1 Review). This ticket is closed — do not re-run.**
+
 # Ticket TICK-108 — Stream integrity create/verify instead of materializing file lists
 
 > **Wave 1** | **Domain:** Modules / Integrity | **Depends on:** "TICK-003"
