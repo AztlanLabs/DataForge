@@ -4,9 +4,9 @@
 
 **Generic prompt:** `../parallel-ticket-agent.md` / `../../../.github/prompts/parallel-ticket-agent.prompt.md` — set `{{TICKET_ID}}`.
 
-> **Status 2026-08-22 16:15 UTC — Wave 0 ✅ DONE (5/5), Wave 1 PARTIAL 2/9 ✅ (TICK-101, TICK-103) → 7 remaining**
-> Wave 0 (69 tests) + Wave 1 partial (25 tests) = 94 tests green — Wave 1 remaining 7 tickets can run in parallel. See `docs/PARALLEL_BACKLOG.md` Wave 0 + Wave 1 Reviews.
-> **Overall: 7/25 DONE (28%) — 18 remaining.**
+> **Status 2026-08-22 16:45 UTC — Wave 0 ✅ 5/5 DONE, Wave 1 🔜 5/9 DONE (101,102,103,104,105) → 4 remaining**
+> Wave 0 (69 tests) + Wave 1 5/9 (63 tests: `11+22+14+8+8` + `11+14` already counted) = 132 tests green — Wave 1 remaining 4 tickets (`TICK-106`–`109`) can run in parallel on distinct files. See `docs/PARALLEL_BACKLOG.md` Wave 0 + Wave 1 Reviews (updated).
+> **Overall: 10/25 DONE (40%) — 15 remaining.**
 
 ## Execution Order (Wave DAG)
 
@@ -18,13 +18,13 @@
 - **TICK-004** ✅ DONE — Add CONFIG_SCHEMA_VERSION, cache PRAGMA user_version, set_hash_many sig, and adaptive worker defaults | depends: "TICK-001" | writes: `dataforge/core/config.py`, `dataforge/core/cache.py`, `dataforge/engine/__init__.py [NEW FILE]`, `dataforge/engine/migrations/README.md [NEW FILE]` → [`TICK-004.prompt.md`](./TICK-004.prompt.md)
 - **TICK-005** ✅ DONE — Define Job model (id, provider, params, cancel_token, progress_callback, results) | depends: "TICK-003" | writes: `dataforge/engine/jobs.py [NEW FILE]`, `dataforge/engine/daemon.py [NEW FILE]` → [`TICK-005.prompt.md`](./TICK-005.prompt.md)
 
-### Wave 1 — 2/9 DONE, 7 remaining (in progress)
+### Wave 1 — 5/9 DONE, 4 remaining (in progress, 63 tests)
 
 - **TICK-101** ✅ DONE 2026-08-22 — Route console logger to stderr so CLI JSON stays clean | depends: "TICK-004" | writes: `dataforge/core/logger.py` → [`TICK-101.prompt.md`](./TICK-101.prompt.md)
-- **TICK-102** 🔜 Ready — Replace recursive yield-from walk with parallel BFS + DirEntry.stat reuse + inode fields | depends: "TICK-002" | writes: `dataforge/core/scanner.py` → [`TICK-102.prompt.md`](./TICK-102.prompt.md)
+- **TICK-102** ✅ DONE 2026-08-22 — Replace recursive yield-from walk with parallel BFS + DirEntry.stat reuse + inode fields | depends: "TICK-002" | writes: `dataforge/core/scanner.py` → [`TICK-102.prompt.md`](./TICK-102.prompt.md)
 - **TICK-103** ✅ DONE 2026-08-22 — Switch hasher to 1 MiB blocks + mmap for large files | depends: "TICK-002" | writes: `dataforge/core/hasher.py` → [`TICK-103.prompt.md`](./TICK-103.prompt.md)
-- **TICK-104** 🔜 Ready — Batch cache writes + WAL pragmas + composite index (impl for TICK-004 contract) | depends: "TICK-004" | writes: `dataforge/core/cache.py` → [`TICK-104.prompt.md`](./TICK-104.prompt.md)
-- **TICK-105** 🔜 Ready — Fix collision O(N²), prune empty-dest, and case-only rename on case-insensitive FS | depends: "TICK-002" | writes: `dataforge/core/operations/files.py` → [`TICK-105.prompt.md`](./TICK-105.prompt.md)
+- **TICK-104** ✅ DONE 2026-08-22 — Batch cache writes + WAL pragmas + composite index (impl for TICK-004 contract) | depends: "TICK-004" | writes: `dataforge/core/cache.py` → [`TICK-104.prompt.md`](./TICK-104.prompt.md)
+- **TICK-105** ✅ DONE 2026-08-22 — Fix collision O(N²), prune empty-dest, and case-only rename on case-insensitive FS | depends: "TICK-002" | writes: `dataforge/core/operations/files.py` → [`TICK-105.prompt.md`](./TICK-105.prompt.md)
 - **TICK-106** 🔜 Ready — Make search content path parallel, mmap-based, and shared with forensics | depends: "TICK-003" | writes: `dataforge/modules/search.py` → [`TICK-106.prompt.md`](./TICK-106.prompt.md)
 - **TICK-107** 🔜 Ready — Pipeline dupes: streaming size-map → fast-hash → full-hash with verify | depends: "TICK-003" | writes: `dataforge/modules/duplicates.py` → [`TICK-107.prompt.md`](./TICK-107.prompt.md)
 - **TICK-108** 🔜 Ready — Stream integrity create/verify instead of materializing file lists | depends: "TICK-003" | writes: `dataforge/modules/integrity.py` → [`TICK-108.prompt.md`](./TICK-108.prompt.md)

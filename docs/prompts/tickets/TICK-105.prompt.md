@@ -1,3 +1,5 @@
+> **Status: ✅ COMPLETED 2026-08-22 — Wave 1 DONE, verified (see docs/PARALLEL_BACKLOG.md Wave 1 Review). This ticket is closed — do not re-run.**
+
 # Ticket TICK-105 — Fix collision O(N²), prune empty-dest, and case-only rename on case-insensitive FS
 
 > **Wave 1** | **Domain:** Core / Operations | **Depends on:** "TICK-002"

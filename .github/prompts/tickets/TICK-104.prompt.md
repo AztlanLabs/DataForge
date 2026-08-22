@@ -1,3 +1,5 @@
+> **Status: ✅ COMPLETED 2026-08-22 — Wave 1 DONE, verified (see docs/PARALLEL_BACKLOG.md Wave 1 Review). This ticket is closed — do not re-run.**
+
 # Ticket TICK-104 — Batch cache writes + WAL pragmas + composite index (impl for TICK-004 contract)
 
 > **Wave 1** | **Domain:** Core / Cache | **Depends on:** "TICK-004"
