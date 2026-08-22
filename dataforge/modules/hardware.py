@@ -154,9 +154,12 @@ def _get_ram_details():
         ram["swap_total_bytes"] = swap.total
         ram["swap_formatted_total"] = format_size(swap.total)
 
-    # Linux: try dmidecode for RAM type/speed (requires root)
+    # Linux: try dmidecode for RAM type/speed (requires root — never use sudo here)
+    # On startup this would trigger a password prompt. We try without sudo;
+    # if not permitted, _run_cmd returns None and we gracefully skip
+    # detailed DIMM info (sysfs fallback in _get_motherboard_details covers most).
     if platform.system() == "Linux" and _command_available("dmidecode"):
-        dmidecode = _run_cmd(["sudo", "dmidecode", "-t", "memory"], timeout=5)
+        dmidecode = _run_cmd(["dmidecode", "-t", "memory"], timeout=5)
         if dmidecode:
             ram["modules"] = []
             current_module = {}

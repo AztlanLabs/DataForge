@@ -5,6 +5,8 @@ Progress is real, not simulated: DataForgeApp.__init__ accepts an
 on_progress(current, total, message) callback and invokes it once per view
 as it's constructed, so the bar and "what's loading" text track actual work.
 """
+import os
+
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar, QApplication
 from PyQt5.QtCore import Qt
 
@@ -17,7 +19,14 @@ class SplashScreen(QWidget):
     HEIGHT = 200
 
     def __init__(self):
-        super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        # WindowStaysOnTopHint triggers QWindow::requestActivate() on show(),
+        # which Wayland deliberately does not support (compositor controls
+        # focus). The flag is useful on X11/Windows but only produces a
+        # warning on Wayland, so we add it only when not on Wayland.
+        flags = Qt.FramelessWindowHint
+        if not os.environ.get("WAYLAND_DISPLAY"):
+            flags |= Qt.WindowStaysOnTopHint
+        super().__init__(None, flags)
         self.setAttribute(Qt.WA_TranslucentBackground, False)
         self.setFixedSize(self.WIDTH, self.HEIGHT)
         self._center_on_screen()

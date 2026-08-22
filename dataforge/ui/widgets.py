@@ -34,10 +34,14 @@ except Exception:  # pragma: no cover - optional dependency
     _HAS_MUTAGEN = False
 
 try:
-    import fitz  # type: ignore  # PyMuPDF - renders PDF pages to images
+    import pymupdf as fitz  # type: ignore  # PyMuPDF - renders PDF pages to images (use pymupdf, fitz shim is deprecated)
     _HAS_FITZ = True
 except Exception:  # pragma: no cover - optional dependency
-    _HAS_FITZ = False
+    try:
+        import fitz as fitz  # type: ignore  # fallback for old installs
+        _HAS_FITZ = True
+    except Exception:  # pragma: no cover
+        _HAS_FITZ = False
 
 try:
     import cv2  # type: ignore  # opencv-python-headless - extracts video frames
