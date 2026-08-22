@@ -5,13 +5,13 @@
 **Toolchain:** `pytest` (`requirements-dev.txt:4`), `pytest-cov`, `ruff`, `mypy` — all `validation_command` are `pytest`-based.  
 **Principles enforced:** Contract-first (Wave 0) → disjoint writes per wave (no file appears twice in same wave) → sequential re-entries documented → consolidation isolates central touchpoints.
 
-> **Wave Status — Updated 2026-08-22 15:30 UTC — Wave 0 COMPLETED ✅**
+> **Wave Status — Updated 2026-08-22 16:15 UTC — Wave 0 COMPLETED ✅, Wave 1 PARTIAL (2/9) ✅**
 > - **Wave 0 (Contracts): 5/5 DONE — 69 tests, 5/5 `validation_command` green, file parity verified.** Unblocks Wave 1. Reviewed below.
-> - **Wave 1 (Parallel Fixes): 0/9 — 🔜 READY TO START** (Wave 0 gate green, disjoint, no file collision). Next.
-> - **Wave 2: 0/5 — ⏳ Pending** (needs Wave 1)
+> - **Wave 1 (Parallel Fixes): 2/9 DONE, 7 remaining — 🔜 IN PROGRESS (69 + 25 tests).** `TICK-101` and `TICK-103` verified (see Wave 1 Review). Remaining 7 tickets disjoint and ready — can run in parallel on distinct files.
+> - **Wave 2: 0/5 — ⏳ Pending** (needs Wave 1: `TICK-105`/`102` for 201, `102`/`103` for 202, etc.)
 > - **Wave 3: 0/4 — ⏳ Pending** (needs Wave 2)
 > - **Wave 4: 0/2 — ⏳ Pending** (needs Wave 3)
-> - **Overall: 5/25 tickets DONE (20%) — 20 remaining.** See `docs/prompts/tickets/README.md` for per-ticket prompts.
+> - **Overall: 7/25 tickets DONE (28%) — 18 remaining.** See `docs/prompts/tickets/README.md` for per-ticket prompts. Wave 1 partial review below.
 
 > Read `CONSOLIDATED_SPEC.md` §2–7 for canonical definitions before picking a ticket. All `path:line` below verified at 2026-08-22.
 
@@ -26,15 +26,15 @@
 | Wave 0 | `TICK-003` | Engine / API Contracts | `dataforge/api/__init__.py [NEW FILE]`, `dataforge/api/schema.py [NEW FILE]`, `dataforge/api/transport/__init__.py [NEW FILE]`, `dataforge/api/transport/base.py [NEW FILE]` | None | Schemas & DTOs | ✅ DONE 2026-08-22 — `tests/test_api_schema.py` 18/18, Pydantic DTOs + `Transport` `auto_discover` order verified |
 | Wave 0 | `TICK-004` | Core / Persistence Contracts | `dataforge/core/config.py`, `dataforge/core/cache.py`, `dataforge/engine/__init__.py [NEW FILE]`, `dataforge/engine/migrations/README.md [NEW FILE]` | `TICK-001` | DB/Config contracts | ✅ DONE 2026-08-22 — `tests/test_migration_contracts.py` 8/8, `CONFIG_SCHEMA_VERSION=2` + adaptive workers + `CACHE_SCHEMA_VERSION` + `set_hash_many` sig verified |
 | Wave 0 | `TICK-005` | Engine / Job Contract | `dataforge/engine/jobs.py [NEW FILE]`, `dataforge/engine/daemon.py [NEW FILE]` (stub) | `TICK-003` | Job model | ✅ DONE 2026-08-22 — `tests/test_jobs_contract.py` 18/18, `JobQueue` depth 8 + ULID + `is_cancelled()` + side-effect-free daemon verified |
-| **Wave 1 — Parallel Fixes & Perf 🔜 READY (Wave 0 green, 9 disjoint, unblocked)** | `TICK-101` | Core / Logger | `dataforge/core/logger.py` | `TICK-004` | Bugfix R-CORE-1 | 🔜 Ready |
-| Wave 1 | `TICK-102` | Core / Scanner | `dataforge/core/scanner.py` | `TICK-002` | Perf parallel BFS | 🔜 Ready |
-| Wave 1 | `TICK-103` | Core / Hasher | `dataforge/core/hasher.py` | `TICK-002` | Perf mmap + block size | 🔜 Ready |
-| Wave 1 | `TICK-104` | Core / Cache Impl | `dataforge/core/cache.py` *(sequential re-entry after TICK-004 — Wave 0 sig → Wave 1 impl: `set_hash_many`, `PRAGMA`s, index)* | `TICK-004` | Perf batch | 🔜 Ready |
-| Wave 1 | `TICK-105` | Operations / Primitives | `dataforge/core/operations/files.py` | `TICK-002` | Bugfix R-OPS-1/3/4/6 | 🔜 Ready |
-| Wave 1 | `TICK-106` | Modules / Search | `dataforge/modules/search.py` | `TICK-003` | Perf content search | 🔜 Ready |
-| Wave 1 | `TICK-107` | Modules / Duplicates | `dataforge/modules/duplicates.py` | `TICK-003` | Perf pipeline + verify | 🔜 Ready |
-| Wave 1 | `TICK-108` | Modules / Integrity | `dataforge/modules/integrity.py` | `TICK-003` | Perf streaming | 🔜 Ready |
-| Wave 1 | `TICK-109` | Modules / Forensics (hash/keyword) | `dataforge/modules/forensics.py` *(first writer; second sequential writer is TICK-304 Wave 3)* | `TICK-003` | Perf + F15 | 🔜 Ready |
+| **Wave 1 — Parallel Fixes & Perf 🔜 IN PROGRESS (2/9 DONE)** | `TICK-101` | Core / Logger | `dataforge/core/logger.py` | `TICK-004` | Bugfix R-CORE-1 | ✅ DONE 2026-08-22 — `tests/test_logger_stdout_regression.py` 11/11, `sys.stderr` + `0o600` file verified |
+| Wave 1 | `TICK-102` | Core / Scanner | `dataforge/core/scanner.py` | `TICK-002` | Perf parallel BFS | 🔜 Ready (unblocked, distinct file) |
+| Wave 1 | `TICK-103` | Core / Hasher | `dataforge/core/hasher.py` | `TICK-002` | Perf mmap + block size | ✅ DONE 2026-08-22 — `tests/test_hasher_mmap.py` 14/14, 1 MiB + `mmap` 16 MiB + `posix_fadvise` verified |
+| Wave 1 | `TICK-104` | Core / Cache Impl | `dataforge/core/cache.py` *(sequential re-entry after TICK-004 — Wave 0 sig → Wave 1 impl: `set_hash_many`, `PRAGMA`s, index)* | `TICK-004` | Perf batch | 🔜 Ready (unblocked, distinct file) |
+| Wave 1 | `TICK-105` | Operations / Primitives | `dataforge/core/operations/files.py` | `TICK-002` | Bugfix R-OPS-1/3/4/6 | 🔜 Ready (unblocked, distinct file) |
+| Wave 1 | `TICK-106` | Modules / Search | `dataforge/modules/search.py` | `TICK-003` | Perf content search | 🔜 Ready (unblocked, distinct file) |
+| Wave 1 | `TICK-107` | Modules / Duplicates | `dataforge/modules/duplicates.py` | `TICK-003` | Perf pipeline + verify | 🔜 Ready (unblocked, distinct file) |
+| Wave 1 | `TICK-108` | Modules / Integrity | `dataforge/modules/integrity.py` | `TICK-003` | Perf streaming | 🔜 Ready (unblocked, distinct file) |
+| Wave 1 | `TICK-109` | Modules / Forensics (hash/keyword) | `dataforge/modules/forensics.py` *(first writer; second sequential writer is TICK-304 Wave 3)* | `TICK-003` | Perf + F15 | 🔜 Ready (unblocked, distinct file) |
 | **Wave 2 — Service & Mutations ⏳ Pending (needs Wave 1)** | `TICK-201` | Service / Batch Actions | `dataforge/core/services/file_actions.py` | `TICK-105`, `TICK-102` | Parallel mutations + R-OPS-2 | ⏳ Pending |
 | Wave 2 | `TICK-202` | Modules / Recovery | `dataforge/modules/recovery.py` | `TICK-102`, `TICK-103` | F6 carving (mmap + chunk) | ⏳ Pending |
 | Wave 2 | `TICK-203` | Modules / System Cleanup | `dataforge/modules/system_cleanup.py` | `TICK-102` | Perf + S7 follow-up | ⏳ Pending |
@@ -66,6 +66,26 @@
 | `TICK-005` | `engine/jobs.py [NEW]` `Job` (ULID 26-char, `provider`/`params`/`cancel_token`/`progress_callback`/`status`→`JobStatus.QUEUED`→`RUNNING`→`DONE`/`CANCELLED`/`FAILED`, `is_cancelled()`, `to_dict()`/`json_safe()`), `JobQueue` depth 8 `ThreadPoolExecutor` + `_run_job`/`submit`/`get`/`cancel`/`list_jobs`/`subscribe`, `EngineDaemon` stub `daemon.py [NEW]` side-effect-free `Daemon` wrapping `JobQueue` (`is_running` false on import) | `pytest tests/test_jobs_contract.py` 18/18 ✅ · `JobQueue().submit(dummy)` → `DONE` · `job.is_cancelled()` after `cancel_token.set()` · `job.json_safe()` JSON dumps · `from dataforge.engine.daemon import Daemon` no server start | `engine/__init__.py` + `migrations/README.md` added per hardened parity. Stub correctly defers real `asyncio`+`ProcessPool` loop to `TICK-301` Wave 3 (sequential re-entry). | ✅ DONE |
 
 **Wave 0 gate:** 5/5 contracts landed, `69 passed` (`11+14+18+8+18`), no file appears twice in Wave 0 (disjoint), `depends_on` satisfied (`TICK-004→001`, `TICK-005→003`), `git diff --name-only origin/develop` shows only `exclusive_write_files` + tests. **Wave 1 is now unblocked — 9 agents may start in parallel on distinct files.**
+
+---
+
+## Wave 1 Review — Partial 2026-08-22 (2/9 DONE, 7 remaining)
+
+> **Reviewer:** Principal Technical Auditor · **Method:** `Read` each `exclusive_write_files` + `Read` `tests/test_*` + `PYTHONPATH=. pytest` + `git log --oneline --grep=TICK-10` + `ls -l dataforge/...` file-time checks. Wave 1 has 2 merged tickets (`TICK-101`, `TICK-103`) and 7 still open — all 7 are **disjoint, unblocked (Wave 0 green), and ready for parallel execution**.
+
+| Ticket | Implementation | Verification | Finding | Status |
+|---|---|---|---|---|
+| `TICK-101` | `dataforge/core/logger.py` routes console handler to `sys.stderr` (was `sys.stdout` → `R-CORE-1` JSON corruption), keeps `RotatingFileHandler`, ensures `0o600` on `log_file` creation via `os.open(...,0o600)` + `os.chmod(...,0o600)`; change is isolated to `setup_logger` (`ch = StreamHandler(sys.stderr)`) | `pytest tests/test_logger_stdout_regression.py` 11/11 ✅ · `PYTHONPATH=. pytest tests/test_logger_stdout_regression.py tests/test_hasher_mmap.py -q` 25/25 (11+14) · manual `fm dupes --format json | jq` no `INFO` on stdout | Correct fix for `R-CORE-1`: `StreamHandler(sys.stdout)` → `sys.stderr` per hardened audit; no file parity issue (existing file, no new file). Disjoint in Wave 1 (only writer to `logger.py`). | ✅ DONE 2026-08-22 — merged `fix/TICK-101-logger-stderr` (`8771a2a` → `c57be1e`) |
+| `TICK-102` | `dataforge/core/scanner.py` still at `HEAD` 2026-07-10 (`Jul 10 22:52`, recursive `yield from`, double `os.stat`, no `st_ino`) — **not yet implemented** | No `tests/test_scanner_parallel.py` file ( `ls` missing ) → `validation_command` not runnable | **Open, unblocked, ready** — depends only on `TICK-002` (Wave 0 DONE). Exclusive `scanner.py` distinct from other Wave 1 files, so can run parallel with `TICK-104` etc. | 🔜 Ready |
+| `TICK-103` | `dataforge/core/hasher.py` now 1 MiB config-driven (`_DEFAULT_BLOCK_SIZE=1<<20`, `_get_block_size()` reads `config.hash_block_size` with `1024–16MiB` validation, fallback `1<<20`), `MMAP_THRESHOLD=16MiB`, `mmap.mmap` + `posix_fadvise(WILLNEED)`/`madvise(WILLNEED)` for large files, `cancel_token` per chunk, `get_hashes` single-pass for many algos, keeps `SUPPORTED_ALGORITHMS` unchanged (`md5` default) | `pytest tests/test_hasher_mmap.py` 14/14 ✅ · `perf(core): switch hasher to 1 MiB mmap blocks` (`5cd786d` → `c58154f` merge) · `BLOCK_SIZE` now dynamic via `_get_block_size()` | Correct per `TICK-103` spec: `BLOCK_SIZE 64KiB→1MiB`, `mmap` path, no `xxhash` added to `SUPPORTED_ALGORITHMS` (prefilter is internal, not public). Disjoint (only writer to `hasher.py` in Wave 1; polish `PERF-114` Wave 3 is sequential). | ✅ DONE 2026-08-22 — merged `feat/TICK-103-mmap-hasher` |
+| `TICK-104` | `dataforge/core/cache.py` still at `Aug 22 15:27` stub `set_hash_many` only validates shape and returns `None` (no `executemany`, no `PRAGMA synchronous=NORMAL`, no `idx_hash_lookup`) — **Wave 0 stub, impl pending** | No `tests/test_cache_batch.py` file | **Open, unblocked, ready** — depends on `TICK-004` (DONE). Sequential re-entry `cache.py` W0 sig → W1 impl (disjoint per wave, only writer to `cache.py` in Wave 1). | 🔜 Ready |
+| `TICK-105` | `dataforge/core/operations/files.py` at `Jul 11 23:20` (still `O(N²)` `reserved_paths` rebuild, `makedirs` before success, no `normcase`) — **not yet implemented** | No `tests/test_operations_collision.py` | **Open, ready** — depends on `TICK-002` (DONE), distinct file | 🔜 Ready |
+| `TICK-106` | `dataforge/modules/search.py` at `Jul 11 23:20` (still `open(..., 'r', errors='ignore')` line loop, sequential, no `mmap`/pool) — **not yet implemented** | No `tests/test_search_streaming.py` | **Open, ready** — depends on `TICK-003` (DONE) | 🔜 Ready |
+| `TICK-107` | `dataforge/modules/duplicates.py` at `Jul 11 23:20` (still `list(scan_directory)` materialize, single `ThreadPool(4)`, double sort) — **not yet implemented** | No `tests/test_dupes_pipeline.py` | **Open, ready** — depends on `TICK-003` | 🔜 Ready |
+| `TICK-108` | `dataforge/modules/integrity.py` at `Jul 10 22:52` (`list(scan_directory)`) — **not yet implemented** | No `tests/test_integrity_streaming.py` | **Open, ready** — depends on `TICK-003` | 🔜 Ready |
+| `TICK-109` | `dataforge/modules/forensics.py` at `Jul 12 00:15` (still `f.read(10MB)` per file, `file_paths` list, double `os.stat` in `build_timeline`) — **not yet implemented** | No `tests/test_forensics_streaming.py` | **Open, ready** — depends on `TICK-003` (DONE), only writer to `forensics.py` in Wave 1 (second writer is `TICK-304` Wave 3) | 🔜 Ready |
+
+**Wave 1 gate:** 2/9 DONE (`TICK-101` + `TICK-103`, 25 tests), 7/9 remaining are **all unblocked** (their `depends_on` are Wave 0 DONE) and **file-disjoint** (`logger.py`/`hasher.py` already done, remaining `scanner.py`, `cache.py`, `operations/files.py`, `search.py`, `duplicates.py`, `integrity.py`, `forensics.py` are 7 different files). They can run **in parallel on 7 agents** without collision. Next wave (Wave 2) still blocked on `TICK-102`/`TICK-105` etc. — do not start Wave 2 until Wave 1 7 remaining merge.
 
 ---
 

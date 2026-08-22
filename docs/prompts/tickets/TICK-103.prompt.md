@@ -1,3 +1,5 @@
+> **Status: ✅ COMPLETED 2026-08-22 — Wave 1 DONE, verified (see docs/PARALLEL_BACKLOG.md Wave 1 Review). This ticket is closed — do not re-run.**
+
 # Ticket TICK-103 — Switch hasher to 1 MiB blocks + mmap for large files
 
 > **Wave 1** | **Domain:** Core / Hasher | **Depends on:** "TICK-002"
