@@ -2,9 +2,9 @@
 
 *File System Management with Steroids and Superpowers*
 
-**Last verified:** 2026-07-12
+**Last verified:** 2026-08-22 *(re-verified against `dataforge/ui/app.py` + `views/*` HEAD; previous stamp 2026-07-12 — no code change since)*
 
-> **2026-07-12 update:** WS-E (Motion, Empty/Error, A11y) is now shipped. Sidebar group expand/collapse and view-switch transitions are animated via `QPropertyAnimation` (180ms / 160ms OutCubic — see [`IMPLEMENTATION_PLAN.md` §WS-E](./reviews/IMPLEMENTATION_PLAN.md#ws-e--motion-emptyerror-a11y-phase-2e--v020-alpha5--closed)); the Braille-character busy label is replaced by a native `QProgressBar` in indeterminate mode; **Settings → General → Appearance** now has a Reduce motion checkbox that gates both animations; every interactive widget draws a `focus_ring` border on `:focus`; Search and Duplicates now show a purposeful `EmptyState` (icon + body + action button) instead of a bare "No results" label; `friendly_error_message` translates the common Python exceptions; sidebar buttons, the status bar, and the destructive-preview Proceed button carry `accessibleName`/`accessibleDescription` plus a `⚠` colour-blind glyph; an 18-icon monochrome SVG set ships in `dataforge/ui/resources/icons.py` and is attached to every sidebar view, with the icon tone regenerated on every theme change.
+> **2026-07-12 update:** WS-E (Motion, Empty/Error, A11y) is now shipped. Sidebar group expand/collapse and view-switch transitions are animated via `QPropertyAnimation` (180ms / 160ms OutCubic — see [`ROADMAP.md` §WS-E](./reviews/ROADMAP.md#ws-e--motion-emptyerror-a11y-phase-2e--v020-alpha5--closed)); the Braille-character busy label is replaced by a native `QProgressBar` in indeterminate mode; **Settings → General → Appearance** now has a Reduce motion checkbox that gates both animations; every interactive widget draws a `focus_ring` border on `:focus`; Search and Duplicates now show a purposeful `EmptyState` (icon + body + action button) instead of a bare "No results" label; `friendly_error_message` translates the common Python exceptions; sidebar buttons, the status bar, and the destructive-preview Proceed button carry `accessibleName`/`accessibleDescription` plus a `⚠` colour-blind glyph; an 18-icon monochrome SVG set ships in `dataforge/ui/resources/icons.py` and is attached to every sidebar view, with the icon tone regenerated on every theme change.
 
 ## Desktop Shell — GUI Superpowers
 
@@ -37,7 +37,7 @@ The application registers these built-in screens on startup:
 
 After those are loaded, the app scans `dataforge/ui/plugins/` and registers plugin views that inherit from `BaseView` (they appear under a **Plugins** group).
 
-> **Detail-level gating:** the `settings_ui_tier` setting (now relabelled "Detail level" in Settings, values `Simple` / `Standard` / `Everything`, was `Basic` / `Advanced` / `Expert`) controls *in-view* complexity only — advanced controls stay hidden behind in-view expanders on `Simple` and `Standard`. The sidebar shows every group regardless of tier so users can always discover what DataForge can do. This trade-off (hidden navigation vs. progressive disclosure) is discussed in [`reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md).
+> **Detail-level gating:** the `settings_ui_tier` setting (now relabelled "Detail level" in Settings, values `Simple` / `Standard` / `Everything`, was `Basic` / `Advanced` / `Expert`) controls *in-view* complexity only — advanced controls stay hidden behind in-view expanders on `Simple` and `Standard`. The sidebar shows every group regardless of tier so users can always discover what DataForge can do. This trade-off (hidden navigation vs. progressive disclosure) is discussed in [`reviews/ROADMAP.md`](./reviews/ROADMAP.md).
 
 ## Background execution model
 
@@ -143,7 +143,7 @@ Supports two operations:
 - create a snapshot of a file or folder
 - verify the current state against a saved snapshot
 
-This wraps the `IntegrityMonitor` module and uses background execution for long-running checks. Snapshots are self-describing (`{"algorithm": ..., "created_at": ..., "files": {...}}`) and use the configured hash algorithm (default `sha256`); legacy flat MD5 snapshots are still verifiable — see [`reviews/AUDIT_FINDINGS.md`](./reviews/AUDIT_FINDINGS.md) (M4).
+This wraps the `IntegrityMonitor` module and uses background execution for long-running checks. Snapshots are self-describing (`{"algorithm": ..., "created_at": ..., "files": {...}}`) and use the configured hash algorithm (default `sha256`); legacy flat MD5 snapshots are still verifiable — see [`reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md) (M4).
 
 ### Metadata Cleaner
 
@@ -198,7 +198,7 @@ It allows the user to manage:
 
 These values persist through `ConfigManager` into `~/.dataforge/config.json`.
 
-> **Persistence is uniform:** every setting **autosaves** the moment the user changes it, and a transient "Saved ✓" indicator flashes in the Settings header to confirm the write — no Save button, no hidden state. This was previously inconsistent (Performance / Exclusions / Dashboard had ad-hoc Save buttons); the unified behaviour is documented as 2c.2 in [`reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md).
+> **Persistence is uniform:** every setting **autosaves** the moment the user changes it, and a transient "Saved ✓" indicator flashes in the Settings header to confirm the write — no Save button, no hidden state. This was previously inconsistent (Performance / Exclusions / Dashboard had ad-hoc Save buttons); the unified behaviour is documented as 2c.2 in [`reviews/ROADMAP.md`](./reviews/ROADMAP.md).
 
 ## Plugin view: Metadata Cleaner
 
@@ -240,4 +240,4 @@ Use these heuristics when adding functionality:
 - [Architecture](./ARCHITECTURE.md)
 - [CLI reference](./CLI_REFERENCE.md)
 - [Development guide](./DEVELOPMENT_GUIDE.md)
-- [Project review (bugs, security, UX, roadmap)](./reviews/EXECUTIVE_SUMMARY.md)
+- [Project review (bugs, security, UX, roadmap)](./reviews/README.md)

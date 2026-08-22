@@ -393,14 +393,14 @@ If you find a security vulnerability, **do not open a public issue**. Email the 
 
 ### Current Status
 
-Security findings are tracked in [`docs/reviews/AUDIT_FINDINGS.md`](./reviews/AUDIT_FINDINGS.md).
+Security findings are tracked in [`docs/reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md).
 The point-security backlog **S1–S13 is complete** — all closed across WS-A/WS-B
 (trash-restore confinement, plugin-loader hardening, cleanup safeguards, `0600`
 report/credential permissions, `defusedxml`, config validation, executable-open
 confirm, decompression-bomb caps).
 
 The open work is now **forensic-soundness architecture**, tracked as F1–F4 in
-[`docs/reviews/FORENSIC_SECURITY_REVIEW.md`](./reviews/FORENSIC_SECURITY_REVIEW.md):
+[`docs/reviews/FORENSIC_REVIEW.md`](./reviews/FORENSIC_REVIEW.md):
 
 - **F1** — no chain-of-custody / tamper-evident audit log
 - **F2** — no acquisition provenance (operator, host, source-image hash) in reports
@@ -408,7 +408,7 @@ The open work is now **forensic-soundness architecture**, tracked as F1–F4 in
 - **F4** — `secure_delete` placement and hardlink/reflink-awareness (with F21)
 
 These are the gating items for any forensic-product claim and are sequenced in
-[`docs/reviews/IMPLEMENTATION_PLAN.md`](./reviews/IMPLEMENTATION_PLAN.md) as WS-H → WS-J.
+[`docs/reviews/ROADMAP.md`](./reviews/ROADMAP.md) as WS-H → WS-J.
 
 ### Guidelines
 
@@ -456,13 +456,20 @@ Verify:
   the commit boundary.
 - **Close a work-stream by tagging** — when a plan's work-stream is finished and
   `PYTHONPATH=. pytest -q` is green, cut its `vX.Y.Z-alpha.N` tag on `develop`
-  before starting the next stream (see `docs/reviews/IMPLEMENTATION_PLAN.md` §2.2).
+  before starting the next stream (see `docs/reviews/ROADMAP.md` §2.2).
 - One commit per logical change
 - Sequential commits for the same feature (don't interleave)
 - Test commits after implementation (unless TDD)
 - Multi-scope changes omit scope: `docs:` not `docs(readme):`
 - Breaking changes: use `!` and add `BREAKING CHANGE:` footer
 - Version impact is cumulative (3 `feat:` commits = one MINOR bump)
+
+#### Parallel vs Sequential Execution (for AI and human agents)
+
+- **Ticket = branch = commit = PR** — each ticket in `docs/PARALLEL_BACKLOG.md` (or `proposals/PERFORMANCE_TICKETS.md`) owns its `exclusive_write_files` for its wave.
+- **Sequential (default):** execute waves in DAG order `Wave 0 → Wave 1 → Wave 2 → Wave 3 → Wave 4`; a wave starts only after all `depends_on` tickets in earlier waves have merged to `develop`.
+- **Parallel within a wave:** tickets in the **same wave** have disjoint write sets and may run concurrently (e.g. Wave 1: 9 agents on 9 different files). Agents must not touch files outside their exclusive list; append-only `CHANGELOG.md [Unreleased]` is safe for concurrent appends. Rebase (`git rebase origin/develop`) before push, keep `.github/workflows/ci.yml` green before next wave. See `docs/PARALLEL_BACKLOG.md#how-to-work-a-ticket--sequential-and-parallel-execution-guide` and `.github/workflows/sdlc-parallel.workflow.md` / `sdlc-sequential.workflow.md` for full rules and when to choose parallel vs sequential.
+- **If two tickets need the same file, they are in different waves → sequential.** Do not run them in parallel.
 
 ---
 
@@ -508,8 +515,8 @@ Your task: [describe the task]
 | [`docs/CLI_REFERENCE.md`](./CLI_REFERENCE.md) | Complete CLI command reference |
 | [`docs/GUI_WORKFLOWS.md`](./GUI_WORKFLOWS.md) | Desktop app workflows |
 | [`docs/TECHNICAL_SOURCE_OF_TRUTH.md`](./TECHNICAL_SOURCE_OF_TRUTH.md) | File-by-file source map |
-| [`docs/reviews/EXECUTIVE_SUMMARY.md`](./reviews/EXECUTIVE_SUMMARY.md) | Audit status and backlog |
-| [`docs/reviews/AUDIT_FINDINGS.md`](./reviews/AUDIT_FINDINGS.md) | Bug and security tracker |
-| [`docs/reviews/IMPROVEMENT_PLAN.md`](./reviews/IMPROVEMENT_PLAN.md) | UX roadmap and phased plan |
-| [`docs/reviews/IMPLEMENTATION_PLAN.md`](./reviews/IMPLEMENTATION_PLAN.md) | Sequenced execution plan and `v0.2.0` release roadmap |
-| [`docs/reviews/FORENSIC_SECURITY_REVIEW.md`](./reviews/FORENSIC_SECURITY_REVIEW.md) | Forensic-soundness, security, and investigator-UX architectural review (F1–F21, U1–U11) |
+| [`docs/reviews/README.md`](./reviews/README.md) | Audit status and backlog |
+| [`docs/reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md) | Bug and security tracker |
+| [`docs/reviews/ROADMAP.md`](./reviews/ROADMAP.md) | UX roadmap and phased plan |
+| [`docs/reviews/ROADMAP.md`](./reviews/ROADMAP.md) | Sequenced execution plan and `v0.2.0` release roadmap |
+| [`docs/reviews/FORENSIC_REVIEW.md`](./reviews/FORENSIC_REVIEW.md) | Forensic-soundness, security, and investigator-UX architectural review (F1–F21, U1–U11) |

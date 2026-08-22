@@ -2,7 +2,7 @@
 
 *File System Management with Steroids and Superpowers*
 
-**Last verified:** 2026-07-12
+**Last verified:** 2026-08-22 *(re-verified against `dataforge/` HEAD; previous stamp 2026-07-12 — no code change since)*
 
 ## System Summary
 
@@ -166,7 +166,7 @@ The desktop application eagerly registers these built-in views (see `DataForgeAp
 
 It then loads plugin views from `dataforge/ui/plugins/`.
 
-**Detail-level gating.** The sidebar groups these views into task-oriented sections (Home / Find & Organize / Clean & Optimize / Recover & Investigate / System); every group is always visible. The `settings_ui_tier` setting (now relabelled "Detail level" with values `Simple` / `Standard` / `Everything`, was `Basic` / `Advanced` / `Expert`) controls *in-view* complexity only — advanced controls stay hidden behind in-view expanders on `Simple` and `Standard`. The discoverability cliff of hiding whole groups at `Simple`/`Standard` is gone. See `IMPROVEMENT_PLAN.md` §6 Phase 2c.4 / Phase 2d for the rationale.
+**Detail-level gating.** The sidebar groups these views into task-oriented sections (Home / Find & Organize / Clean & Optimize / Recover & Investigate / System); every group is always visible. The `settings_ui_tier` setting (now relabelled "Detail level" with values `Simple` / `Standard` / `Everything`, was `Basic` / `Advanced` / `Expert`) controls *in-view* complexity only — advanced controls stay hidden behind in-view expanders on `Simple` and `Standard`. The discoverability cliff of hiding whole groups at `Simple`/`Standard` is gone. See `ROADMAP.md` §6 Phase 2c.4 / Phase 2d for the rationale.
 
 ## Extension points
 
@@ -211,7 +211,7 @@ If a new feature starts from file discovery, it should usually build on:
 - `dataforge/core/provider.py` (`FileProvider`/`LocalProvider`) is defined but unused — dead abstraction.
 - Generated build output exists in-repo (`build/`, `dist/`), but it is not maintained source.
 
-Correctness and security caveats from the 2026-07-10 review are tracked in [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md). Key points: the scanner no longer follows symlinks, the cache is thread-safe, integrity/dedup default to SHA-256, and the forensic-report HTML injection (S2) is fixed. Open risks include trash-restore path traversal (S4) and System Cleanup over-classification (S7).
+Correctness and security caveats from the 2026-07-10 review are tracked in [`docs/reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md) and [`AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md). Key points: the scanner no longer follows symlinks, the cache is thread-safe, integrity/dedup default to SHA-256, and the forensic-report HTML injection (S2) is fixed. S1–S13 are **fixed** as of WS-B, including trash-restore path confinement (S4, `recovery.py:205`) and System Cleanup safeguards (S7, `system_cleanup.py:267`); residual forensic-soundness work is tracked as F1–F21 in [`FORENSIC_REVIEW.md`](./reviews/FORENSIC_REVIEW.md).
 
 ## Related documents
 
@@ -220,4 +220,4 @@ Correctness and security caveats from the 2026-07-10 review are tracked in [`doc
 - [GUI workflows](./GUI_WORKFLOWS.md)
 - [Development guide](./DEVELOPMENT_GUIDE.md)
 - [Technical Source of Truth](./TECHNICAL_SOURCE_OF_TRUTH.md)
-- [Project review (bugs, security, UX, roadmap)](./reviews/EXECUTIVE_SUMMARY.md)
+- [Project review (bugs, security, UX, roadmap)](./reviews/README.md)

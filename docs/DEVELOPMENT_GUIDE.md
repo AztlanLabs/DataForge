@@ -2,7 +2,7 @@
 
 *File System Management with Steroids and Superpowers*
 
-**Last verified:** 2026-07-12
+**Last verified:** 2026-08-22 *(re-verified against `pyproject.toml` / `build_exe.py` / `dataforge/` HEAD; previous stamp 2026-07-12 — no code change since)*
 
 ## Effective Project Root
 
@@ -56,7 +56,7 @@ PYTHONPATH=. pytest -q
 
 The nested project layout means plain `pytest -q` may not resolve `dataforge` unless the package is installed or the project root is placed on `PYTHONPATH`.
 
-The full suite passes — 301 tests. The earlier collection failure (a stale `rename_with_regex` import) has been fixed. See [`docs/reviews/NOTES_REVIEW.md`](./reviews/NOTES_REVIEW.md) for verification details.
+The full suite passes — 301 tests. The earlier collection failure (a stale `rename_with_regex` import) has been fixed. See [`docs/reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md) for verification details.
 
 ## Packaging and distribution
 
@@ -164,7 +164,7 @@ New top-level screens and plugins should inherit from `BaseView` and use its sha
 
 - The repository mixes application source with generated build output. Be deliberate about which files are source of truth.
 - The repository is under Git version control on `develop` and `main` branches. Follow [`docs/CONTRIBUTING.md`](./CONTRIBUTING.md) for the complete development workflow — commit conventions, versioning, release process, and implementation plan format. A `commit-msg` hook in `.githooks/` validates every commit; install it with `git config core.hooksPath .githooks`.
-- **CI runs on every push/PR.** `.github/workflows/ci.yml` runs pytest + coverage, ruff (blocking), mypy (advisory), and pip-audit on push/PR to `develop`/`main`. See [`reviews/IMPLEMENTATION_PLAN.md`](./reviews/IMPLEMENTATION_PLAN.md) WS-A.
+- **CI runs on every push/PR.** `.github/workflows/ci.yml` runs pytest + coverage, ruff (blocking), mypy (advisory), and pip-audit on push/PR to `develop`/`main`. See [`reviews/ROADMAP.md`](./reviews/ROADMAP.md) WS-A.
 - The plugin loader registers every discovered `BaseView` subclass in `dataforge/ui/plugins/`; plugin import failures are now logged (via `logger.error`) and skipped. Loading is **opt-in** behind `config["plugins_enabled"]` (default off) and the loader refuses plugins in group/world-writable directories or files owned by another user. Only add plugins you trust (S5, fixed in WS-B).
 - The stray empty `26.1.2` file has been removed and a root `.gitignore` added.
 - The current dependency story is split: `pyproject.toml` is enough for the core package/CLI entrypoint; `requirements.txt` provisions the full GUI/media runtime, and `requirements-dev.txt` adds the build/test tooling.
@@ -177,4 +177,4 @@ New top-level screens and plugins should inherit from `BaseView` and use its sha
 3. Read [`./GUI_WORKFLOWS.md`](./GUI_WORKFLOWS.md) or [`./CLI_REFERENCE.md`](./CLI_REFERENCE.md), depending on your work area
 4. Use [`./TECHNICAL_SOURCE_OF_TRUTH.md`](./TECHNICAL_SOURCE_OF_TRUTH.md) when you need file-by-file depth
 5. Read [`./CONTRIBUTING.md`](./CONTRIBUTING.md) for commit conventions, versioning, and implementation plan format — required before your first commit
-6. Skim [`./reviews/EXECUTIVE_SUMMARY.md`](./reviews/EXECUTIVE_SUMMARY.md) for the current bug/security/UX backlog before picking up work
+6. Skim [`./reviews/README.md`](./reviews/README.md) for the current bug/security/UX backlog before picking up work

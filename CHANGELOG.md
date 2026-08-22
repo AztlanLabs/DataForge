@@ -73,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   
 - **Documentation Overhaul**
   - Unified CONTRIBUTING.md with commit conventions, versioning, and release process
-  - Consolidated review documentation into `docs/reviews/` (EXECUTIVE_SUMMARY.md, AUDIT_FINDINGS.md, IMPROVEMENT_PLAN.md, NOTES_REVIEW.md)
+  - Consolidated review documentation into `docs/reviews/` (README.md, AUDIT_REPORT.md, ROADMAP.md, AUDIT_REPORT.md)
   - Updated all architecture and workflow docs to reflect PyQt5 migration
   
 - **Testing Infrastructure**
@@ -116,7 +116,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - **S1 (Fixed)**: MD5 used for integrity/dedup → now SHA-256 default
 - **S3 (Fixed)**: Symlink-following scan → now disabled
-- **S2, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13 (Open)**: Tracked in `docs/reviews/AUDIT_FINDINGS.md`
+- **S2, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13 (Open)**: Tracked in `docs/reviews/AUDIT_REPORT.md`
 
 ### Known Issues
 - No CI/CD pipeline yet (Phase 0 in roadmap)

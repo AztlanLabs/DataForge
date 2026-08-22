@@ -4,7 +4,7 @@
 
 **Professional file and system intelligence platform** for power users, developers, and digital forensics specialists. Unified CLI + desktop experience for file discovery, organization, recovery, and forensic analysis.
 
-DataForge provides both a **terminal interface** (`fm` CLI) and **interactive desktop application** (PyQt5 GUI) — same powerful toolkit, two workflows. Built around shared core services so your logic runs consistently anywhere.
+DataForge provides both a **terminal interface** (`fm` CLI) and **interactive desktop application** (PyQt5 GUI). They share core services where applicable, while some desktop workflows (such as Action Builder and media tools) are GUI-only.
 
 > **What's inside:** Enterprise-grade duplicate detection, forensic carving, integrity verification, automated cleanup, media batch processing, hardware diagnostics, artifact parsing, and workflow automation — all in one streamlined, production-tested toolkit.
 
@@ -12,7 +12,7 @@ DataForge provides both a **terminal interface** (`fm` CLI) and **interactive de
   <img src="DataForgeLogo.jpeg" alt="DataForge Logo - File & System Intelligence" width="300" />
 </div>
 
-The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5**, and new modules (hardware, forensics, recovery, metadata, performance, system cleanup, password tools, device manager, file signatures) were added. Documentation, packaging metadata, and CLI wiring have been reconciled to match. Remaining open items and a full audit are tracked in [`docs/reviews/NOTES_REVIEW.md`](./docs/reviews/NOTES_REVIEW.md).
+The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5**, and new modules (hardware, forensics, recovery, metadata, performance, system cleanup, password tools, device manager, file signatures) were added. Documentation, packaging metadata, and CLI wiring have been reconciled to match. Remaining open items and a full audit are tracked in [`docs/reviews/AUDIT_REPORT.md`](./docs/reviews/AUDIT_REPORT.md).
 
 ## Why DataForge? (The Superpowers)
 
@@ -21,7 +21,7 @@ The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5**, and new modules (ha
 | **🎯 Find the noise** | Locate duplicates by content hash, search by name/size/age/content, parse forensic artifacts in seconds — find what matters, fast |
 | **🧹 Clean and organize** | Batch operations, integrity snapshots, automated cleanup by category, one-click categorized organization — organize chaos in minutes |
 | **🔍 Go deep into data** | Forensic file carving, GPS metadata stripping, disk SMART health, password strength analysis, trash recovery — extract what's hidden |
-| **⚡ Unified interface** | Terminal and desktop — choose your workflow. Same features, same results, same safety standards — no tool switching |
+| **⚡ Unified interface** | Terminal and desktop — shared core where applicable, with GUI-only features (Action Builder, media tools) called out — no tool switching |
 | **🧩 Extensible** | Action Builder pipeline for custom multi-step workflows; plugin system for custom views; scriptable CLI — build your own workflows |
 | **🛡️ Production-ready** | 301 passing tests, thread-safe batch operations, dry-run previews, cancellation support, detailed logging — trust the tool |
 | **🚀 Automation at scale** | Parallel hashing, batch operations on thousands of files, configurable worker threads, progress tracking, cancellation — process like a pro |
@@ -70,7 +70,7 @@ The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5**, and new modules (ha
 | Area | Details |
 | --- | --- |
 | **Product** | 🔨 **DataForge** — File system management with steroids and superpowers (code: `dataforge/`) |
-| **CLI** | `fm` command → `dataforge.cli:main` (17 commands, all powers available) |
+| **CLI** | `fm` command → `dataforge.cli:main` (16 top-level commands/groups; see the capability map for GUI-only features) |
 | **GUI** | `python run_ui.py` → `dataforge.ui.app.DataForgeApp` (PyQt5, 14 views, task-oriented sidebar) |
 | **Config** | `~/.dataforge/config.json` (theme, performance, exclusions, dashboard paths, detail level) |
 | **Cache** | `~/.dataforge/cache.db` (SQLite hash cache, thread-safe with WAL, parallel hashing) |
@@ -121,7 +121,7 @@ PYTHONPATH=. python -m dataforge.cli --help
 PYTHONPATH=. pytest -q  # 301 tests pass
 ```
 
-Full test suite passes — 301 tests. All correctness fixes are verified. See [`docs/reviews/AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md) and [`docs/reviews/NOTES_REVIEW.md`](./docs/reviews/NOTES_REVIEW.md) for the full audit.
+Full test suite passes — 301 tests. All correctness fixes are verified. See [`docs/reviews/AUDIT_REPORT.md`](./docs/reviews/AUDIT_REPORT.md) and [`docs/reviews/AUDIT_REPORT.md`](./docs/reviews/AUDIT_REPORT.md) for the full audit.
 
 ### Build desktop executables
 
@@ -147,29 +147,33 @@ python build_exe.py debug
 
 ## Documentation Map
 
-**Getting Started:**
-- [`docs/DEVELOPMENT_GUIDE.md`](./docs/DEVELOPMENT_GUIDE.md) - setup, testing, packaging, onboarding paths
-- [`docs/CLI_REFERENCE.md`](./docs/CLI_REFERENCE.md) - complete CLI command reference with examples
+**Current truth (start here):**
+- [`docs/APP_REFERENCE.md`](./docs/APP_REFERENCE.md) — consolidated application guide: features, safety, config, deps, platform support (source verified 2026-08-22)
+- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — layered design, control flow, shared abstractions, extension points
+- [`docs/CLI_REFERENCE.md`](./docs/CLI_REFERENCE.md) — complete CLI reference (16 groups / 17 leaf commands) with examples
+- [`docs/GUI_WORKFLOWS.md`](./docs/GUI_WORKFLOWS.md) — view-by-view desktop workflows, threading, background execution
+- [`docs/TECHNICAL_SOURCE_OF_TRUTH.md`](./docs/TECHNICAL_SOURCE_OF_TRUTH.md) — authoritative file-by-file source map for maintainers
+- [`docs/DEVELOPMENT_GUIDE.md`](./docs/DEVELOPMENT_GUIDE.md) — setup, testing, packaging, onboarding paths
+- [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md) — commit convention, versioning, release process
 
-**Deeper Dives:**
-- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) - layered design, control flow, shared abstractions, extension points
-- [`docs/GUI_WORKFLOWS.md`](./docs/GUI_WORKFLOWS.md) - view-by-view desktop workflows, threading, background execution model
-- [`docs/TECHNICAL_SOURCE_OF_TRUTH.md`](./docs/TECHNICAL_SOURCE_OF_TRUTH.md) - authoritative file-by-file source map for maintainers
+**Proposals (future architecture, not yet implemented):**
+- [`docs/proposals/PERFORMANCE_INVESTIGATION.md`](./docs/proposals/PERFORMANCE_INVESTIGATION.md) — parallel scanner, batched cache, engine/API split
+- [`docs/proposals/NATIVE_OS_API_REVIEW.md`](./docs/proposals/NATIVE_OS_API_REVIEW.md) — native OS service: UDS/Named Pipes + D-Bus/XPC/COM
+- [`docs/proposals/INSTALL_UPGRADE_LIFECYCLE.md`](./docs/proposals/INSTALL_UPGRADE_LIFECYCLE.md) — installable/removable/upgradable: XDG/AppData, migrations, deb/rpm/msi/dmg
+- [`docs/DOCUMENTATION_AUDIT_2026-08-22.md`](./docs/DOCUMENTATION_AUDIT_2026-08-22.md) — audit of all docs vs. code (this cleanup)
 
-**Contributing:**
-- [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md) — complete development workflow: commit convention, versioning, release process, implementation plan guidance for AI and developers
+**Project history & reviews (`docs/reviews/`):**
+- [`README.md`](./docs/reviews/README.md) — start here: overview, findings index, remediation status, brand identity
+- [`AUDIT_REPORT.md`](./docs/reviews/AUDIT_REPORT.md) — 15 correctness bugs (all fixed) + 13 security findings (S1–S13 fixed); forensic checklist, remediation order
+- [`FORENSIC_REVIEW.md`](./docs/reviews/FORENSIC_REVIEW.md) — forensic-soundness + investigator UX (F1–F21, U1–U11) vs. EnCase/FTK/AXIOM/FIM
+- [`ROADMAP.md`](./docs/reviews/ROADMAP.md) — UX/UI + engineering roadmap (Phases 2a–2e shipped; WS-F open)
+- [`ROADMAP.md`](./docs/reviews/ROADMAP.md) — sequenced work-streams + release mapping (WS-A … WS-J)
+- [`AUDIT_REPORT.md`](./docs/reviews/AUDIT_REPORT.md) — doc-defect audit D1–D7 (historical)
+
+**Draft:** [`reviews/drafts/FULL_APP_REVIEW.md`](./docs/reviews/drafts/FULL_APP_REVIEW.md) — WIP line-level review (R-CORE/R-OPS, §3+ pending)
 
 **Project History:**
 - [`CHANGELOG.md`](./CHANGELOG.md) — version history, release notes, and migration notes
-
-### Project Review & Audit (2026-07-10)
-
-A comprehensive engineering, security, and UX audit lives under [`docs/reviews/`](./docs/reviews/):
-
-- **[`EXECUTIVE_SUMMARY.md`](./docs/reviews/EXECUTIVE_SUMMARY.md)** — start here: overview, findings index, remediation status, brand identity
-- **[`AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md)** — all code-correctness bugs (15 findings, all fixed) and security/forensic findings (13 findings, 3 fixed); forensic-soundness checklist, remediation order
-- **[`IMPROVEMENT_PLAN.md`](./docs/reviews/IMPROVEMENT_PLAN.md)** — UX/UI review, visual design system, engineering improvements, phased roadmap with per-item implementation status (Phases 2a/2b/2c/2d shipped; 2e open)
-- **[`FORENSIC_SECURITY_REVIEW.md`](./docs/reviews/FORENSIC_SECURITY_REVIEW.md)** — forensic-soundness, security, and investigator-facing UX architectural review (F1–F19, U1–U11) evaluated against EnCase/FTK/AXIOM/FIM and ACPO/ISO 27037/NIST SP 800-86
 
 ## Directory Structure
 
@@ -178,7 +182,7 @@ A comprehensive engineering, security, and UX audit lives under [`docs/reviews/`
 | **`CHANGELOG.md`** | Version history and release notes (Keep a Changelog format) |
 | **`run_ui.py`** | Desktop GUI entry point (PyQt5 application launcher) |
 | **`build_exe.py`** | PyInstaller bundler for standalone executables (release/debug) |
-| **`dataforge/cli.py`** | 17 CLI commands via Click (scan, dupes, search, organize, rename, clean, usage, integrity, cleanup, performance, recover, metadata, hardware, forensics, hash-calc, devices) |
+| **`dataforge/cli.py`** | 16 CLI commands/groups via Click (scan, dupes, search, organize, rename, clean, usage, integrity, cleanup, performance, recover, metadata, hardware, forensics, hash-calc, devices) |
 | **`dataforge/core/`** | Shared foundation: file model, scanner, config, cache, hasher, logger, operations layer |
 | **`dataforge/core/services/`** | `FileActionService` — centralized batch file operations (move, copy, delete, rename, archive with progress/cancel/dry-run) |
 | **`dataforge/core/actions/`** | Action Builder pipeline engine: filters, IO steps, transformations, media operations |
@@ -198,7 +202,7 @@ DataForge is built in strict layers so the **same superpower logic runs in CLI a
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  CLI Superpowers           │  GUI Superpowers               │
-│  🔨 17 commands            │  ⚡ 14 views + plugins         │
+│  🔨 16 groups (17 leaf)    │  ⚡ 14 views + plugins         │
 │  ⚙️ Scriptable             │  🎨 Interactive               │
 │  📊 JSON/JSONL output      │  🎯 Visual workflow builder   │
 └─────────┬────────────────────────────────────────┬─────────┘
@@ -234,7 +238,7 @@ The **two user interfaces are thin adapters** — all the real superpowers live 
 
 - **Correctness** — 301 tests pass. All correctness bugs fixed: MD5→SHA-256 defaults, symlink-loop scope escape, thread-safe cache, JSON error handling, SHA-512 crash, etc.
 - **UI/UX overhaul** — Phase 2a/2b/2c/2d/2e shipped: surface brightness fix, themed checkboxes/combos, design-token module (`ui/theme_tokens.py`) with AA-validated colours replacing three legacy colour vocabularies, type-scale constants, per-widget colour migration, file-vs-folder riddle removed (2c.1), settings autosave (2c.2), dark-mode dedup (2c.3), progressive disclosure (2c.4), destructive checklist (2c.5), named busy task (2c.6), rich help (2c.7), task-oriented sidebar (2d.1), Automations merge (2d.2), label renames (2d.3), `fm devices` GUI (2d.4), stray-name sweep (2d.5), animated sidebar/view transitions (2e.1), native indeterminate `QProgressBar` busy indicator (2e.2), Reduce motion setting (2e.3), `focus_ring` token + `:focus` QSS for every interactive widget (2e.4), purposeful `EmptyState` + `friendly_error_message` (2e.5), screen-reader `accessibleName`/`accessibleDescription` + colour-blind `⚠` glyph on destructive Proceed (2e.6), and an 18-icon monochrome SVG sidebar set (2e.7).
-- **Security findings** — S1–S13 are all fixed. The residual forensic-soundness work (chain-of-custody, Evidence Mode, provenance, UTC timestamps) lives in [`FORENSIC_SECURITY_REVIEW.md`](./docs/reviews/FORENSIC_SECURITY_REVIEW.md) and is the v0.2.0 WS-H / v0.3.0 WS-I/WS-J backlog.
+- **Security findings** — S1–S13 are all fixed. The residual forensic-soundness work (chain-of-custody, Evidence Mode, provenance, UTC timestamps) lives in [`FORENSIC_REVIEW.md`](./docs/reviews/FORENSIC_REVIEW.md) and is the v0.2.0 WS-H / v0.3.0 WS-I/WS-J backlog.
 - **Documentation** — ARCHITECTURE, CLI_REFERENCE, GUI_WORKFLOWS, DEVELOPMENT_GUIDE, TECHNICAL_SOURCE_OF_TRUTH all verified against current PyQt5 source (2026-07-12 pass; post-WS-E pass updated the 2e cross-references and added the new `dataforge/ui/resources/icons.py` file map).
 - **Packaging** — pyproject.toml and build_exe.py verified; release bundle working.
 
@@ -251,7 +255,7 @@ All 13 security findings (S1–S13) are **fixed** in the current source. Per-sev
 - 🟠 Medium: **7/7** (S3 symlink scope, S4 trash-restore, S5 plugin loader, S6 `secure_delete`, S7 cleanup, S8 secret hygiene, S13 decomposition bombs)
 - 🟡 Low: **4/4** (S9 XML, S10 config validation, S11 OS-handler, S12 forensic permissions)
 
-See [`docs/reviews/AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md) for severity, impact, and per-finding fix detail. The remaining forensic-soundness work (F1–F21 / U1–U11) is in [`FORENSIC_SECURITY_REVIEW.md`](./docs/reviews/FORENSIC_SECURITY_REVIEW.md).
+See [`docs/reviews/AUDIT_REPORT.md`](./docs/reviews/AUDIT_REPORT.md) for severity, impact, and per-finding fix detail. The remaining forensic-soundness work (F1–F21 / U1–U11) is in [`FORENSIC_REVIEW.md`](./docs/reviews/FORENSIC_REVIEW.md).
 
 ## Developer & Deployment Notes
 
@@ -259,7 +263,7 @@ See [`docs/reviews/AUDIT_FINDINGS.md`](./docs/reviews/AUDIT_FINDINGS.md) for sev
 - **Dependency split** — `pyproject.toml` = CLI + core only. `requirements.txt` = full stack (GUI/media). Install both for development.
 - **User data** — `~/.dataforge/config.json`, cache.db, app.log — all created on first run, no migration needed.
 - **Build artifacts** — `build/` and `dist/` are generated; don't maintain them. `release` profile is current; refresh `debug` via `python build_exe.py debug`.
-- **Next milestone** — WS-A through WS-E are all done (CI/CD, linting, packaging, S1–S13 security, design tokens, interaction correctness, IA/label/parity, motion/empty-error/a11y polish). Next is WS-F (architecture consolidation), WS-G (brand/release polish), and WS-H (forensic soundness) — the v0.2.0 release PR opens after WS-A through WS-H close. See [`docs/reviews/IMPLEMENTATION_PLAN.md`](./docs/reviews/IMPLEMENTATION_PLAN.md) and [`docs/reviews/IMPROVEMENT_PLAN.md`](./docs/reviews/IMPROVEMENT_PLAN.md).
+- **Next milestone** — WS-A through WS-E are all done (CI/CD, linting, packaging, S1–S13 security, design tokens, interaction correctness, IA/label/parity, motion/empty-error/a11y polish). Next is WS-F (architecture consolidation), WS-G (brand/release polish), and WS-H (forensic soundness) — the v0.2.0 release PR opens after WS-A through WS-H close. See [`docs/reviews/ROADMAP.md`](./docs/reviews/ROADMAP.md) and [`docs/reviews/ROADMAP.md`](./docs/reviews/ROADMAP.md).
 
 ---
 
@@ -269,7 +273,7 @@ DataForge is an open-source project. The audit and roadmap under [`docs/reviews/
 
 **For questions:**
 - File an issue in the repository
-- Check the [audit findings](./docs/reviews/AUDIT_FINDINGS.md) — your question may be answered there
+- Check the [audit findings](./docs/reviews/AUDIT_REPORT.md) — your question may be answered there
 - Review the [CLI reference](./docs/CLI_REFERENCE.md) and [GUI workflows](./docs/GUI_WORKFLOWS.md) for usage
 
 ---
