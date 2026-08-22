@@ -4,9 +4,9 @@
 
 **Generic prompt:** `../parallel-ticket-agent.md` / `../../../.github/prompts/parallel-ticket-agent.prompt.md` — set `{{TICKET_ID}}`.
 
-> **Status 2026-08-22 18:30 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 🔜 3/5 DONE (202,204,205) → 2 remaining**
-> Wave 0 (69 tests) + Wave 1 (126 tests) + Wave 2 3/5 (59 tests: `19+10+30`) = 254 tests green — Wave 2 remaining 2 tickets (`TICK-201`, `TICK-203`) can run in parallel on distinct files. See `docs/PARALLEL_BACKLOG.md` Wave 0 + Wave 1 + Wave 2 Reviews.
-> **Overall: 17/25 DONE (68%) — 8 remaining.**
+> **Status 2026-08-22 19:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5 DONE → Wave 3 🔜 READY**
+> Wave 0 (69 tests) + Wave 1 (126 tests) + Wave 2 (98 tests: `20+19+19+10+30`) = 293 tests green — Wave 2 fully green, unblocks Wave 3 (4 parallel agents). See `docs/PARALLEL_BACKLOG.md` Wave 0 + Wave 1 + Wave 2 Reviews (5/5).
+> **Overall: 19/25 DONE (76%) — 6 remaining.**
 
 ## Execution Order (Wave DAG)
 
@@ -30,15 +30,15 @@
 - **TICK-108** ✅ DONE 2026-08-22 — Stream integrity create/verify instead of materializing file lists | depends: "TICK-003" | writes: `dataforge/modules/integrity.py` → [`TICK-108.prompt.md`](./TICK-108.prompt.md)
 - **TICK-109** ✅ DONE 2026-08-22 — Make forensics calc_hashes/keyword_search share streaming engine + byte budget | depends: "TICK-003" | writes: `dataforge/modules/forensics.py` → [`TICK-109.prompt.md`](./TICK-109.prompt.md)
 
-### Wave 2 — 3/5 DONE, 2 remaining (in progress, 59 tests)
+### Wave 2 ✅ DONE 2026-08-22 19:00 UTC (5/5 — 98 tests, 5/5 validation_command green)
 
-- **TICK-201** 🔜 Ready — Parallelize FileActionService + fix single-mode zip abort/partial | depends: "TICK-105", "TICK-102" | writes: `dataforge/core/services/file_actions.py` → [`TICK-201.prompt.md`](./TICK-201.prompt.md)
+- **TICK-201** ✅ DONE 2026-08-22 — Parallelize FileActionService + fix single-mode zip abort/partial | depends: "TICK-105", "TICK-102" | writes: `dataforge/core/services/file_actions.py` → [`TICK-201.prompt.md`](./TICK-201.prompt.md)
 - **TICK-202** ✅ DONE 2026-08-22 — Parallelize carving: mmap image, sliding-window scan, chunked workers | depends: "TICK-102", "TICK-103" | writes: `dataforge/modules/recovery.py` → [`TICK-202.prompt.md`](./TICK-202.prompt.md)
-- **TICK-203** 🔜 Ready — Dedupe cleanup walks and reuse parallel scanner | depends: "TICK-102" | writes: `dataforge/modules/system_cleanup.py` → [`TICK-203.prompt.md`](./TICK-203.prompt.md)
+- **TICK-203** ✅ DONE 2026-08-22 — Dedupe cleanup walks and reuse parallel scanner | depends: "TICK-102" | writes: `dataforge/modules/system_cleanup.py` → [`TICK-203.prompt.md`](./TICK-203.prompt.md)
 - **TICK-204** ✅ DONE 2026-08-22 — Consolidate metadata cleaning to MetadataEngine (keep cleaner.py as shim) | depends: "TICK-003" | writes: `dataforge/modules/metadata.py` → [`TICK-204.prompt.md`](./TICK-204.prompt.md)
 - **TICK-205** ✅ DONE 2026-08-22 — Implement UDS (Linux/macOS) + Named Pipes (Windows) transports | depends: "TICK-003", "TICK-005" | writes: `dataforge/api/transport/uds.py [NEW FILE]`, `dataforge/api/transport/named_pipe.py [NEW FILE]` → [`TICK-205.prompt.md`](./TICK-205.prompt.md)
 
-### Wave 3
+### Wave 3 🔜 READY 2026-08-22 — Wave 2 ✅ 5/5 gate green, 4 disjoint, unblocked
 
 - **TICK-301** — Wire daemon job queue + client auto-discover (consolidation) | depends: "TICK-205", "TICK-201" | writes: `dataforge/engine/daemon.py`, `dataforge/client/__init__.py [NEW FILE]`, `dataforge/client/sync.py [NEW FILE]`, `dataforge/service/__main__.py [NEW FILE]` → [`TICK-301.prompt.md`](./TICK-301.prompt.md)
 - **TICK-302** — Install service lifecycle files (systemd user service + socket, launchd plist, Windows Service) | depends: "TICK-301" | writes: `dataforge/service/linux/dataforge.socket [NEW FILE]`, `dataforge/service/linux/dataforge.service [NEW FILE]`, `dataforge/service/linux/com.dataforge.Engine.service [NEW FILE]`, `dataforge/service/windows/service.py [NEW FILE]`, `dataforge/service/windows/install.py [NEW FILE]`, `dataforge/service/macos/com.dataforge.engine.plist [NEW FILE]` → [`TICK-302.prompt.md`](./TICK-302.prompt.md)

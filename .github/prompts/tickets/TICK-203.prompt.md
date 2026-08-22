@@ -1,3 +1,5 @@
+> **Status: ✅ COMPLETED 2026-08-22 — Wave 2 DONE, verified (see docs/PARALLEL_BACKLOG.md Wave 2 Review). This ticket is closed — do not re-run.**
+
 # Ticket TICK-203 — Dedupe cleanup walks and reuse parallel scanner
 
 > **Wave 2** | **Domain:** Modules / System Cleanup | **Depends on:** "TICK-102"
