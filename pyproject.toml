@@ -17,6 +17,7 @@ dependencies = [
     "mutagen>=1.47.0",
     "py-cpuinfo>=9.0.0",
     "defusedxml>=0.7.1",
+    "pydantic>=2",
 ]
 
 [project.scripts]
