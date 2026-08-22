@@ -701,7 +701,7 @@ def ingest_disk_image(
 # Forensic report generation
 # ---------------------------------------------------------------------------
 
-def generate_forensic_report(results, output_path, fmt="json"):
+def generate_forensic_report(results, output_path, fmt="json", case_context=None, audit_log=None):
     """
     Generate a forensic analysis report.
 
@@ -709,13 +709,32 @@ def generate_forensic_report(results, output_path, fmt="json"):
         results: dict from ingest_disk_image() or other analysis.
         output_path: Output file path.
         fmt: "json" or "html".
+        case_context: Optional CaseContext for provenance fields.
+        audit_log: Optional AuditLog for audit_tail_hash.
 
     Returns:
         str: output path.
     """
+    # F9 fix: always use UTC ISO-8601 (was naive datetime.now())
+    report_generated = datetime.now(timezone.utc).isoformat()
+
+    # F2 provenance: operator, host, source_sha256, case_id, audit_tail_hash, tool_version
+    provenance = {}
+    if case_context is not None:
+        provenance = {
+            "case_id": case_context.case_id,
+            "operator": case_context.operator,
+            "host": case_context.host,
+            "source_sha256": case_context.source_sha256,
+        }
+    if audit_log is not None:
+        provenance["audit_tail_hash"] = audit_log.tail_hash()
+
     report = {
-        "report_generated": datetime.now().isoformat(),
+        "report_generated": report_generated,
         "tool": "DataForge Forensics Module",
+        "tool_version": "0.2.0",
+        **provenance,
         "data": results,
     }
 
@@ -744,9 +763,16 @@ def _forensic_report_html(report):
         "</style></head><body>",
         "<h1>🔬 Forensic Analysis Report</h1>",
         f"<p>Generated: {esc(str(report['report_generated']))}</p>",
-        f"<p>Tool: {esc(str(report['tool']))}</p>",
-        "<hr>",
+        f"<p>Tool: {esc(str(report['tool']))} v{esc(str(report.get('tool_version', '')))}</p>",
     ]
+
+    # F2 provenance fields
+    for field in ("case_id", "operator", "host", "source_sha256", "audit_tail_hash"):
+        val = report.get(field)
+        if val:
+            lines.append(f"<p><strong>{esc(field.replace('_', ' ').title())}:</strong> {esc(str(val))}</p>")
+
+    lines.append("<hr>")
 
     data = report.get("data", {})
 
@@ -1082,7 +1108,18 @@ def secure_delete(path, passes=3, cancel_token=None):
        journaled filesystems the overwrite may not reach the physical media.
        This function does **not** guarantee data destruction on those
        platforms.
+
+    F3/U2 gate: blocked when CaseContext.evidence_mode is True.
     """
+    # F3/U2: Evidence Mode gate — refuse destructive operations
+    from ..core.case import is_evidence_mode
+    if is_evidence_mode():
+        return {
+            "success": False,
+            "path": path,
+            "message": "Evidence Mode is active — destructive operations are blocked (ACPO §1)",
+        }
+
     if not os.path.isfile(path):
         return {"success": False, "message": "not a regular file"}
     size = os.path.getsize(path)
