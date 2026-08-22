@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait
 from dataclasses import dataclass
 import os
 import re
+import threading
 import zipfile
 from typing import Any, Callable, Iterable, Optional
 
@@ -11,6 +13,13 @@ from ..logger import logger
 from ..operations import apply_result_to_entry, delete_path, rename_path, render_template_name, transfer_path
 from ..operations.files import OperationResult, normalize_path
 from ..utils import normalize_filename, safe_zip_write
+
+
+def _get_batch_workers() -> int:
+    try:
+        return min(16, (os.cpu_count() or 4) * 2)
+    except Exception:
+        return 4
 
 
 def _normalize_path_value(path: Any) -> str:
@@ -105,6 +114,81 @@ class FileActionService:
 
         return BatchActionOutcome(action=action, records=records)
 
+    @classmethod
+    def _run_batch_parallel(
+        cls,
+        items: list[Any],
+        *,
+        action: str,
+        progress_message: str,
+        operation: Callable[[Any, str, int], BatchActionRecord],
+        cancel_token=None,
+        progress_callback=None,
+        path_getter: Callable[[Any], str] = _default_path_getter,
+    ) -> BatchActionOutcome:
+        total = len(items)
+        if total == 0:
+            return BatchActionOutcome(action=action, records=[])
+
+        workers = _get_batch_workers()
+        records: list[BatchActionRecord] = [None] * total  # type: ignore[list-item]
+        counter_lock = threading.Lock()
+        completed_count = 0
+
+        def _do_one(idx: int, item: Any) -> tuple[int, BatchActionRecord]:
+            source_path = _normalize_path_value(path_getter(item))
+            record = operation(item, source_path, idx + 1)
+            return idx, record
+
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {}
+            for idx, item in enumerate(items):
+                if cancel_token and cancel_token.is_set():
+                    break
+                futures[pool.submit(_do_one, idx, item)] = idx
+
+            while futures:
+                if cancel_token and cancel_token.is_set():
+                    for f in futures:
+                        f.cancel()
+                    break
+
+                done, _ = wait(futures, timeout=0.1, return_when=FIRST_COMPLETED)
+                for fut in done:
+                    futures.pop(fut, None)
+                    if fut.cancelled():
+                        continue
+                    exc = fut.exception()
+                    if exc is not None:
+                        idx = futures.get(fut, -1)
+                        if idx < 0:
+                            for k, v in list(futures.items()):
+                                if k is fut:
+                                    idx = v
+                                    break
+                        if idx >= 0:
+                            item = items[idx]
+                            sp = _normalize_path_value(path_getter(item))
+                            msg = f"ERROR: {exc}"
+                            result = OperationResult(action, sp, None, False, msg)
+                            rec = BatchActionRecord(item=item, source_path=sp, message=msg, result=result, success=False)
+                            records[idx] = rec
+                            cls._log_record(rec)
+                        continue
+
+                    idx, record = fut.result()
+                    records[idx] = record
+                    cls._log_record(record)
+
+                    with counter_lock:
+                        completed_count += 1
+                        if progress_callback:
+                            progress_callback(completed_count, total, progress_message)
+
+        records = [r for r in records if r is not None]
+        cancelled = cancel_token is not None and cancel_token.is_set()
+        return BatchActionOutcome(action=action, records=records, cancelled=cancelled)
+
     @staticmethod
     def records_for_output(outcome: BatchActionOutcome, *, include_skipped: bool = True) -> list[BatchActionRecord]:
         if include_skipped:
@@ -146,8 +230,20 @@ class FileActionService:
             result = transfer_path(source_path, target_dir, action, dry_run=dry_run, reserved_paths=reserved_paths)
             return BatchActionRecord(item=item, source_path=source_path, message=result.message, result=result, success=result.success)
 
-        return cls._run_batch_operation(
-            items,
+        items_list = list(items)
+        if dry_run or len(items_list) <= 1:
+            return cls._run_batch_operation(
+                items_list,
+                action=action,
+                progress_message=f"{action.title()}...",
+                operation=_transfer_record,
+                cancel_token=cancel_token,
+                progress_callback=progress_callback,
+                path_getter=path_getter,
+            )
+
+        return cls._run_batch_parallel(
+            items_list,
             action=action,
             progress_message=f"{action.title()}...",
             operation=_transfer_record,
@@ -172,8 +268,20 @@ class FileActionService:
             result = delete_path(source_path, dry_run=dry_run, safe_mode=safe_mode)
             return BatchActionRecord(item=item, source_path=source_path, message=result.message, result=result, success=result.success)
 
-        return cls._run_batch_operation(
-            items,
+        items_list = list(items)
+        if dry_run or len(items_list) <= 1:
+            return cls._run_batch_operation(
+                items_list,
+                action="delete",
+                progress_message="Deleting...",
+                operation=_delete_record,
+                cancel_token=cancel_token,
+                progress_callback=progress_callback,
+                path_getter=path_getter,
+            )
+
+        return cls._run_batch_parallel(
+            items_list,
             action="delete",
             progress_message="Deleting...",
             operation=_delete_record,
@@ -207,8 +315,20 @@ class FileActionService:
                 return BatchActionRecord(item=item, source_path=source_path, message=message, skipped=True)
             return BatchActionRecord(item=item, source_path=source_path, message=result.message, result=result, success=result.success)
 
-        return cls._run_batch_operation(
-            items,
+        items_list = list(items)
+        if dry_run or len(items_list) <= 1:
+            return cls._run_batch_operation(
+                items_list,
+                action="rename",
+                progress_message="Renaming...",
+                operation=_rename_record,
+                cancel_token=cancel_token,
+                progress_callback=progress_callback,
+                path_getter=path_getter,
+            )
+
+        return cls._run_batch_parallel(
+            items_list,
             action="rename",
             progress_message="Renaming...",
             operation=_rename_record,
@@ -354,62 +474,98 @@ class FileActionService:
                         progress_callback(index, total, "Previewing Archive...")
                 return BatchActionOutcome(action="archive", records=records)
 
-            try:
-                destination = _normalize_path_value(destination)
-                output_dir = os.path.dirname(destination)
-                if output_dir:
-                    os.makedirs(output_dir, exist_ok=True)
+            destination = _normalize_path_value(destination)
+            tmp_path = destination + ".tmp"
+            output_dir = os.path.dirname(destination)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
 
-                existing_names = set()
-                with zipfile.ZipFile(destination, "w", compression) as archive_handle:
+            existing_names: set[str] = set()
+            any_failed = False
+            try:
+                with zipfile.ZipFile(tmp_path, "w", compression) as archive_handle:
                     for index, item in enumerate(items, start=1):
                         if cancel_token and cancel_token.is_set():
+                            try:
+                                os.remove(tmp_path)
+                            except OSError:
+                                pass
                             return BatchActionOutcome(action="archive", records=records, cancelled=True)
 
                         source_path = _normalize_path_value(path_getter(item))
-                        archived_name = safe_zip_write(archive_handle, source_path, os.path.basename(source_path), existing_names)
-                        result = OperationResult("archive", source_path, destination, True, f"Archived: {source_path} -> {destination} ({archived_name})")
-                        record = BatchActionRecord(item=item, source_path=source_path, message=result.message, result=result, success=True)
+                        try:
+                            archived_name = safe_zip_write(archive_handle, source_path, os.path.basename(source_path), existing_names)
+                            result = OperationResult("archive", source_path, destination, True, f"Archived: {source_path} -> {destination} ({archived_name})")
+                            record = BatchActionRecord(item=item, source_path=source_path, message=result.message, result=result, success=True)
+                        except Exception as exc:
+                            any_failed = True
+                            result = OperationResult("archive", source_path, destination, False, f"ERROR: Could not archive {source_path}: {exc}")
+                            record = BatchActionRecord(item=item, source_path=source_path, message=result.message, result=result, success=False)
                         cls._log_record(record)
                         records.append(record)
 
                         if progress_callback:
                             progress_callback(index, total, "Archiving...")
+
+                if any_failed:
+                    try:
+                        os.remove(tmp_path)
+                    except OSError:
+                        pass
+                else:
+                    os.replace(tmp_path, destination)
             except Exception as exc:
-                failed_result = OperationResult("archive", destination or "", destination, False, f"ERROR: Could not archive to {destination}: {exc}")
-                record = BatchActionRecord(item=destination, source_path=destination or "", message=failed_result.message, result=failed_result, success=False)
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+                failed_result = OperationResult("archive", destination, destination, False, f"ERROR: Could not archive to {destination}: {exc}")
+                record = BatchActionRecord(item=destination, source_path=destination, message=failed_result.message, result=failed_result, success=False)
                 cls._log_record(record)
                 records.append(record)
             return BatchActionOutcome(action="archive", records=records)
 
-        for index, item in enumerate(items, start=1):
-            if cancel_token and cancel_token.is_set():
-                return BatchActionOutcome(action="archive", records=records, cancelled=True)
-
-            source_path = _normalize_path_value(path_getter(item))
+        def _individual_record(item: Any, source_path: str, _index: int) -> BatchActionRecord:
             archive_path = _normalize_path_value(destination) or f"{os.path.splitext(source_path)[0]}.zip"
-            if dry_run:
+            output_dir = os.path.dirname(archive_path)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+            tmp_path = archive_path + ".tmp"
+            try:
+                with zipfile.ZipFile(tmp_path, "w", compression) as archive_handle:
+                    safe_zip_write(archive_handle, source_path, os.path.basename(source_path), set())
+                os.replace(tmp_path, archive_path)
+                result = OperationResult("archive", source_path, archive_path, True, f"Archived: {source_path} -> {archive_path}")
+                return BatchActionRecord(item=item, source_path=source_path, message=result.message, result=result, success=True)
+            except Exception as exc:
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+                result = OperationResult("archive", source_path, archive_path, False, f"ERROR: Could not archive {source_path}: {exc}")
+                return BatchActionRecord(item=item, source_path=source_path, message=result.message, result=result, success=False)
+
+        if dry_run:
+            for index, item in enumerate(items, start=1):
+                source_path = _normalize_path_value(path_getter(item))
+                archive_path = _normalize_path_value(destination) or f"{os.path.splitext(source_path)[0]}.zip"
                 message = f"Would archive: {source_path} -> {archive_path}"
                 record = BatchActionRecord(item=item, source_path=source_path, message=message, success=True)
-            else:
-                try:
-                    output_dir = os.path.dirname(archive_path)
-                    if output_dir:
-                        os.makedirs(output_dir, exist_ok=True)
-                    with zipfile.ZipFile(archive_path, "w", compression) as archive_handle:
-                        safe_zip_write(archive_handle, source_path, os.path.basename(source_path), set())
-                    result = OperationResult("archive", source_path, archive_path, True, f"Archived: {source_path} -> {archive_path}")
-                    record = BatchActionRecord(item=item, source_path=source_path, message=result.message, result=result, success=True)
-                except Exception as exc:
-                    result = OperationResult("archive", source_path, archive_path, False, f"ERROR: Could not archive {source_path}: {exc}")
-                    record = BatchActionRecord(item=item, source_path=source_path, message=result.message, result=result, success=False)
-            cls._log_record(record)
-            records.append(record)
+                cls._log_record(record)
+                records.append(record)
+                if progress_callback:
+                    progress_callback(index, total, "Previewing Archive...")
+            return BatchActionOutcome(action="archive", records=records)
 
-            if progress_callback:
-                progress_callback(index, total, "Archiving...")
-
-        return BatchActionOutcome(action="archive", records=records)
+        return cls._run_batch_parallel(
+            items,
+            action="archive",
+            progress_message="Archiving...",
+            operation=_individual_record,
+            cancel_token=cancel_token,
+            progress_callback=progress_callback,
+            path_getter=path_getter,
+        )
 
     @staticmethod
     def apply_successes_to_entries(outcome: BatchActionOutcome):
