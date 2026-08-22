@@ -1,17 +1,63 @@
 import filecmp
+import hashlib
+import os
+import queue
 from collections import defaultdict
-from typing import List, Dict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from ..core.scanner import scan_directory
-from ..core.hasher import get_file_hash
-from ..core.common import FileEntry
-from ..core.logger import logger
+from typing import Dict, List
+
 from ..core.cache import file_cache
+from ..core.common import FileEntry
 from ..core.config import config
+from ..core.hasher import get_file_hash
+from ..core.logger import logger
+from ..core.scanner import scan_directory
 from .search import serialize_file_entry
 
-
 KEEP_STRATEGIES = ("first path", "newest", "oldest", "largest", "smallest")
+
+
+def _get_max_workers() -> int:
+    try:
+        c = os.cpu_count()
+        if c is None:
+            c = 4
+        return min(32, c * 4)
+    except Exception:
+        return 16
+
+
+def _fast_hash(path: str, cancel_token=None) -> str | None:
+    """xxhash64(first 4KiB) prefilter — fallback to blake2b 8B if xxhash missing."""
+    if cancel_token is not None and cancel_token.is_set():
+        return None
+    try:
+        try:
+            import xxhash  # type: ignore
+
+            h = xxhash.xxh64()
+            with open(path, "rb") as f:
+                data = f.read(4096)
+                if data:
+                    h.update(data)
+            return h.hexdigest()
+        except ImportError:
+            h2 = hashlib.blake2b(digest_size=8)
+            with open(path, "rb") as f:
+                data = f.read(4096)
+                if data:
+                    h2.update(data)
+            return h2.hexdigest()
+    except OSError:
+        return None
+
+
+def _content_matches(path_a: str, path_b: str) -> bool:
+    """Byte-for-byte comparison; treats unreadable files as non-matching."""
+    try:
+        return filecmp.cmp(path_a, path_b, shallow=False)
+    except OSError:
+        return False
 
 
 def build_duplicate_records(duplicates: Dict[str, List[FileEntry]]) -> list[dict]:
@@ -69,14 +115,6 @@ def choose_duplicate_keeper(entries: List[FileEntry], strategy: str) -> FileEntr
     if strategy == "smallest":
         return min(entries, key=lambda entry: (entry.size, entry.path.lower()))
     return min(entries, key=lambda entry: entry.path.lower())
-
-
-def _content_matches(path_a: str, path_b: str) -> bool:
-    """Byte-for-byte comparison; treats unreadable files as non-matching."""
-    try:
-        return filecmp.cmp(path_a, path_b, shallow=False)
-    except OSError:
-        return False
 
 
 def select_duplicate_records(records, keep_strategy: str = "first path", verify_content: bool = False) -> list[dict]:
@@ -154,87 +192,197 @@ def _hash_worker(path, size, mtime, algo, cancel_token):
         return path, None
     return path, get_file_hash(path, algo, cancel_token)
 
-def find_duplicates(path: str, recursive: bool = True, max_depth: int = -1, progress_callback=None, cancel_token=None) -> Dict[str, List[FileEntry]]:
-    # ... (header same)
+
+def find_duplicates(path: str, recursive: bool = True, max_depth: int = -1, progress_callback=None, cancel_token=None, verify_content: bool = False) -> Dict[str, List[FileEntry]]:
     logger.info(f"Starting duplicate scan in {path}")
-    algo = config.get("hash_algorithm", "md5")
-    
+    algo = config.get("hash_algorithm", "sha256")
+
     if cancel_token and cancel_token.is_set():
         raise InterruptedError("Cancelled")
 
-    # Step 1: Group by size
-    size_map = defaultdict(list)
+    # Streaming size-map via queue.Queue — O(batch) not O(n)
+    # scanner thread(s) -> queue.Queue[FileEntry] -> size-map
+    entry_queue: queue.Queue = queue.Queue()
+    BATCH_SIZE = 1000
+    size_map: Dict[int, List[FileEntry]] = defaultdict(list)
+    seen_inodes: set[tuple[int, int]] = set()
     count = 0
-    # Note: Scanning progress is hard without total count.
-    # We could report "Scanned X items" indeterminate.
+
+    def _drain_queue_to_size_map():
+        while not entry_queue.empty():
+            if cancel_token is not None and cancel_token.is_set():
+                # discard remaining to stop promptly
+                while not entry_queue.empty():
+                    try:
+                        entry_queue.get_nowait()
+                    except queue.Empty:
+                        break
+                return True  # cancelled
+            try:
+                e = entry_queue.get_nowait()
+            except queue.Empty:
+                break
+            # hardlink dedup: (st_dev, st_ino) equal -> counted once
+            key = e.hardlink_key
+            # only dedup when inode is populated (non-zero)
+            if key != (0, 0):
+                if key in seen_inodes:
+                    continue
+                seen_inodes.add(key)
+            size_map[e.size].append(e)
+        return False
+
+    # Streaming scan — do not materialize scanner output
     for entry in scan_directory(path, recursive, max_depth=max_depth, cancel_token=cancel_token):
         if cancel_token and cancel_token.is_set():
             raise InterruptedError("Cancelled")
-            
-        if entry.size > 0:
-            size_map[entry.size].append(entry)
+
+        # skip empty files (size 0 cannot be duplicate in useful sense)
+        if entry.size == 0:
+            count += 1
+            continue
+        entry_queue.put(entry)
         count += 1
         if progress_callback and count % 100 == 0:
             progress_callback(count, 0, "Scanning files...")
-            
+        if entry_queue.qsize() >= BATCH_SIZE:
+            if _drain_queue_to_size_map():
+                raise InterruptedError("Cancelled")
+
+    # drain remainder
+    if _drain_queue_to_size_map():
+        raise InterruptedError("Cancelled")
+
     logger.info(f"Scanned {count} files. Analyzing potential duplicates...")
-    
-    # Step 2: Filter potential duplicates
+
+    # Filter potential duplicates by size
     potential_dupes = {size: entries for size, entries in size_map.items() if len(entries) > 1}
-    
-    # Step 3: Hash and group
-    hash_map = defaultdict(list)
-    files_to_hash = []
-    
-    # Check cache first
-    for size, entries in potential_dupes.items():
-        if cancel_token and cancel_token.is_set():
-            raise InterruptedError("Cancelled")
-            
-        for entry in entries:
-            cached_hash = file_cache.get_hash(entry.path, entry.size, entry.modified_at, algo)
-            if cached_hash:
-                entry.md5 = cached_hash # Using generic field for convenience, or add entry.hash?
-                hash_map[cached_hash].append(entry)
-            else:
-                files_to_hash.append(entry)
-                
-    # Parallel hashing for uncached files
-    if files_to_hash:
-        logger.info(f"Hashing {len(files_to_hash)} new files...")
-        max_workers = config.get("max_thread_workers", 4)
-        total_hashes = len(files_to_hash)
-        completed_hashes = 0
-        
-        # Use ThreadPoolExecutor to allow sharing cancel_token (Event)
+    if not potential_dupes:
+        return {}
+
+    if cancel_token and cancel_token.is_set():
+        raise InterruptedError("Cancelled")
+
+    max_workers = _get_max_workers()
+
+    # Stage 2: fast-hash (xxhash64 first 4KiB) prefilter via ThreadPool(min(32,cpu*4))
+    fast_map: Dict[str, List[FileEntry]] = defaultdict(list)
+    # flatten potential entries for fast hashing
+    all_potential: List[FileEntry] = []
+    for entries in potential_dupes.values():
+        all_potential.extend(entries)
+
+    # fast hash in parallel
+    if all_potential:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(_hash_worker, e.path, e.size, e.modified_at, algo, cancel_token): e 
-                for e in files_to_hash
-            }
-            
-            for future in as_completed(futures):
+            futures = {executor.submit(_fast_hash, e.path, cancel_token): e for e in all_potential}
+            for fut in as_completed(futures):
                 if cancel_token and cancel_token.is_set():
                     executor.shutdown(wait=False, cancel_futures=True)
                     raise InterruptedError("Cancelled")
-                    
-                entry = futures[future]
-                completed_hashes += 1
-                if progress_callback:
-                    progress_callback(completed_hashes, total_hashes, "Hashing files")
-
+                entry = futures[fut]
                 try:
-                    path, file_hash = future.result()
+                    fh = fut.result()
+                    if fh is None:
+                        continue
+                    fast_map[fh].append(entry)
+                except Exception:
+                    continue
+
+    # only keep fast groups with collisions
+    fast_candidates: List[FileEntry] = []
+    for fh, entries in fast_map.items():
+        if len(entries) > 1:
+            fast_candidates.extend(entries)
+
+    if not fast_candidates:
+        return {}
+
+    if cancel_token and cancel_token.is_set():
+        raise InterruptedError("Cancelled")
+
+    # Stage 3: full hash (sha256 etc.) only on fast collisions
+    hash_map: Dict[str, List[FileEntry]] = defaultdict(list)
+    files_to_hash: List[FileEntry] = []
+    # cache probe
+    for entry in fast_candidates:
+        if cancel_token and cancel_token.is_set():
+            raise InterruptedError("Cancelled")
+        cached = file_cache.get_hash(entry.path, entry.size, entry.modified_at, algo)
+        if cached:
+            hash_map[cached].append(entry)
+        else:
+            files_to_hash.append(entry)
+
+    if files_to_hash:
+        logger.info(f"Hashing {len(files_to_hash)} new files...")
+        total_hashes = len(files_to_hash)
+        completed = 0
+        pending_rows: List[tuple] = []
+        cache_batch = int(config.get("cache_batch_size", 1000) or 1000)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(_hash_worker, e.path, e.size, e.modified_at, algo, cancel_token): e
+                for e in files_to_hash
+            }
+            for fut in as_completed(futures):
+                if cancel_token and cancel_token.is_set():
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    # flush pending batch before abort if needed
+                    if pending_rows:
+                        try:
+                            file_cache.set_hash_many(pending_rows)
+                        except Exception:
+                            pass
+                    raise InterruptedError("Cancelled")
+                entry = futures[fut]
+                completed += 1
+                if progress_callback:
+                    progress_callback(completed, total_hashes, "Hashing files")
+                try:
+                    _path, file_hash = fut.result()
                     if file_hash:
-                        entry.md5 = file_hash
-                        # Update cache
-                        file_cache.set_hash(entry.path, entry.size, entry.modified_at, file_hash, algo)
                         hash_map[file_hash].append(entry)
+                        pending_rows.append((entry.path, entry.size, entry.modified_at, file_hash, algo))
+                        if len(pending_rows) >= cache_batch:
+                            try:
+                                file_cache.set_hash_many(pending_rows)
+                            except Exception as e:
+                                logger.error(f"Batch cache write failed: {e}")
+                            pending_rows.clear()
                 except Exception as e:
                     logger.error(f"Error hashing {entry.path}: {e}")
-                    
-    # Step 4: Final filter for actual duplicates
+        if pending_rows:
+            try:
+                file_cache.set_hash_many(pending_rows)
+            except Exception as e:
+                logger.error(f"Batch cache write failed: {e}")
+
+    # Final filter; optional verify_content byte-compare on close hashes
     duplicates = {h: entries for h, entries in hash_map.items() if len(entries) > 1}
+
+    if verify_content and duplicates:
+        verified: Dict[str, List[FileEntry]] = {}
+        for h, entries in duplicates.items():
+            if cancel_token and cancel_token.is_set():
+                raise InterruptedError("Cancelled")
+            # group by content equality to keeper
+            # keep only entries byte-identical to first
+            keeper = entries[0]
+            same: List[FileEntry] = [keeper]
+            for other in entries[1:]:
+                if _content_matches(other.path, keeper.path):
+                    same.append(other)
+                else:
+                    logger.warning(
+                        "Skipping suspected duplicate %s: content differs from keeper %s (hash collision or changed file)",
+                        other.path,
+                        keeper.path,
+                    )
+            if len(same) > 1:
+                verified[h] = same
+        duplicates = verified
+
     logger.info(f"Duplicate scan complete. Found {len(duplicates)} sets.")
-    
+
     return duplicates
