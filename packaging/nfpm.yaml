@@ -1,0 +1,84 @@
+# nfpm configuration for DataForge deb/rpm packaging
+# See: docs/proposals/INSTALL_UPGRADE_LIFECYCLE.md §3.2
+# Usage: nfpm pkg --packager deb --target dist/packages/
+
+name: dataforge
+arch: amd64
+platform: linux
+version: "0.1.0"
+section: utils
+priority: optional
+maintainer: "DataForge Contributors <dev@dataforge.dev>"
+description: |
+  DataForge — File System Management with Steroids and Superpowers.
+  Local-first desktop and CLI toolkit for file discovery, deduplication,
+  organization, cleanup, integrity, recovery, and forensic triage.
+homepage: https://github.com/AztlanLabs/DataForge
+license: GPL-3.0
+
+contents:
+  # Main application bundle (PyInstaller onedir output)
+  - src: dist/onedir/DataForge/
+    dst: /opt/dataforge/
+    type: tree
+
+  # CLI shim → symlink to /opt/dataforge/DataForge
+  - src: dist/onedir/DataForge/DataForge
+    dst: /usr/bin/dataforge
+    type: symlink
+
+  # Desktop entry
+  - src: packaging/assets/dataforge.desktop
+    dst: /usr/share/applications/dataforge.desktop
+    type: config
+    file_info:
+      mode: 0644
+
+  # Application icon
+  - src: packaging/assets/dataforge.png
+    dst: /usr/share/icons/hicolor/256x256/apps/dataforge.png
+    type: config
+    file_info:
+      mode: 0644
+
+  # systemd --user units
+  - src: packaging/systemd/dataforge.socket
+    dst: /usr/lib/systemd/user/dataforge.socket
+    type: config
+    file_info:
+      mode: 0644
+
+  - src: packaging/systemd/dataforge.service
+    dst: /usr/lib/systemd/user/dataforge.service
+    type: config
+    file_info:
+      mode: 0644
+
+  # D-Bus user service
+  - src: packaging/dbus/com.dataforge.Engine.service
+    dst: /usr/share/dbus-1/services/com.dataforge.Engine.service
+    type: config
+    file_info:
+      mode: 0644
+
+# Package scripts (postinst/prerm)
+scripts:
+  postinstall: packaging/scripts/postinst.sh
+  preremove: packaging/scripts/prerm.sh
+
+# Dependencies (deb)
+depends:
+  - python3
+  - python3-pyqt5
+
+# RPM-specific
+rpm:
+  group: Applications/System
+  summary: File System Management with Steroids and Superpowers
+
+# Deb-specific
+deb:
+  breaks:
+    - dataforge (<< 0.1.0)
+  replaces:
+    - dataforge (<< 0.1.0)

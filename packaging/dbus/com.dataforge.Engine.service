@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=com.dataforge.Engine
+Exec=/opt/dataforge/DataForge --engine
+SystemdService=dataforge.service

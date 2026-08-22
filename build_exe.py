@@ -50,6 +50,13 @@ def release_args() -> list[str]:
     ]
 
 
+def onedir_args() -> list[str]:
+    return build_common_args('onedir', 'DataForge') + [
+        '--windowed',
+        '--onedir',
+    ]
+
+
 def debug_args() -> list[str]:
     return build_common_args('debug', 'DataForge-debug') + [
         '--console',
@@ -65,7 +72,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         'profile',
         nargs='?',
-        choices=('release', 'debug', 'all'),
+        choices=('release', 'onedir', 'debug', 'all'),
         default='release',
         help='Select which build profile to generate.',
     )
@@ -75,6 +82,8 @@ def parse_args() -> argparse.Namespace:
 def run_build(profile: str) -> None:
     if profile == 'release':
         args = release_args()
+    elif profile == 'onedir':
+        args = onedir_args()
     elif profile == 'debug':
         args = debug_args()
     else:
@@ -90,6 +99,7 @@ def main() -> None:
 
     if args.profile == 'all':
         run_build('release')
+        run_build('onedir')
         run_build('debug')
         return
 

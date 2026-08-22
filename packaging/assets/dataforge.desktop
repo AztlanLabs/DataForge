@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=DataForge
+GenericName=File System Manager
+Comment=File System Management with Steroids and Superpowers
+Exec=/opt/dataforge/DataForge %F
+Icon=dataforge
+Terminal=false
+Categories=Utility;FileTools;FileManager;
+Keywords=file;manager;organize;duplicate;cleanup;forensics;
+StartupNotify=true
+StartupWMClass=DataForge
