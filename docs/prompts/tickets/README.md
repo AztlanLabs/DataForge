@@ -46,6 +46,10 @@
 - **TICK-401** — Replace single BackgroundWorker is_busy with JobManager + virtualized views | depends: "TICK-301", "TICK-304" | writes: `dataforge/ui/app.py`, `dataforge/ui/job_manager.py [NEW FILE]` → [`TICK-401.prompt.md`](./TICK-401.prompt.md)
 - **TICK-402** — Centralize version bump (pyproject → __init__ → Info.plist/wxs) | depends: "TICK-001", "TICK-303" | writes: `scripts/bump_version.py [NEW FILE]`, `pyproject.toml` → [`TICK-402.prompt.md`](./TICK-402.prompt.md)
 
+## Relevant Documentation Per Ticket
+
+Each per-ticket file now includes a **Relevant Documentation — Must Read Before Coding** section tailored to its `scope` (e.g. `UI` → `GUI_WORKFLOWS.md`, `Core` → `TECHNICAL_SOURCE_OF_TRUTH.md` + `ARCHITECTURE.md`, `Modules` → `CLI_REFERENCE.md` + module-specific GUI workflow). The generic prompt also contains a domain→docs table (`docs/prompts/parallel-ticket-agent.md` §6). Always read the listed docs before editing and update them per `CONTRIBUTING.md §8` after editing.
+
 ## How to Use
 
 ### Sequential (default, safe)
