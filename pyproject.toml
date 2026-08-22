@@ -65,3 +65,6 @@ source = ["dataforge"]
 
 [tool.coverage.report]
 show_missing = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

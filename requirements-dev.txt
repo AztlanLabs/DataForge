@@ -3,6 +3,7 @@
 -r requirements.txt
 pytest
 pytest-cov
+pytest-asyncio
 ruff
 mypy
 pre-commit
