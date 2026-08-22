@@ -131,7 +131,8 @@ def test_set_hash_many_validates_shape(tmp_path):
     valid = [("/path/a.txt", 100, 12345.0, "abc123", "md5")]
     assert cm.set_hash_many(valid) is None
     assert cm.set_hash_many([]) is None
-    assert cm.get_hash("/path/a.txt", 100, 12345.0, "md5") is None
+    # Wave 0 stub returned None; Wave 1 (TICK-104) impl persists via executemany
+    assert cm.get_hash("/path/a.txt", 100, 12345.0, "md5") == "abc123"
     with pytest.raises(TypeError):
         cm.set_hash_many("not a list")  # type: ignore
     with pytest.raises(ValueError):
