@@ -1,5 +1,7 @@
 # Ticket TICK-302 — Install service lifecycle files (systemd user service + socket, launchd plist, Windows Service)
 
+> ✅ **DONE 2026-08-22** — Merged to `develop`. Tests: `tests/test_service_lifecycle.py` 392/392 passed.
+
 > **Wave 3** | **Domain:** Service / Lifecycle | **Depends on:** "TICK-301"
 > **Source:** `docs/PARALLEL_BACKLOG.md` + `docs/CONSOLIDATED_SPEC.md` + `docs/CONTRIBUTING.md`
 

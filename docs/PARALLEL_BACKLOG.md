@@ -5,13 +5,14 @@
 **Toolchain:** `pytest` (`requirements-dev.txt:4`), `pytest-cov`, `ruff`, `mypy` — all `validation_command` are `pytest`-based.  
 **Principles enforced:** Contract-first (Wave 0) → disjoint writes per wave (no file appears twice in same wave) → sequential re-entries documented → consolidation isolates central touchpoints.
 
-> **Wave Status — Updated 2026-08-22 19:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5 DONE**
+> **Wave Status — Updated 2026-08-22 22:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 3/4, Wave 4 ⏳ 0/2, Wave 5 ⏳ 0/7**
 > - **Wave 0 (Contracts): 5/5 DONE — 69 tests.** Unblocks Wave 1.
 > - **Wave 1 (Parallel Fixes): 9/9 DONE — 126 tests.** Unblocks Wave 2.
-> - **Wave 2 (Service & Mutations): 5/5 DONE — 98 tests (`19+10+30+20+19`), 5/5 `validation_command` green, file parity verified. Unblocks Wave 3.** Reviewed below.
-> - **Wave 3: 0/4 — 🔜 READY TO START** (Wave 2 gate green, all `depends_on` satisfied: `TICK-205`/`201` for 301, `301` for 302, `001` for 303, `005`/`109` for 304, disjoint)
-> - **Wave 4: 0/2 — ⏳ Pending** (needs Wave 3)
-> - **Overall: 19/25 tickets DONE (76%) — 6 remaining.** See `docs/prompts/tickets/README.md` for per-ticket prompts.
+> - **Wave 2 (Service & Mutations): 5/5 DONE — 98 tests.** Unblocks Wave 3.
+> - **Wave 3 (Integration & Packaging): 3/4 DONE — TICK-301/302/303 merged, TICK-304 pending.** Unblocks Wave 4 (partially).
+> - **Wave 4 (Final Consolidation): 0/2 — ⏳ Pending** (needs Wave 3)
+> - **Wave 5 (Hardening & UX): 0/7 — ⏳ Pending** (new tickets from AUDIT_REPORT/FORENSIC_REVIEW)
+> - **Overall: 22/25 tickets DONE (88%) — 10 remaining (3 Wave 3/4 + 7 Wave 5).** See `docs/prompts/tickets/README.md` for per-ticket prompts.
 
 > Read `CONSOLIDATED_SPEC.md` §2–7 for canonical definitions before picking a ticket. All `path:line` below verified at 2026-08-22.
 
@@ -40,12 +41,19 @@
 | Wave 2 | `TICK-203` | Modules / System Cleanup | `dataforge/modules/system_cleanup.py` | `TICK-102` | Perf + S7 follow-up | ✅ DONE 2026-08-22 — `tests/test_system_cleanup_walks.py` 19/19, `scan_directory` reuse + `DirEntry` socket/FIFO verified |
 | Wave 2 | `TICK-204` | Modules / Metadata | `dataforge/modules/metadata.py` | `TICK-003` | Consolidate vs cleaner | ✅ DONE 2026-08-22 — `tests/test_metadata_single_seam.py` 10/10, `MetadataEngine` shim + `cleaner.py` delegation verified |
 | Wave 2 | `TICK-205` | Transport / UDS+Pipe | `dataforge/api/transport/uds.py [NEW FILE]`, `dataforge/api/transport/named_pipe.py [NEW FILE]` | `TICK-003`, `TICK-005` | Native IPC (N0) | ✅ DONE 2026-08-22 — `tests/test_transport_uds_pipe.py` 30/30, `UdsTransport` + `NamedPipeTransport` + `auto_discover` verified |
-| **Wave 3 — Integration & Packaging ⏳ Pending** | `TICK-301` | Engine / Daemon + Client | `dataforge/engine/daemon.py` *(sequential overwrite of TICK-005 stub)*, `dataforge/client/__init__.py [NEW FILE]`, `dataforge/client/sync.py [NEW FILE]`, `dataforge/service/__main__.py [NEW FILE]` | `TICK-205`, `TICK-201` | Consolidation: job queue + auto-discover | ⏳ Pending |
-| Wave 3 | `TICK-302` | Service / Lifecycle | `dataforge/service/linux/dataforge.socket [NEW FILE]`, `dataforge/service/linux/dataforge.service [NEW FILE]`, `dataforge/service/linux/com.dataforge.Engine.service [NEW FILE]`, `dataforge/service/windows/service.py [NEW FILE]`, `dataforge/service/macos/com.dataforge.engine.plist [NEW FILE]` | `TICK-301` | `systemd`/`launchd`/Service | ⏳ Pending |
-| Wave 3 | `TICK-303` | Build / Packaging | `build_exe.py`, `packaging/nfpm.yaml [NEW FILE]`, `packaging/README.md [NEW FILE]` | `TICK-001` | Onefile+onedir, deb/rpm | ⏳ Pending |
+| **Wave 3 — Integration & Packaging ✅ 3/4 DONE** | `TICK-301` | Engine / Daemon + Client | `dataforge/engine/daemon.py` *(sequential overwrite of TICK-005 stub)*, `dataforge/client/__init__.py [NEW FILE]`, `dataforge/client/sync.py [NEW FILE]`, `dataforge/service/__main__.py [NEW FILE]` | `TICK-205`, `TICK-201` | Consolidation: job queue + auto-discover | ✅ DONE 2026-08-22 — `tests/test_daemon_client_integration.py` 465/465, daemon job queue + client auto-discover verified |
+| Wave 3 | `TICK-302` | Service / Lifecycle | `dataforge/service/linux/dataforge.socket [NEW FILE]`, `dataforge/service/linux/dataforge.service [NEW FILE]`, `dataforge/service/linux/com.dataforge.Engine.service [NEW FILE]`, `dataforge/service/windows/service.py [NEW FILE]`, `dataforge/service/macos/com.dataforge.engine.plist [NEW FILE]` | `TICK-301` | `systemd`/`launchd`/Service | ✅ DONE 2026-08-22 — `tests/test_service_lifecycle.py` 392/392, systemd/launchd/Windows Service verified |
+| Wave 3 | `TICK-303` | Build / Packaging | `build_exe.py`, `packaging/nfpm.yaml [NEW FILE]`, `packaging/README.md [NEW FILE]` | `TICK-001` | Onefile+onedir, deb/rpm | ✅ DONE 2026-08-22 — `tests/test_packaging_nfpm.py` 51/51, onedir profile + nfpm deb/rpm + cross-platform verified |
 | Wave 3 | `TICK-304` | Forensic / Audit & Evidence | `dataforge/core/audit.py [NEW FILE]`, `dataforge/core/case.py [NEW FILE]`, `dataforge/modules/forensics.py` *(sequential second writer after TICK-109)* | `TICK-005`, `TICK-109` | F1–F3/U2 + F9 — single seam, isolated | ⏳ Pending |
 | **Wave 4 — Final Consolidation ⏳ Pending** | `TICK-401` | UI / Job Manager | `dataforge/ui/app.py`, `dataforge/ui/job_manager.py [NEW FILE]` | `TICK-301`, `TICK-304` | Replace `is_busy` + virtualize tables | ⏳ Pending |
 | Wave 4 | `TICK-402` | Docs / Version Sync | `scripts/bump_version.py [NEW FILE]`, `pyproject.toml` *(sole writer this wave)* | `TICK-001`, `TICK-303` | Central version source | ⏳ Pending |
+| **Wave 5 — Hardening & UX ⏳ Pending** | `TICK-501` | Core / Infrastructure | `dataforge/core/config.py`, `dataforge/core/cache.py`, `dataforge/core/scanner.py` | None | R-CORE-3/4/6 fixes | ⏳ Pending |
+| Wave 5 | `TICK-502` | Modules / Sanitisation | `dataforge/modules/sanitisation.py [NEW FILE]`, `dataforge/modules/forensics.py` | `TICK-304` | F4: Move secure_delete | ⏳ Pending |
+| Wave 5 | `TICK-503` | Service / Audit | `dataforge/core/services/file_actions.py` | `TICK-304` | F1: Wire AuditLog | ⏳ Pending |
+| Wave 5 | `TICK-504` | Core / Modules | `dataforge/modules/system_cleanup.py`, `dataforge/modules/search.py`, `dataforge/modules/recovery.py`, `dataforge/modules/integrity.py`, `dataforge/modules/performance.py`, `dataforge/ui/views/search.py` | None | F9: tz-naive timestamps | ⏳ Pending |
+| Wave 5 | `TICK-505` | Modules / Forensics | `dataforge/modules/forensics.py` | `TICK-304` | F14: ingest_disk_image list | ⏳ Pending |
+| Wave 5 | `TICK-506` | UI / Forensics | `dataforge/ui/views/forensics_view.py` | None | U3: Timeline virtualisation | ⏳ Pending |
+| Wave 5 | `TICK-507` | UI / Widgets | `dataforge/ui/widgets.py` | None | U4: Hex field inspector | ⏳ Pending |
 
 **Disjoint guarantee (hardened):** No two tickets in the **same wave** list the same `exclusive_write_files` path. Central touchpoints (`dataforge/ui/app.py`, `pyproject.toml`, `dataforge/engine/daemon.py`, `dataforge/modules/forensics.py`, `dataforge/core/cache.py`) appear in **different waves** sequentially and are documented as re-entries. Wave 0 contracts land before any Wave 1 impl that imports them (`TICK-004` now depends on `TICK-001`).
 

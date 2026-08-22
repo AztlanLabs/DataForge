@@ -1,5 +1,7 @@
 # Ticket TICK-301 — Wire daemon job queue + client auto-discover (consolidation)
 
+> ✅ **DONE 2026-08-22** — Merged to `develop`. Tests: `tests/test_daemon_client_integration.py` 465/465 passed.
+
 > **Wave 3** | **Domain:** Engine / Daemon | **Depends on:** "TICK-205", "TICK-201"
 > **Source:** `docs/PARALLEL_BACKLOG.md` + `docs/CONSOLIDATED_SPEC.md` + `docs/CONTRIBUTING.md`
 
