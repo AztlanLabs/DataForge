@@ -4,9 +4,9 @@
 
 **Generic prompt:** `../parallel-ticket-agent.md` / `../../../.github/prompts/parallel-ticket-agent.prompt.md` — set `{{TICKET_ID}}`.
 
-> **Status 2026-08-22 19:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5 DONE → Wave 3 🔜 READY**
-> Wave 0 (69 tests) + Wave 1 (126 tests) + Wave 2 (98 tests: `20+19+19+10+30`) = 293 tests green — Wave 2 fully green, unblocks Wave 3 (4 parallel agents). See `docs/PARALLEL_BACKLOG.md` Wave 0 + Wave 1 + Wave 2 Reviews (5/5).
-> **Overall: 19/25 DONE (76%) — 6 remaining.**
+> **Status 2026-08-22 20:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4 DONE → Wave 4 🔜 READY**
+> Wave 0 (69 tests) + Wave 1 (126 tests) + Wave 2 (98 tests) + Wave 3 (130 tests: `21+37+51+21`) = 423 tests green — Wave 3 fully green, unblocks Wave 4 (2 parallel agents). See `docs/PARALLEL_BACKLOG.md` Wave 0–3 Reviews (4/4).
+> **Overall: 23/25 DONE (92%) — 2 remaining.**
 
 ## Execution Order (Wave DAG)
 
@@ -38,14 +38,14 @@
 - **TICK-204** ✅ DONE 2026-08-22 — Consolidate metadata cleaning to MetadataEngine (keep cleaner.py as shim) | depends: "TICK-003" | writes: `dataforge/modules/metadata.py` → [`TICK-204.prompt.md`](./TICK-204.prompt.md)
 - **TICK-205** ✅ DONE 2026-08-22 — Implement UDS (Linux/macOS) + Named Pipes (Windows) transports | depends: "TICK-003", "TICK-005" | writes: `dataforge/api/transport/uds.py [NEW FILE]`, `dataforge/api/transport/named_pipe.py [NEW FILE]` → [`TICK-205.prompt.md`](./TICK-205.prompt.md)
 
-### Wave 3 🔜 READY 2026-08-22 — Wave 2 ✅ 5/5 gate green, 4 disjoint, unblocked
+### Wave 3 ✅ DONE 2026-08-22 20:00 UTC (4/4 — 130 tests, 4/4 validation_command green)
 
-- **TICK-301** — Wire daemon job queue + client auto-discover (consolidation) | depends: "TICK-205", "TICK-201" | writes: `dataforge/engine/daemon.py`, `dataforge/client/__init__.py [NEW FILE]`, `dataforge/client/sync.py [NEW FILE]`, `dataforge/service/__main__.py [NEW FILE]` → [`TICK-301.prompt.md`](./TICK-301.prompt.md)
-- **TICK-302** — Install service lifecycle files (systemd user service + socket, launchd plist, Windows Service) | depends: "TICK-301" | writes: `dataforge/service/linux/dataforge.socket [NEW FILE]`, `dataforge/service/linux/dataforge.service [NEW FILE]`, `dataforge/service/linux/com.dataforge.Engine.service [NEW FILE]`, `dataforge/service/windows/service.py [NEW FILE]`, `dataforge/service/windows/install.py [NEW FILE]`, `dataforge/service/macos/com.dataforge.engine.plist [NEW FILE]` → [`TICK-302.prompt.md`](./TICK-302.prompt.md)
-- **TICK-303** — Produce onefile (portable) + onedir (package) + nfpm deb/rpm | depends: "TICK-001" | writes: `build_exe.py`, `packaging/nfpm.yaml [NEW FILE]`, `packaging/README.md [NEW FILE]` → [`TICK-303.prompt.md`](./TICK-303.prompt.md)
-- **TICK-304** — Add hash-chained audit log, CaseContext, and Evidence Mode gate (F1–F3/U2 + F9) | depends: "TICK-005", "TICK-109" | writes: `dataforge/core/audit.py [NEW FILE]`, `dataforge/core/case.py [NEW FILE]`, `dataforge/modules/forensics.py` → [`TICK-304.prompt.md`](./TICK-304.prompt.md)
+- **TICK-301** ✅ DONE 2026-08-22 — Wire daemon job queue + client auto-discover (consolidation) | depends: "TICK-205", "TICK-201" | writes: `dataforge/engine/daemon.py`, `dataforge/client/__init__.py [NEW FILE]`, `dataforge/client/sync.py [NEW FILE]`, `dataforge/service/__main__.py [NEW FILE]` → [`TICK-301.prompt.md`](./TICK-301.prompt.md)
+- **TICK-302** ✅ DONE 2026-08-22 — Install service lifecycle files (systemd user service + socket, launchd plist, Windows Service) | depends: "TICK-301" | writes: `dataforge/service/linux/dataforge.socket [NEW FILE]`, `dataforge/service/linux/dataforge.service [NEW FILE]`, `dataforge/service/linux/com.dataforge.Engine.service [NEW FILE]`, `dataforge/service/windows/service.py [NEW FILE]`, `dataforge/service/windows/install.py [NEW FILE]`, `dataforge/service/macos/com.dataforge.engine.plist [NEW FILE]` → [`TICK-302.prompt.md`](./TICK-302.prompt.md)
+- **TICK-303** ✅ DONE 2026-08-22 — Produce onefile (portable) + onedir (package) + nfpm deb/rpm | depends: "TICK-001" | writes: `build_exe.py`, `packaging/nfpm.yaml [NEW FILE]`, `packaging/README.md [NEW FILE]` → [`TICK-303.prompt.md`](./TICK-303.prompt.md)
+- **TICK-304** ✅ DONE 2026-08-22 — Add hash-chained audit log, CaseContext, and Evidence Mode gate (F1–F3/U2 + F9) | depends: "TICK-005", "TICK-109" | writes: `dataforge/core/audit.py [NEW FILE]`, `dataforge/core/case.py [NEW FILE]`, `dataforge/modules/forensics.py` → [`TICK-304.prompt.md`](./TICK-304.prompt.md)
 
-### Wave 4
+### Wave 4 🔜 READY 2026-08-22 — Wave 3 ✅ 4/4 gate green, 2 disjoint, unblocked
 
 - **TICK-401** — Replace single BackgroundWorker is_busy with JobManager + virtualized views | depends: "TICK-301", "TICK-304" | writes: `dataforge/ui/app.py`, `dataforge/ui/job_manager.py [NEW FILE]` → [`TICK-401.prompt.md`](./TICK-401.prompt.md)
 - **TICK-402** — Centralize version bump (pyproject → __init__ → Info.plist/wxs) | depends: "TICK-001", "TICK-303" | writes: `scripts/bump_version.py [NEW FILE]`, `pyproject.toml` → [`TICK-402.prompt.md`](./TICK-402.prompt.md)

@@ -1,3 +1,5 @@
+> **Status: ✅ COMPLETED 2026-08-22 — Wave 3 DONE, verified (see docs/PARALLEL_BACKLOG.md Wave 3 Review). This ticket is closed — do not re-run.**
+
 # Ticket TICK-301 — Wire daemon job queue + client auto-discover (consolidation)
 
 > **Wave 3** | **Domain:** Engine / Daemon | **Depends on:** "TICK-205", "TICK-201"
