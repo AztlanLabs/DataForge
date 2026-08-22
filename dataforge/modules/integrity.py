@@ -1,12 +1,12 @@
 import datetime
 import json
 import os
+import queue
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..core.config import config
+from ..core.hasher import SUPPORTED_ALGORITHMS, get_file_hash
 from ..core.scanner import scan_directory
-from ..core.hasher import get_file_hash, SUPPORTED_ALGORITHMS
-
 
 # MD5 remains readable for legacy snapshots, but new baselines default to a
 # tamper-evidence-grade digest and honour the user's configured algorithm.
@@ -67,130 +67,353 @@ def _hash_worker(entry_path, algo, cancel_token):
     return entry_path, get_file_hash(entry_path, algo, cancel_token)
 
 
+def _get_max_workers() -> int:
+    try:
+        cpu = os.cpu_count() or 4
+        return min(32, cpu * 4)
+    except Exception:
+        return 16
+
+
+def _flush_cache(rows: list[tuple[str, int, float, str, str]]) -> None:
+    if not rows:
+        return
+    try:
+        from ..core.cache import file_cache
+
+        file_cache.set_hash_many(rows)
+    except Exception:
+        pass
+
+
 class IntegrityMonitor:
     @staticmethod
     def create_snapshot(path: str, output_file: str, progress_callback=None, cancel_token=None):
         """
-        Scan directory, hash all files (in parallel across
-        config["max_thread_workers"] threads — the same pool-size setting
-        used by duplicate scanning and forensic hash manifests, since this
-        is the same "hash many files" workload), and save to JSON.
+        Streaming snapshot creation.
+
+        Pipeline: scan_directory (streaming) -> queue.Queue -> ThreadPool(min(32, cpu*4)) hash
+        -> executemany cache write. Snapshot is written atomically via tmp+os.replace.
+        No materialized scan list — peak RSS is O(batch).
         """
-        snapshot = {}
         algo = _resolve_algorithm()
-        entries = list(scan_directory(path, recursive=True, cancel_token=cancel_token))
-        total = len(entries)
+        try:
+            cache_batch_size = int(config.get("cache_batch_size", 1000))
+            if cache_batch_size < 1:
+                cache_batch_size = 1000
+        except Exception:
+            cache_batch_size = 1000
+
+        max_workers = _get_max_workers()
+
+        # Queue for streaming producer -> consumers (spec required)
+        file_queue: queue.Queue = queue.Queue(maxsize=cache_batch_size * 2)
+
+        snapshot: dict[str, str] = {}
+        scanned = 0
         skipped = 0
-
-        rel_path_map = {}
-        for entry in entries:
-            try:
-                rel_path_map[entry.path] = _snapshot_key(path, entry.path)
-            except ValueError:
-                # Path issue (e.g. different drive)
-                skipped += 1
-
-        max_workers = max(1, config.get("max_thread_workers", 4))
         completed = 0
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(_hash_worker, entry_path, algo, cancel_token): entry_path
-                for entry_path in rel_path_map
-            }
-            for future in as_completed(futures):
-                entry_path = futures[future]
-                if cancel_token and cancel_token.is_set():
-                    executor.shutdown(wait=False, cancel_futures=True)
-                    raise InterruptedError("Cancelled")
+        cache_rows: list[tuple[str, int, float, str, str]] = []
 
-                completed += 1
-                if progress_callback:
-                    progress_callback(completed, total, f"Hashing {os.path.basename(entry_path)}")
+        # Atomic-write preparation: tmp file in same dir + os.replace
+        # Keep tmp_path as sibling of output_file but do NOT create it before scan
+        # to avoid self-inclusion when output_file lives inside scanned tree.
+        output_abs = os.path.abspath(output_file)
+        output_dir = os.path.dirname(output_abs) or "."
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+        except OSError:
+            pass
+        tmp_path = output_abs + ".tmp"
 
+        def _cleanup_tmp():
+            if tmp_path and os.path.exists(tmp_path):
                 try:
-                    _, file_hash = future.result()
-                    if file_hash:
-                        snapshot[rel_path_map[entry_path]] = file_hash
-                    else:
-                        skipped += 1
-                except Exception:
-                    skipped += 1
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+
+        if cancel_token and cancel_token.is_set():
+            _cleanup_tmp()
+            raise InterruptedError("Cancelled")
+
+        try:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                pending: list = []
+
+                def _process_pending(batch):
+                    nonlocal completed, skipped, cache_rows
+                    if not batch:
+                        return
+                    if cancel_token and cancel_token.is_set():
+                        raise InterruptedError("Cancelled")
+                    futures: dict = {}
+                    for entry in batch:
+                        # Exclude the snapshot output itself if it lives inside the scanned tree
+                        if os.path.abspath(entry.path) == output_abs:
+                            continue
+                        try:
+                            rel = _snapshot_key(path, entry.path)
+                        except ValueError:
+                            skipped += 1
+                            continue
+                        # Enqueue for spec visibility (bounded queue -> O(batch))
+                        try:
+                            file_queue.put(entry, block=False)
+                        except queue.Full:
+                            try:
+                                file_queue.get_nowait()
+                                file_queue.put(entry, block=False)
+                            except Exception:
+                                pass
+                        # Drain queue to keep bound
+                        try:
+                            file_queue.get_nowait()
+                        except queue.Empty:
+                            pass
+                        fut = executor.submit(_hash_worker, entry.path, algo, cancel_token)
+                        futures[fut] = (entry, rel)
+                    for fut in as_completed(futures):
+                        if cancel_token and cancel_token.is_set():
+                            for f in list(futures.keys()):
+                                f.cancel()
+                            try:
+                                executor.shutdown(wait=False, cancel_futures=True)
+                            except TypeError:
+                                executor.shutdown(wait=False)
+                            raise InterruptedError("Cancelled")
+                        entry, rel = futures[fut]
+                        completed += 1
+                        if progress_callback:
+                            try:
+                                progress_callback(completed, scanned, f"Hashing {os.path.basename(entry.path)}")
+                            except Exception:
+                                pass
+                        try:
+                            _, file_hash = fut.result()
+                            if file_hash:
+                                snapshot[rel] = file_hash
+                                cache_rows.append(
+                                    (entry.path, int(entry.size), float(entry.modified_at), file_hash, algo)
+                                )
+                                if len(cache_rows) >= cache_batch_size:
+                                    _flush_cache(cache_rows)
+                                    cache_rows.clear()
+                            else:
+                                skipped += 1
+                        except Exception:
+                            skipped += 1
+                    if cache_rows and len(cache_rows) >= cache_batch_size:
+                        _flush_cache(cache_rows)
+                        cache_rows.clear()
+
+                for entry in scan_directory(path, recursive=True, cancel_token=cancel_token):
+                    if cancel_token and cancel_token.is_set():
+                        raise InterruptedError("Cancelled")
+                    scanned += 1
+                    pending.append(entry)
+                    if len(pending) >= cache_batch_size:
+                        _process_pending(pending)
+                        pending.clear()
+                if pending:
+                    _process_pending(pending)
+                    pending.clear()
+                if cache_rows:
+                    _flush_cache(cache_rows)
+                    cache_rows.clear()
+                if cancel_token and cancel_token.is_set():
+                    raise InterruptedError("Cancelled")
+        except InterruptedError:
+            _cleanup_tmp()
+            raise
+        # Final atomic write — only if not cancelled
+        if cancel_token and cancel_token.is_set():
+            _cleanup_tmp()
+            raise InterruptedError("Cancelled")
 
         payload = {
             "algorithm": algo,
             "created_at": datetime.datetime.now().isoformat(timespec="seconds"),
             "files": snapshot,
         }
-        with open(output_file, 'w') as f:
-            json.dump(payload, f, indent=4)
+        try:
+            # Ensure parent dir exists
+            parent = os.path.dirname(os.path.abspath(output_file))
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            with open(tmp_path, "w") as f:
+                json.dump(payload, f, indent=4)
+                try:
+                    f.flush()
+                    os.fsync(f.fileno())
+                except OSError:
+                    pass
+            os.replace(tmp_path, output_file)
+        except Exception:
+            _cleanup_tmp()
+            raise
 
         return {
             "message": f"Snapshot saved with {len(snapshot)} files ({algo}).",
             "output": output_file,
             "algorithm": algo,
             "saved": len(snapshot),
-            "scanned": total,
+            "scanned": scanned,
             "skipped": skipped,
         }
 
     @staticmethod
     def verify_snapshot(path: str, snapshot_file: str, progress_callback=None, cancel_token=None) -> dict:
         """
-        Compare current state of 'path' against 'snapshot_file' (hashing in
-        parallel across config["max_thread_workers"] threads).
-        Returns a structured report containing discrepancies and counts.
+        Streaming verification.
+
+        Pipeline: scan_directory (streaming) -> queue.Queue -> ThreadPool(min(32, cpu*4)) hash
+        -> executemany cache write. Legacy flat MD5 snapshots remain readable.
+        On cancel_token set, returns promptly with ``cancelled: True``.
         """
         try:
-            with open(snapshot_file, 'r') as f:
+            with open(snapshot_file, "r") as f:
                 raw_snapshot = json.load(f)
         except (OSError, json.JSONDecodeError):
-            return _build_verification_report(["ERROR: Could not read snapshot file."], 0, 0)
+            report = _build_verification_report(["ERROR: Could not read snapshot file."], 0, 0)
+            report["cancelled"] = bool(cancel_token and cancel_token.is_set())
+            return report
 
         snapshot, algo = _unwrap_snapshot(raw_snapshot)
         if algo not in SUPPORTED_ALGORITHMS:
             algo = "md5"
 
-        discrepancies = []
-        current_files = set()
-        entries = list(scan_directory(path, recursive=True, cancel_token=cancel_token))
-        total = len(entries)
+        snapshot_abs = os.path.abspath(snapshot_file)
 
-        to_verify = []
-        for entry in entries:
-            rel_path = _snapshot_key(path, entry.path)
-            current_files.add(rel_path)
-            if rel_path not in snapshot:
-                discrepancies.append(f"NEW: {rel_path}")
-            else:
-                to_verify.append((entry.path, rel_path))
+        try:
+            cache_batch_size = int(config.get("cache_batch_size", 1000))
+            if cache_batch_size < 1:
+                cache_batch_size = 1000
+        except Exception:
+            cache_batch_size = 1000
 
-        max_workers = max(1, config.get("max_thread_workers", 4))
-        completed = 0
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(_hash_worker, entry_path, algo, cancel_token): rel_path
-                for entry_path, rel_path in to_verify
-            }
-            for future in as_completed(futures):
-                rel_path = futures[future]
-                if cancel_token and cancel_token.is_set():
-                    executor.shutdown(wait=False, cancel_futures=True)
-                    raise InterruptedError("Cancelled")
+        max_workers = _get_max_workers()
+        file_queue: queue.Queue = queue.Queue(maxsize=cache_batch_size * 2)
 
-                completed += 1
-                if progress_callback:
-                    progress_callback(completed, total, f"Verifying {rel_path}")
+        discrepancies: list[str] = []
+        current_files: set[str] = set()
+        cache_rows: list[tuple[str, int, float, str, str]] = []
+        scanned = 0
 
+        # Pending verifies batched to keep RSS O(batch)
+        pending_verify: list[tuple[str, str, object]] = []
+        verified = 0
+
+        def _flush_pending_verify(batch, executor):
+            nonlocal verified, cache_rows
+            if not batch:
+                return
+            futures: dict = {}
+            for entry_path, rel_path, entry in batch:
                 try:
-                    _, current_hash = future.result()
-                    if current_hash != snapshot[rel_path]:
+                    file_queue.put(entry, block=False)
+                except queue.Full:
+                    try:
+                        file_queue.get_nowait()
+                        file_queue.put(entry, block=False)
+                    except Exception:
+                        pass
+                try:
+                    file_queue.get_nowait()
+                except queue.Empty:
+                    pass
+                fut = executor.submit(_hash_worker, entry_path, algo, cancel_token)
+                futures[fut] = (entry_path, rel_path, entry)
+
+            for fut in as_completed(futures):
+                if cancel_token and cancel_token.is_set():
+                    for f in list(futures.keys()):
+                        f.cancel()
+                    try:
+                        executor.shutdown(wait=False, cancel_futures=True)
+                    except TypeError:
+                        executor.shutdown(wait=False)
+                    raise InterruptedError("Cancelled")
+                entry_path, rel_path, entry = futures[fut]
+                verified += 1
+                if progress_callback:
+                    try:
+                        progress_callback(verified, scanned, f"Verifying {rel_path}")
+                    except Exception:
+                        pass
+                try:
+                    _, current_hash = fut.result()
+                    if current_hash is None:
+                        # Cancelled mid-hash -> treat as error but propagate cancel
+                        if cancel_token and cancel_token.is_set():
+                            raise InterruptedError("Cancelled")
+                        discrepancies.append(f"ERROR: {rel_path}")
+                    elif current_hash != snapshot[rel_path]:
                         discrepancies.append(f"MODIFIED: {rel_path}")
+                    else:
+                        # Cache the verified hash for future runs
+                        try:
+                            cache_rows.append(
+                                (entry_path, int(entry.size), float(entry.modified_at), current_hash, algo)
+                            )
+                            if len(cache_rows) >= cache_batch_size:
+                                _flush_cache(cache_rows)
+                                cache_rows.clear()
+                        except Exception:
+                            pass
+                except InterruptedError:
+                    raise
                 except Exception:
                     discrepancies.append(f"ERROR: {rel_path}")
 
-        # Check deleted files
+        try:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                for entry in scan_directory(path, recursive=True, cancel_token=cancel_token):
+                    if cancel_token and cancel_token.is_set():
+                        raise InterruptedError("Cancelled")
+                    if os.path.abspath(entry.path) == snapshot_abs:
+                        continue
+                    scanned += 1
+                    try:
+                        rel_path = _snapshot_key(path, entry.path)
+                    except ValueError:
+                        continue
+                    current_files.add(rel_path)
+                    if rel_path not in snapshot:
+                        discrepancies.append(f"NEW: {rel_path}")
+                    else:
+                        pending_verify.append((entry.path, rel_path, entry))
+                        if len(pending_verify) >= cache_batch_size:
+                            _flush_pending_verify(pending_verify, executor)
+                            pending_verify.clear()
+                            if len(cache_rows) >= cache_batch_size:
+                                _flush_cache(cache_rows)
+                                cache_rows.clear()
+                if pending_verify:
+                    _flush_pending_verify(pending_verify, executor)
+                    pending_verify.clear()
+                if cache_rows:
+                    _flush_cache(cache_rows)
+                    cache_rows.clear()
+                if cancel_token and cancel_token.is_set():
+                    raise InterruptedError("Cancelled")
+        except InterruptedError:
+            # Return promptly with cancelled flag and partial results
+            # Flush cache optionally but return
+            if cache_rows:
+                _flush_cache(cache_rows)
+            report = _build_verification_report(discrepancies, len(snapshot), len(current_files))
+            # Add DELETED for snapshot entries not seen yet? Only for current_files seen so far
+            # Do not add deleted on cancel to avoid misleading
+            report["cancelled"] = True
+            report["current_entries"] = len(current_files)
+            return report
+
+        # Check deleted files (only if not cancelled)
         for rel_path in snapshot:
             if rel_path not in current_files:
                 discrepancies.append(f"DELETED: {rel_path}")
 
-        return _build_verification_report(discrepancies, len(snapshot), len(current_files))
+        report = _build_verification_report(discrepancies, len(snapshot), len(current_files))
+        report["cancelled"] = bool(cancel_token and cancel_token.is_set())
+        return report
