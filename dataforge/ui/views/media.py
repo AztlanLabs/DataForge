@@ -54,6 +54,7 @@ class MediaView(BaseView):
         bar_layout.setContentsMargins(0, 5, 0, 5)
         
         self.pdf_add_button = QPushButton("Add PDFs...", bar)
+        self.pdf_add_button.setProperty("variant", "info")
         self.pdf_add_button.clicked.connect(self.pdf_add)
         bar_layout.addWidget(self.pdf_add_button)
         
@@ -126,6 +127,7 @@ class MediaView(BaseView):
         top_layout.setContentsMargins(0, 5, 0, 5)
         
         self.img_add_button = QPushButton("Add Images...", top)
+        self.img_add_button.setProperty("variant", "info")
         self.img_add_button.clicked.connect(self.img_add)
         top_layout.addWidget(self.img_add_button)
         

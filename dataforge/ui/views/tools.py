@@ -115,7 +115,7 @@ class ToolsView(BaseView):
         layout.addWidget(f1)
         
         self.integrity_create_summary = QLabel("Snapshot summary will appear here.", self.frame_integrity)
-        self.integrity_create_summary.setStyleSheet("color: gray;")
+        self.integrity_create_summary.setProperty("class", "muted")
         self.integrity_create_summary.setWordWrap(True)
         layout.addWidget(self.integrity_create_summary)
         
@@ -154,7 +154,7 @@ class ToolsView(BaseView):
         layout.addWidget(f2)
         
         self.integrity_verify_summary = QLabel("Verification summary will appear here.", self.frame_integrity)
-        self.integrity_verify_summary.setStyleSheet("color: gray;")
+        self.integrity_verify_summary.setProperty("class", "muted")
         self.integrity_verify_summary.setWordWrap(True)
         layout.addWidget(self.integrity_verify_summary)
         
@@ -467,7 +467,7 @@ class ToolsView(BaseView):
         r_body_layout.addWidget(renamer_btn_row)
 
         self.renamer_summary_var = QLabel("Preview not run yet.", parent)
-        self.renamer_summary_var.setStyleSheet("color: gray;")
+        self.renamer_summary_var.setProperty("class", "muted")
         self.renamer_summary_var.setWordWrap(True)
         layout.addWidget(self.renamer_summary_var)
 
@@ -523,7 +523,7 @@ class ToolsView(BaseView):
         s_body_layout.addWidget(sync_btn_row, 2, 0, 1, 3)
         
         self.sync_summary_var = QLabel("Analyze to preview pending copy actions.", parent)
-        self.sync_summary_var.setStyleSheet("color: gray;")
+        self.sync_summary_var.setProperty("class", "muted")
         self.sync_summary_var.setWordWrap(True)
         layout.addWidget(self.sync_summary_var)
         

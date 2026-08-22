@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 
-from ..theme_tokens import TOKENS, TYPE_SCALE
+from ..theme_tokens import TYPE_SCALE
 
 from .base import BaseView
 from .. import dialogs
@@ -112,7 +112,6 @@ class SystemCleanupView(BaseView):
             QPushButton, text="SCAN JUNK",
         )
         self.btn_scan.setProperty("variant", "warning")
-        self.btn_scan.setStyleSheet("font-weight: bold;")
         self.btn_scan.clicked.connect(self._start_junk_scan)
 
         # Summary label
@@ -128,7 +127,8 @@ class SystemCleanupView(BaseView):
         savings_layout.setContentsMargins(10, 8, 10, 8)
 
         self.lbl_total_savings = QLabel("Reclaimable: —")
-        self.lbl_total_savings.setStyleSheet(f"font-size: {TYPE_SCALE['heading']}px; font-weight: bold; color: {TOKENS['light']['success']};")
+        self.lbl_total_savings.setProperty("variant", "success")
+        self.lbl_total_savings.setStyleSheet(f"font-size: {TYPE_SCALE['heading']}px; font-weight: bold;")
         savings_layout.addWidget(self.lbl_total_savings)
 
         self.lbl_file_count = QLabel("Files: —")
@@ -174,7 +174,6 @@ class SystemCleanupView(BaseView):
 
         self.btn_clean = QPushButton("🗑 Clean Selected", action_frame)
         self.btn_clean.setProperty("variant", "danger")
-        self.btn_clean.setStyleSheet("font-weight: bold;")
         self.btn_clean.clicked.connect(self._clean_selected)
         action_layout.addWidget(self.btn_clean)
 
@@ -209,7 +208,6 @@ class SystemCleanupView(BaseView):
             QPushButton, text="SCAN BROWSERS",
         )
         self.btn_browser_scan.setProperty("variant", "primary")
-        self.btn_browser_scan.setStyleSheet("font-weight: bold;")
         self.btn_browser_scan.clicked.connect(self._start_browser_scan)
 
         # Browser savings
@@ -218,7 +216,8 @@ class SystemCleanupView(BaseView):
         bsav_layout = QHBoxLayout(self.browser_savings_frame)
         bsav_layout.setContentsMargins(10, 8, 10, 8)
         self.lbl_browser_savings = QLabel("Browser artifacts: —")
-        self.lbl_browser_savings.setStyleSheet(f"font-size: {TYPE_SCALE['heading']}px; font-weight: bold; color: {TOKENS['light']['primary']};")
+        self.lbl_browser_savings.setProperty("variant", "primary")
+        self.lbl_browser_savings.setStyleSheet(f"font-size: {TYPE_SCALE['heading']}px; font-weight: bold;")
         bsav_layout.addWidget(self.lbl_browser_savings)
         bsav_layout.addStretch()
         browser_layout.addWidget(self.browser_savings_frame)
