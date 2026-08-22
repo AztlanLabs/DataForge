@@ -30,6 +30,7 @@ from .views.about import AboutView
 from .plugin_loader import PluginLoader
 from .theme_tokens import generate_qss, generate_palette, TYPE_SCALE
 from .resources.icons import build_icons, TONE_LIGHT, TONE_DARK
+from .job_manager import JobManager
 from ..core.config import config
 
 HEADER_COLORS = {
@@ -180,10 +181,10 @@ class DataForgeApp(QMainWindow):
         # labels start getting clipped.
         self.setMinimumSize(900, 600)
 
-        # Threading/Cancellation
-        self.cancel_event = threading.Event()
-        self.current_worker = None
-        self.is_busy = False
+        # Threading/Cancellation — JobManager replaces single BackgroundWorker
+        self.job_manager = JobManager(parent=self)
+        self.cancel_event = threading.Event()  # kept for backward compat
+        self.current_worker = None  # kept for backward compat
 
         # Signals
         self.post_signal.connect(self._handle_posted_event)
@@ -360,6 +361,35 @@ class DataForgeApp(QMainWindow):
         self.build_navigation_sidebar()
         self.switch_view("Dashboard")
 
+    # ------------------------------------------------------------------
+    # Properties — backward-compatible wrappers around JobManager
+    # ------------------------------------------------------------------
+
+    @property
+    def is_busy(self) -> bool:
+        """True if any background job is running."""
+        return self.job_manager.is_busy
+
+    @is_busy.setter
+    def is_busy(self, value: bool) -> None:
+        # Setter kept for backward compat; actual state lives in JobManager.
+        pass
+
+    @property
+    def evidence_mode(self) -> bool:
+        """Whether evidence mode is active (blocks destructive ops)."""
+        return self.job_manager.evidence_mode
+
+    @evidence_mode.setter
+    def evidence_mode(self, value: bool) -> None:
+        self.job_manager.evidence_mode = value
+
+    def set_evidence_mode(self, enabled: bool) -> None:
+        """Enable or disable evidence mode."""
+        self.evidence_mode = enabled
+        status = "EVIDENCE MODE — writes blocked" if enabled else "Evidence mode disabled"
+        self.update_status(status)
+
     def update_status(self, message: str):
         self.status_label.setText(message)
 
@@ -367,7 +397,9 @@ class DataForgeApp(QMainWindow):
         """Signal the running thread to stop."""
         if self.is_busy:
             self.cancel_event.set()
-            self.update_status("Cancelling...")
+            # Cancel all active jobs via JobManager
+            count = self.job_manager.cancel_all()
+            self.update_status(f"Cancelling {count} job(s)...")
 
     def add_view(self, view_cls: Type[BaseView]):
         view_instance = view_cls(self.content_stack, app=self)
@@ -799,24 +831,14 @@ class DataForgeApp(QMainWindow):
         """
         Run a target function in a background thread.
         Automatically starts spinner and handles cancellation.
+        Delegates to JobManager for concurrent job support.
         """
-        if self.is_busy:
-            current = getattr(self, "_current_task_name", None) or "another task"
-            self.update_status(
-                f"Busy: '{current}' is still running — please wait for it to finish."
-            )
-            return
-
         self.reset_status()
         self._current_task_name = task_name or _humanize_callable_name(target)
         self.update_status(f"Running: {self._current_task_name}…")
 
-        self.is_busy = True
         self.cancel_event.clear()
         # 2e.2: indeterminate progress bar replaces the Braille spinner.
-        # The bar stays indeterminate until the first progress callback
-        # arrives with a known total — at that point ``update_progress``
-        # flips it to determinate via ``setRange``.
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setValue(0)
         self.progress_bar.setVisible(True)
@@ -824,37 +846,47 @@ class DataForgeApp(QMainWindow):
         if show_progress:
             self.start_progress()
 
-        # Create Background worker thread
-        self.current_worker = BackgroundWorker(target, args, extra_kwargs, self.cancel_event)
-        
-        # Connect signals
-        self.current_worker.progress_signal.connect(self.update_progress)
-        self.current_worker.status_signal.connect(self.update_status)
-        
-        if callback:
-            self.current_worker.result_signal.connect(callback)
-            
-        if on_error:
-            self.current_worker.error_signal.connect(on_error)
-        else:
-            self.current_worker.error_signal.connect(lambda e: self.update_status(f"Error: {e}"))
-            
-        # Clean up slot
-        self.current_worker.finished.connect(self._on_worker_finished)
-        
-        self.current_worker.start()
+        # Wrap callbacks to include UI cleanup
+        def _on_success(result: Any) -> None:
+            if callback:
+                callback(result)
+            self._on_job_completed()
+
+        def _on_error(error: Exception) -> None:
+            if on_error:
+                on_error(error)
+            else:
+                self.update_status(f"Error: {error}")
+            self._on_job_completed()
+
+        # Delegate to JobManager
+        job_id = self.job_manager.submit(
+            target=target,
+            args=args,
+            kwargs=extra_kwargs,
+            on_success=_on_success,
+            on_error=_on_error,
+            progress=show_progress,
+            task_name=self._current_task_name,
+        )
+
+        if job_id is None:
+            # Rejected by evidence mode or queue full
+            self._on_job_completed()
+
+    def _on_job_completed(self) -> None:
+        """Clean up UI when a job completes (success or error)."""
+        if not self.job_manager.is_busy:
+            self.cancel_btn.setVisible(False)
+            # Reset the bar back to a determinate 0..100 range
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(0)
+            self.progress_bar.setVisible(False)
+            self._current_task_name = None
 
     def _on_worker_finished(self):
-        self.is_busy = False
-        self.cancel_btn.setVisible(False)
-        # Reset the bar back to a determinate 0..100 range so the next
-        # ``run_background`` does not inherit the indeterminate animation
-        # after a quick second job.
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setVisible(False)
-        self.current_worker = None
-        self._current_task_name = None
+        """Legacy cleanup slot — kept for backward compat."""
+        self._on_job_completed()
 
     def run_in_thread(
         self,
