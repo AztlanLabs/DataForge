@@ -13,6 +13,7 @@ from ..logger import logger
 from ..operations import apply_result_to_entry, delete_path, rename_path, render_template_name, transfer_path
 from ..operations.files import OperationResult, normalize_path
 from ..utils import normalize_filename, safe_zip_write
+from ..case import is_evidence_mode
 
 
 def _get_batch_workers() -> int:
@@ -224,6 +225,21 @@ class FileActionService:
         path_getter: Callable[[Any], str] = _default_path_getter,
         destination_getter: Callable[[Any], Optional[str]] = _default_destination_getter,
     ) -> BatchActionOutcome:
+        # F3/U2: Evidence Mode gate
+        if is_evidence_mode() and not dry_run:
+            items_list = list(items)
+            records = [
+                BatchActionRecord(
+                    item=item,
+                    source_path=_normalize_path_value(path_getter(item)),
+                    message="Evidence Mode is active — transfer blocked (ACPO §1)",
+                    result=OperationResult(action, _normalize_path_value(path_getter(item)), None, False, "Evidence Mode active"),
+                    success=False,
+                )
+                for item in items_list
+            ]
+            return BatchActionOutcome(action=action, records=records)
+
         reserved_paths = set()
         def _transfer_record(item: Any, source_path: str, _index: int) -> BatchActionRecord:
             target_dir = _normalize_path_value(destination_getter(item) or destination_dir)
@@ -263,6 +279,21 @@ class FileActionService:
         cancel_token=None,
         path_getter: Callable[[Any], str] = _default_path_getter,
     ) -> BatchActionOutcome:
+        # F3/U2: Evidence Mode gate
+        if is_evidence_mode() and not dry_run:
+            items_list = list(items)
+            records = [
+                BatchActionRecord(
+                    item=item,
+                    source_path=_normalize_path_value(path_getter(item)),
+                    message="Evidence Mode is active — delete blocked (ACPO §1)",
+                    result=OperationResult("delete", _normalize_path_value(path_getter(item)), None, False, "Evidence Mode active"),
+                    success=False,
+                )
+                for item in items_list
+            ]
+            return BatchActionOutcome(action="delete", records=records)
+
         safe_mode = config.get("safe_mode", True) if safe_mode is None else safe_mode
         def _delete_record(item: Any, source_path: str, _index: int) -> BatchActionRecord:
             result = delete_path(source_path, dry_run=dry_run, safe_mode=safe_mode)
