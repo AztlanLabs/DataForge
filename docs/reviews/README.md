@@ -30,3 +30,5 @@ Every item follows **Where / Why / How** (`CONTRIBUTING.md §8`): exact `path:li
 `ROADMAP.md` + `ROADMAP.md` → `ROADMAP.md`  
 `README.md` → this index (overview folded)  
 `FORENSIC_REVIEW.md` → `FORENSIC_REVIEW.md` (trimmed, same findings)
+
+> **2026-08-23 — Wave 5 (11/11) + Wave 6 (1/1) DONE:** `AUDIT_REPORT.md` Part 4 `R-CORE-3/4/6` + `FORENSIC_REVIEW.md` `F1/F4/F5/F7/F8/F9/F11/F12/F13/F14/U3/U4/U10/U11` closed. See `docs/PARALLEL_BACKLOG.md`.

@@ -1,3 +1,5 @@
+> **Status: ✅ COMPLETED 2026-08-23 — Wave 5 DONE, verified (see docs/PARALLEL_BACKLOG.md Wave 5 Review). This ticket is closed — do not re-run.**
+
 # Ticket TICK-501 — Fix R-CORE-3/4/6: config persistence, cache null-guard, scanner error reporting
 
 > **Wave 5** | **Domain:** Core / Infrastructure | **Depends on:** None

@@ -1,5 +1,7 @@
 # Roadmap — Sequenced Execution to v0.2.0 / v0.3.0
 
+> **Update 2026-08-23 06:00 UTC — Wave 5 (11/11) + Wave 6 (1/1) DONE, 37/37 tickets, 1213 tests, HEAD `b373e7e`. See `docs/PARALLEL_BACKLOG.md` Wave 5+6 Reviews. 13 orphaned gaps deferred to Wave 7+.**
+
 **Date:** 2026-07-11 · **Updated:** 2026-08-22 · **Last verified:** 2026-07-12  
 **Merges:** `ROADMAP.md` + `ROADMAP.md` (no work-stream removed — this is a consolidation). Originals in git history.  
 **Target:** `v0.2.0` (WS-A…WS-H) → `v0.3.0` (WS-I, WS-J) · **Current:** `0.1.0` (`pyproject.toml`)

@@ -2,7 +2,7 @@
 
 *File System Management with Steroids and Superpowers*
 
-**Last verified:** 2026-08-22 *(re-verified against `dataforge/cli.py` HEAD; previous stamp 2026-07-12 — no code change since)*
+**Last verified:** 2026-08-23 06:00 UTC *(re-verified against `dataforge/cli.py` + `dataforge/ui/views/about.py` HEAD `b373e7e`; Wave 5+6 12/12 DONE, U10/U11 platform matrix)*
 
 ## Entry Point — CLI Superpowers
 

@@ -1,6 +1,6 @@
 # DataForge — Consolidated Specification (Authoritative)
 
-**Date:** 2026-08-22 · **Source of truth for:** `dataforge/` HEAD (v0.1.0) + reconciled proposals in `proposals/`  
+**Date:** 2026-08-23 06:00 UTC · **Source of truth for:** `dataforge/` HEAD `b373e7e` (v0.1.0, 37/37 tickets DONE, 1213 tests) + reconciled proposals in `proposals/`  
 **Replaces reading:** `APP_REFERENCE`, `ARCHITECTURE`, `CLI_REFERENCE`, `GUI_WORKFLOWS`, `TECHNICAL_SOURCE…`, `reviews/*`, `proposals/*` individually — this is the single index. Originals remain as detail supplements.  
 **Verification:** Re-checked against `dataforge/{core,modules,ui,cli}.py`, `pyproject.toml`, `build_exe.py`, and `~/.dataforge/` runtime.
 

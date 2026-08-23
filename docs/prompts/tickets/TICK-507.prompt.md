@@ -1,3 +1,5 @@
+> **Status: ✅ COMPLETED 2026-08-23 — Wave 5 DONE, verified (see docs/PARALLEL_BACKLOG.md Wave 5 Review). This ticket is closed — do not re-run.**
+
 # Ticket TICK-507 — Add hex field inspector / HexView widget (U4)
 
 > **Wave 5** | **Domain:** UI / Widgets | **Depends on:** None

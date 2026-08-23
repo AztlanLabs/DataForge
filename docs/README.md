@@ -1,10 +1,10 @@
 # DataForge Documentation Index
 
-**Last updated:** 2026-08-22 — see [`DOCUMENTATION_AUDIT_2026-08-22.md`](./DOCUMENTATION_AUDIT_2026-08-22.md) for the full audit vs. code.
+**Last updated:** 2026-08-23 06:00 UTC — see [`DOCUMENTATION_AUDIT_2026-08-22.md`](./DOCUMENTATION_AUDIT_2026-08-22.md) for the full audit vs. code. Wave 5 (11/11) + Wave 6 (1/1) merged to `origin/develop` (`b373e7e`), `37/37` tickets DONE.
 
 > **New (principal review):** [`CONSOLIDATED_SPEC.md`](./CONSOLIDATED_SPEC.md) is the single authoritative spec (reconciles all of `docs/` + proposals + reviews). [`PARALLEL_BACKLOG.md`](./PARALLEL_BACKLOG.md) is the DAG backlog for simultaneous agents — start there if you are picking a ticket. Generic parallel-agent prompt: [`.github/prompts/parallel-ticket-agent.prompt.md`](../.github/prompts/parallel-ticket-agent.prompt.md) — copy, set `{{TICKET_ID}}`, and run (one ticket = one branch = one PR, disjoint writes per wave).
 >
-> **Status 2026-08-22 22:30 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2 DONE (1058 tests) → Wave 5 🔜 READY (12 tickets, 24 disjoint files).** See `PARALLEL_BACKLOG.md` Wave 0–4 Reviews + Wave 5 Spec.
+> **Status 2026-08-23 06:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1 DONE (1213 tests: 69+126+98+130+635+142+13, +2 skipped, 1 NTFS caveat) → All waves green, 0 remaining. 13 orphaned gaps deferred to Wave 7+.** See `PARALLEL_BACKLOG.md` Wave 0–6 Reviews (7/7).
 
 ## Current truth — read these
 
@@ -20,17 +20,18 @@
 | `../README.md` | Project overview, superpowers, quick start, system-at-a-glance | Entry point |
 | `../CHANGELOG.md` | Keep-a-Changelog history | Release notes |
 
-All “current truth” docs above are green against `dataforge/` HEAD at 2026-08-22. They all still point at `~/.dataforge/` — that is correct for HEAD; the XDG migration landed in TICK-001 (Wave 0) via `core/paths.py` with a legacy shim.
+All “current truth” docs above are green against `dataforge/` HEAD at `b373e7e` (2026-08-23 06:00 UTC, Wave 5+6 DONE). XDG migration `TICK-001` via `core/paths.py` with legacy shim, forensic engine `TICK-508` (`image_io`/`streams`/`indicators`), plugin isolation `TICK-509`, logger chain `TICK-510`, parser pool `TICK-511` all verified.
 
 ## Proposals — future architecture (partially implemented)
 
-> Some proposals below are now partially or fully implemented via the parallel backlog (Wave 0-3). Check `PARALLEL_BACKLOG.md` for current status.
+> Some proposals below are now partially or fully implemented via the parallel backlog (Wave 0-6). Check `PARALLEL_BACKLOG.md` for current status.
 
 | Proposal | Proposes | Status |
 |---|---|---|
-| Ridiculously fast | Parallel scanner, batched cache, pipelined engine, job queue | **Partially done** (TICK-102/103/104/107/108/109/201/202/203) |
+| Ridiculously fast | Parallel scanner, batched cache, pipelined engine, job queue | **Done** (TICK-102/103/104/107/108/109/201/202/203/505 F14 streaming) |
 | Native OS service | UDS/Named Pipes + D-Bus/XPC/COM, hybrid HTTP for remote | **Partially done** (TICK-205 UDS/Pipe, TICK-301 daemon, TICK-302 lifecycle; HTTP gateway pending) |
 | Installable package | XDG/AppData, versioned migrations, deb/rpm/msi/dmg, auto-update | **Partially done** (TICK-001 paths, TICK-303 nfpm deb/rpm; msi/dmg/auto-update pending) |
+| Forensic soundness | Chain-of-custody, Evidence Mode, sanitisation, parser isolation, forensic engine | **Done** (TICK-304 F1/F2/F3/U2, TICK-502 F4, TICK-503 F1 wiring, TICK-508 F5/F7/F8, TICK-509 F12, TICK-510 F11, TICK-511 F13, TICK-504 F9, TICK-512 U10/U11) |
 
 
 ## History & reviews — frozen
@@ -41,7 +42,7 @@ Historical audits that produced the current code. Keep as records; don’t edit 
 |---|---|
 | [`reviews/README.md`](./reviews/README.md) | Overview, quick wins, Definition of Done |
 | [`reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md) | 15 correctness bugs (fixed) + 13 security findings S1–S13 (fixed) |
-| [`reviews/FORENSIC_REVIEW.md`](./reviews/FORENSIC_REVIEW.md) | Forensic backlog F1–F21 / U1–U11 (F1–F3/U2/F9 fixed, rest open, WS-I/WS-J) |
+| [`reviews/FORENSIC_REVIEW.md`](./reviews/FORENSIC_REVIEW.md) | Forensic backlog F1–F21 / U1–U11 (F1–F5/F7/F8/F9/F11/F12/F13/F14/U3/U4/U10/U11 fixed via Wave 5/6; F6/F10/F15/F16/F20/U5-U9 deferred) |
 | [`reviews/ROADMAP.md`](./reviews/ROADMAP.md) | UX/engineering roadmap (2a–2e shipped, WS-F/H done, WS-G next) |
 | [`reviews/ROADMAP.md`](./reviews/ROADMAP.md) | Sequenced work-streams WS-A … WS-J, release mapping |
 | [`reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md) | Doc-defect audit D1–D7 |

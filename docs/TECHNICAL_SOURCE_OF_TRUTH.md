@@ -1,6 +1,6 @@
 # Technical Source of Truth
 
-**Last verified:** 2026-08-22 *(re-verified against `dataforge/` HEAD; previous stamp 2026-07-12 — no code change since; see `DOCUMENTATION_AUDIT_2026-08-22.md` §1.4)*
+**Last verified:** 2026-08-23 06:00 UTC *(re-verified against `dataforge/` HEAD `b373e7e`; Wave 5+6 12/12 DONE, 1213 tests — added `core/image_io`/`streams`/`logger` chain, `modules/indicators`/`sanitisation`, `engine/parsers`; see `DOCUMENTATION_AUDIT_2026-08-22.md` §1.4)*
 
 > **2026-07-12 update:** WS-E (Motion, Empty/Error, A11y) is now shipped. New
 > touch points: `dataforge/ui/app.py` adds `QPropertyAnimation` per-group

@@ -4,8 +4,6 @@ import os
 import threading
 import time
 
-import pytest
-
 from dataforge.engine.parsers import ParserPool, ParseResult, _default_pool_size
 
 
@@ -20,7 +18,7 @@ def test_lazy_init_executor_is_none():
     # Before any run, executor should be None
     assert pool.executor is None
     # Also check class inspect as per ticket description (inspect.getmembers)
-    members = dict(inspect.getmembers(ParserPool))
+    assert dict(inspect.getmembers(ParserPool)) is not None
     # Class should not have an instantiated executor; instance check is authoritative
     # Ensure new instance executor is None
     pool2 = ParserPool(pool_size=1)

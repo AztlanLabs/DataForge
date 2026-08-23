@@ -1,3 +1,5 @@
+> **Status: ✅ COMPLETED 2026-08-23 — Wave 6 DONE, verified (see docs/PARALLEL_BACKLOG.md Wave 6 Review). This ticket is closed — do not re-run.**
+
 # Ticket TICK-505 — Fix ingest_disk_image list materialisation (F14)
 
 > **Wave 6** | **Domain:** Modules / Forensics | **Depends on:** "TICK-502", "TICK-304"
