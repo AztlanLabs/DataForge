@@ -168,7 +168,7 @@ class DataForgeApp(QMainWindow):
     # 2e.1 motion constants — every animated transition reads its duration
     # from here so a single call (2e.3's reduce-motion setting) can shorten
     # or skip them all in one place.
-    SIDEBAR_ANIM_MS = 180
+    SIDEBAR_ANIM_MS = 120
     VIEW_ANIM_MS = 160
     ANIM_EASING = QEasingCurve.OutCubic
 
@@ -438,11 +438,7 @@ class DataForgeApp(QMainWindow):
         # QGraphicsOpacityEffect on every view forces offscreen pixmap
         # composition and breaks QComboBox popup geometry (QTBUG-80786:
         # popup at 0,0 / top-right when ancestor has effect). No effect at
-        # rest means popups map correctly and paint is faster. Views are
-        # made opaque so crossfade does not show previous view/desktop
-        # through semi-transparent new view (visual glitch 2026-08-23).
-        view_instance.setAttribute(Qt.WA_StyledBackground, True)
-        view_instance.setAutoFillBackground(True)
+        # rest means popups map correctly and paint is faster.
         self.content_stack.addWidget(view_instance)
         self.views[title] = view_instance
 
@@ -637,38 +633,22 @@ class DataForgeApp(QMainWindow):
 
         container = self.group_containers.get(group_name)
         if container is not None:
-            if is_collapsed:
-                # Collapsing: animate maxHeight to 0, then hide to remove from layout
-                # Keep visible during animation so height animates, hide on finished
-                def _hide_on_collapsed_finished(anim=None, w=container):
-                    try:
-                        w.setVisible(False)
-                    except RuntimeError:
-                        pass
-
-                anim = self._animate_max_height(container, container.maximumHeight(), 0, restore_to=None)
-                if anim is not None:
-                    # Hook hide after animation (if reduced motion, anim is None and we hide immediately)
-                    try:
-                        anim.finished.connect(lambda w=container: w.setVisible(False))
-                    except RuntimeError:
-                        container.setVisible(False)
-                else:
-                    container.setVisible(False)
-            else:
-                # Expanding: make visible before animating to target height
-                container.setVisible(True)
-                # Ensure layout recalculates before measuring target
-                container.adjustSize()
-                target = max(container.sizeHint().height(), container.minimumSizeHint().height())
-                if target <= 0:
-                    target = 200  # fallback reasonable height
-                self._animate_max_height(
-                    container,
-                    0,
-                    target,
-                    restore_to=16777215,
-                )
+            # Instant show/hide without maxHeight animation — previous
+            # 120ms/180ms animation had asymmetric start heights
+            # (maximumHeight 16777215 vs 0) causing collapsing to appear
+            # as no animation and expanding to lag, plus inner-window
+            # out-of-bounds for 1s until layout caught up. Instant is
+            # reliable and matches user expectation for sidebar groups.
+            container.setVisible(not is_collapsed)
+            container.setMaximumHeight(16777215 if not is_collapsed else 0)
+            # Ensure layout recalculates immediately so inner windows
+            # (type,hash,file,size) don't show out-of-bounds then snap
+            try:
+                container.updateGeometry()
+                self.nav_scroll.viewport().update()
+                self.nav_scroll.update()
+            except Exception:
+                pass
 
     def _animate_max_height(self, widget, start, end, restore_to=None):
         """Run a ``maximumHeight`` animation on *widget*.

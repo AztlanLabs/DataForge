@@ -434,6 +434,9 @@ QTreeWidget, QTreeView, QListWidget, QTextEdit {
     border: 2px solid $border;
     border-radius: 8px;
 }
+QTreeWidget::viewport, QTreeView::viewport, QListWidget::viewport {
+    background-color: $surface;
+}
 QTreeWidget:focus, QTreeView:focus, QListWidget:focus, QTextEdit:focus {
     border-color: $focus_ring;
     outline: none;

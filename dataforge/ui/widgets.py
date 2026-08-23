@@ -443,8 +443,14 @@ class EnhancedTreeview(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # QTreeWidget
+        # QTreeWidget — ensure viewport repaints correctly after bulk inserts
+        # and when parent view is faded (avoid black/see-through for 1s).
         self.tree = QTreeWidget(self)
+        try:
+            self.tree.setAutoFillBackground(True)
+            self.tree.viewport().setAutoFillBackground(True)
+        except Exception:
+            pass
         self.tree.setAlternatingRowColors(True)
         self.tree.setSortingEnabled(True)
         # U8: disable drag-and-drop (QTreeWidget allows DnD by default)
@@ -566,7 +572,43 @@ class EnhancedTreeview(QWidget):
         # Explicit per-row path override (path resolver / set_item_path wins)
         if path_override is not None:
             self._item_path_role[iid] = path_override
+        # Schedule viewport refresh after bulk inserts — coalesced to one
+        # singleShot per event loop to avoid black/see-through for 1s when
+        # parent view is faded or when splitter sizes are initially 0.
+        try:
+            if not getattr(self, "_refresh_pending", False):
+                self._refresh_pending = True
+
+                def _do_refresh(s=self):
+                    try:
+                        s._refresh_pending = False
+                        s.tree.viewport().update()
+                        s.tree.update()
+                        s.update()
+                    except Exception:
+                        pass
+
+                from PyQt5.QtCore import QTimer
+
+                QTimer.singleShot(0, _do_refresh)
+        except Exception:
+            pass
         return iid
+
+    def refresh_viewport(self):
+        """Schedule viewport repaint after bulk inserts — avoids black/see-through
+        glitch when parent view is faded via QGraphicsOpacityEffect. Uses
+        singleShot(0) so it runs after layout, not during paint."""
+        try:
+            from PyQt5.QtCore import QTimer
+
+            QTimer.singleShot(0, lambda: self.tree.viewport().update())
+            QTimer.singleShot(0, lambda: self.tree.update())
+        except Exception:
+            try:
+                self.tree.viewport().update()
+            except Exception:
+                pass
         
     def delete(self, *items):
         for item_id in items:

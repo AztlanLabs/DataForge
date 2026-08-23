@@ -370,6 +370,11 @@ class MetadataView(BaseView):
         self.app.update_status(
             f"Metadata scan complete: {len(results)} files, {with_meta} with metadata, {with_gps} with GPS."
         )
+        # Refresh viewport after bulk insert to avoid black/see-through glitch
+        try:
+            self.file_tree.refresh_viewport()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Detail display
@@ -430,6 +435,10 @@ class MetadataView(BaseView):
             for key, value in list(fields.items())[:50]:
                 display_val = str(value)[:200]
                 self.overview_tree.insert("", "end", values=(key, display_val))
+        try:
+            self.overview_tree.refresh_viewport()
+        except Exception:
+            pass
 
     def _display_raw(self, meta):
         try:
