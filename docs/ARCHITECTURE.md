@@ -180,7 +180,7 @@ It then loads plugin views from `dataforge/ui/plugins/`.
 
 ### UI plugins
 
-`dataforge/ui/plugin_loader.py` scans Python files in `dataforge/ui/plugins/`, imports them, and registers any `BaseView` subclass it finds.
+`dataforge/ui/plugin_loader.py` scans `dataforge/ui/plugins/`, imports `dataforge.ui.plugins.*`, and registers `BaseView` subclasses. Opt-in via `plugins_enabled` + S5 world/owner-writable checks; optional `isolation='subprocess'` probes each import in `ProcessPoolExecutor(min(2,cpu_count()-1))` + `multiprocessing.Queue` (+ `subprocess.run` fallback) and discards worker on timeout/crash; optional `require_signed=True` verifies detached `plugin.sig` against `~/.local/share/DataForge/plugins-trusted.gpg` (`python-gnupg`) or `plugins-trusted.sha256` and raises `PluginSignatureMissingError` / `PluginSignatureInvalidError`; each outcome appends to `AuditLog` (`plugin_load` / `plugin_load_signed` / `plugin_load_unsigned_refused` / `plugin_load_failed`).
 
 Current bundled plugin:
 

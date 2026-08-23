@@ -103,7 +103,7 @@ Threading: `run_workflow`/`run_background` → single `BackgroundWorker(QThread)
 - **Mutation seam:** All move/copy/delete/rename/archive **must** go via `FileActionService` (except dedicated writers: `recovery` carve, `metadata` strip, `integrity` snapshot — documented as separate). New destructive work adds to `operations/files.py` first, then exposes via service.
 - **Read seam:** New discovery via `build_search_query` → `iter_search_files` → `search_files` (not ad-hoc `os.walk`).
 - **Background:** Views never block Qt main; accept `cancel_token` + `progress_callback` where practical; use `run_workflow(progress=True)` for progress.
-- **Plugins:** Under `ui/plugins/`, opt-in via `plugins_enabled`, owner/world-writable rejected (`plugin_loader.py:40`), in-process (isolation is F12 future).
+- **Plugins:** Under `ui/plugins/`, opt-in via `plugins_enabled`, owner/world-writable rejected (`plugin_loader.py:40`), `isolation='inline'` (default) or `isolation='subprocess'` via `ProcessPoolExecutor` + `Queue` (+ `subprocess.run` fallback) and `require_signed` verifies `plugin.sig` against `plugins-trusted.gpg` / `plugins-trusted.sha256` with `AuditLog` provenance (F12 remainder — `plugin_loader.py:13` `PluginLoader`).
 - **Tokens/Theming:** All colour via `ui/theme_tokens.py` (46 tokens/theme, WCAG AA, `focus_ring`), QSS via `generate_qss`/`generate_palette`. No ad-hoc hex in `ui/**/*.py` (guarded by tests).
 
 ---

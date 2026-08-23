@@ -204,11 +204,12 @@ These values persist through `ConfigManager` into `~/.dataforge/config.json`.
 
 `dataforge/ui/plugins/cleaner_plugin.py` ships with a standalone `MetadataCleanerPlugin`.
 
-The plugin system:
+The plugin system (`dataforge/ui/plugin_loader.py:13` `PluginLoader`):
 
-- scans `dataforge/ui/plugins/*.py`
-- imports each module
-- registers any `BaseView` subclass it finds
+- scans `dataforge/ui/plugins/*.py`, opt-in via `enabled=True` + S5 world-writable/owner checks
+- when `require_signed=True` verifies `plugin.sig` against `~/.local/share/DataForge/plugins-trusted.gpg` (`python-gnupg`) or `plugins-trusted.sha256` (`PluginSignatureMissingError` / `PluginSignatureInvalidError`)
+- when `isolation='subprocess'` probes each import in `ProcessPoolExecutor(max_workers=min(2,cpu_count()-1))` + `multiprocessing.Queue` (+ `subprocess.run` fallback) and discards worker on timeout/crash; `isolation='inline'` (default) is backwards-compatible
+- imports as `dataforge.ui.plugins.*` and registers any `BaseView` subclass it finds; each outcome appends to `AuditLog` (`plugin_load` / `plugin_load_signed` / `plugin_load_unsigned_refused` / `plugin_load_failed`)
 
 Current plugin behavior mirrors the metadata cleaning capability that also exists inside `ToolsView`.
 
