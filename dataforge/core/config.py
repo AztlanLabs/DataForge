@@ -225,7 +225,27 @@ class ConfigManager:
         if key in ("safe_mode", "plugins_enabled", "ui_reduce_motion"):
             return isinstance(val, bool)
         if key in ("excluded_extensions", "excluded_folders", "dashboard_paths"):
-            return isinstance(val, list)
+            if not isinstance(val, list):
+                return False
+            cleaned = []
+            for item in val:
+                if not isinstance(item, str) or not item.strip():
+                    logger.warning("Config %s: dropping invalid item %r", key, item)
+                    continue
+                stripped = item.strip()
+                if key in ("excluded_extensions", "excluded_folders"):
+                    if "/" in stripped or "\\" in stripped:
+                        logger.warning("Config %s: dropping invalid item %r (contains path separator)", key, item)
+                        continue
+                cleaned.append(stripped)
+            if len(cleaned) == 0 and len(val) != 0:
+                logger.warning("Config %s: all items invalid, using default", key)
+                return False
+            try:
+                val[:] = cleaned  # type: ignore[index]
+            except Exception:
+                pass
+            return True
         if key == "theme":
             return isinstance(val, str) and len(val) > 0
         if key == "duplicate_default_keep_strategy":
