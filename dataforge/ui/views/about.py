@@ -138,11 +138,14 @@ class AboutView(BaseView):
              "Features a sortable process table to kill resource-heavy apps, a startup configuration editor "
              "to adjust autostart applications, and a S.M.A.R.T. storage health diagnostics viewer."),
 
-            ("File Recovery & Carving",
-             "Allows you to quickly undelete files from trash bins, or perform raw block-level carving "
+            ("File Recovery & Carving (Linux/macOS only)",
+             "Allows you to quickly undelete files from Trash (Linux ✓ XDG Trash, macOS ✓ Finder Trash) "
+             "or perform raw block-level carving "
              "from physical device blocks when partition tables are corrupted. Built-in carving matches "
              "common headers/footers (JPEG, PNG, ZIP, PDF). Also integrates photorec/testdisk command-line tool. "
-             "Both trash and deep carving results feature integrated file previews."),
+             "Both Trash and deep carving results feature integrated file previews. "
+             "Platform: Linux ✓ (XDG Trash), macOS ✓ (Finder Trash, PyObjC optional), "
+             "Windows: ✗ (TrashScanUnsupported, pywin32 path planned) — see recovery.py:208."),
 
             ("Metadata & EXIF",
              "A unified metadata reader and writer. It parses EXIF, tags, modifications, GPS positions, and timestamps. "
@@ -154,14 +157,27 @@ class AboutView(BaseView):
              "to compile a comprehensive system report. Includes an Upgrade Advisor that identifies potential bottle-necks "
              "and suggests hardware component upgrades."),
 
-            ("Forensics",
+            ("Forensics (Linux/macOS only)",
              "Contains advanced digital forensics workflows including cryptographic hash calculations, SAM/shadow password "
-             "hash extractions, and OS artifact parsing (WTMP logins, cron jobs, etc.). Also supports mounting and "
+             "hash extractions, and OS artifact parsing (WTMP logins, cron jobs, etc.) — Linux: full, macOS: partial, Windows: not yet supported (forensics.py:602). Also supports mounting and "
              "fully ingesting raw disk images.")
         ]
 
         for title, desc in guides:
             card = CollapsibleCard(help_group, title=title, expanded=False)
+            # Platform-gated tooltip for trash recovery (U11) — quotes source per recovery.py:208
+            if "File Recovery" in title:
+                tip = (
+                    "Trash recovery: Linux ✓ (XDG Trash), macOS ✓ (Finder Trash), "
+                    "Windows: ✗ (TrashScanUnsupported, pywin32 path planned) — "
+                    "raise TrashScanUnsupported (recovery.py:208)"
+                )
+                card.setToolTip(tip)
+            elif "Forensics" in title:
+                card.setToolTip(
+                    "OS artifact parsing: Linux ✓, macOS △, Windows ✗ (forensics.py:602) — "
+                    "parse_os_artifacts returns error if PATH is not a directory"
+                )
             card_layout = QVBoxLayout(card.get_body())
             card_layout.setContentsMargins(5, 5, 5, 5)
             
@@ -169,6 +185,11 @@ class AboutView(BaseView):
             lbl_desc.setWordWrap(True)
             lbl_desc.setProperty("class", "muted")
             lbl_desc.setStyleSheet(f"font-size: {TYPE_SCALE['body']}px; line-height: 1.4;")
+            # Ensure tooltip is also on the label for hover discoverability
+            if "File Recovery" in title:
+                lbl_desc.setToolTip(card.toolTip())
+            elif "Forensics" in title:
+                lbl_desc.setToolTip(card.toolTip())
             card_layout.addWidget(lbl_desc)
             
             help_layout.addWidget(card)
