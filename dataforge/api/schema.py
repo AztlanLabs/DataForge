@@ -2,6 +2,15 @@
 
 from __future__ import annotations
 
+# Must be before pydantic import — pydantic's plugin loader calls
+# importlib.metadata.entry_points() at model-creation time and a corrupted
+# NTFS .dist-info/entry_points.txt would otherwise crash with OSError 5.
+# Top-level patch avoids circular import via dataforge.core.__init__.
+try:
+    import dataforge._metadata_patch  # noqa: F401
+except Exception:
+    pass
+
 import enum
 from typing import Any, Dict, List, Literal, Optional
 

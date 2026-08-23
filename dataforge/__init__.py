@@ -1,5 +1,13 @@
 """DataForge — File System Management with Steroids and Superpowers."""
 
+# Harden importlib.metadata against NTFS I/O errors before any pydantic import.
+# Import top-level patch (not core._metadata_patch) to avoid circular import
+# via dataforge.core.__init__ -> logger -> config -> ...
+try:
+    import dataforge._metadata_patch  # noqa: F401 — installs safe distributions()
+except Exception:
+    pass
+
 import re
 from pathlib import Path
 
