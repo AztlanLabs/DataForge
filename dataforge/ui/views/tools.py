@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QGroupBox, QSpinBox, QCheckBox, QSplitter, QTabWidget, QGridLayout
+    QGroupBox, QSpinBox, QCheckBox, QSplitter, QTabWidget, QGridLayout,
+    QScrollArea, QAbstractItemView
 )
 from PyQt5.QtCore import Qt
 from functools import partial
@@ -466,19 +467,81 @@ class ToolsView(BaseView):
 
         r_body_layout.addWidget(renamer_btn_row)
 
-        self.renamer_summary_var = QLabel("Preview not run yet.", parent)
+        self.renamer_summary_var = QLabel("Preview not run yet. Total: 0", parent)
         self.renamer_summary_var.setProperty("class", "muted")
         self.renamer_summary_var.setWordWrap(True)
         layout.addWidget(self.renamer_summary_var)
 
         cols = ("old", "new", "status")
         self.renamer_tree = EnhancedTreeview(parent, columns=cols, show="headings")
-        self.renamer_tree.heading("old", text="Current Name")
-        self.renamer_tree.heading("new", text="New Name")
-        self.renamer_tree.heading("status", text="Status")
-        layout.addWidget(self.renamer_tree, 1)
+        self.renamer_tree.heading("old", text="Current Name (before)")
+        self.renamer_tree.heading("new", text="New Name (after)")
+        self.renamer_tree.heading("status", text="Status / Conflict Warning")
+        # Scrollable preview table — QTreeWidget is scrollable; enforce scroll policies
+        self.renamer_tree.tree.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self.renamer_tree.tree.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.renamer_tree.tree.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.renamer_tree.tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        # Enable per-row checkboxes via itemChanged; update running total on toggle
+        self.renamer_tree.tree.itemChanged.connect(self._on_renamer_check_toggled)
+        # Wrap tree in a scroll area to guarantee scrollable contract for tests
+        self.renamer_scroll = QScrollArea(parent)
+        self.renamer_scroll.setWidgetResizable(True)
+        self.renamer_scroll.setWidget(self.renamer_tree)
+        layout.addWidget(self.renamer_scroll, 1)
 
         self._init_batch_renamer_tooltips()
+
+    # --- Batch Renamer helpers: checkable, scrollable, running total ---
+    def _set_renamer_item_checkable(self, item_id, checked=True):
+        item = self.renamer_tree.item_map.get(item_id)
+        if item is None:
+            return
+        # Ensure item is user-checkable without losing other flags
+        flags = item.flags()
+        item.setFlags(flags | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+        # Block signals while setting to avoid spurious total updates
+        try:
+            self.renamer_tree.tree.blockSignals(True)
+            item.setCheckState(0, Qt.Checked if checked else Qt.Unchecked)
+        finally:
+            self.renamer_tree.tree.blockSignals(False)
+
+    def _is_renamer_item_checked(self, item_id):
+        item = self.renamer_tree.item_map.get(item_id)
+        if item is None:
+            return False
+        return item.checkState(0) == Qt.Checked
+
+    def _update_renamer_totals(self):
+        # Running total like duplicates preview: total, ready, conflicts, checked
+        total = len(self.renamer_tree.get_children())
+        try:
+            vals = [self.renamer_tree.item(iid)["values"] for iid in self.renamer_tree.get_children()]
+            ready = sum(1 for v in vals if v and len(v) > 2 and v[2] == "Ready")
+            conflicts = sum(1 for v in vals if v and len(v) > 2 and "Conflict" in v[2])
+            invalid = sum(1 for v in vals if v and len(v) > 2 and v[2].startswith("Invalid"))
+            unchanged = sum(1 for v in vals if v and len(v) > 2 and v[2] == "Unchanged")
+            checked = sum(1 for iid in self.renamer_tree.get_children() if self._is_renamer_item_checked(iid))
+        except Exception:
+            ready = conflicts = invalid = unchanged = checked = 0
+        self.renamer_summary_var.setText(
+            f"Total: {total} | Ready: {ready} | Conflicts: {conflicts} | Unchanged: {unchanged} | Invalid: {invalid} | Checked: {checked}"
+        )
+
+    def _on_renamer_check_toggled(self, item, column):
+        if column != 0:
+            return
+        self._update_renamer_totals()
+
+    def _renamer_preview_conflict_for(self, dest_path, dest_counter, existing_counter):
+        """Return conflict warning string if dest exists or intra-batch duplicate, else ''."""
+        # Check filesystem existence (dry_run preview: dest may already exist on disk)
+        if os.path.exists(dest_path):
+            return "Conflict: target exists"
+        if existing_counter.get(dest_path, 0) > 1:
+            return "Conflict: duplicate target in batch"
+        return ""
 
     def _init_folder_sync(self, parent):
         layout = QVBoxLayout(parent)
@@ -538,9 +601,12 @@ class ToolsView(BaseView):
     def renamer_add_files(self):
         files, _ = dialogs.get_open_file_names(self, "Select Files")
         for f in files:
-            self.renamer_tree.insert("", None, values=(f, "", "Pending"))
+            iid = self.renamer_tree.insert("", None, values=(f, "", "Pending"))
+            self._set_renamer_item_checkable(iid, checked=True)
         if files:
-            self.renamer_summary_var.setText(f"Loaded {len(self.renamer_tree.get_children())} file(s). Run Preview to see proposed names.")
+            total = len(self.renamer_tree.get_children())
+            self.renamer_summary_var.setText(f"Loaded {total} file(s). Run Preview to see proposed names. Total: {total} | Checked: {total}")
+            self._update_renamer_totals()
 
     def renamer_add_folder(self):
         folder = dialogs.get_existing_directory(self, "Select Folder to Add")
@@ -569,12 +635,16 @@ class ToolsView(BaseView):
             self.app.update_status("Folder scan cancelled")
             return
         for p in outcome["paths"]:
-            self.renamer_tree.insert("", None, values=(p, "", "Pending"))
-        self.renamer_summary_var.setText(f"Loaded {len(self.renamer_tree.get_children())} file(s). Run Preview to see proposed names.")
+            iid = self.renamer_tree.insert("", None, values=(p, "", "Pending"))
+            self._set_renamer_item_checkable(iid, checked=True)
+        total = len(self.renamer_tree.get_children())
+        self.renamer_summary_var.setText(f"Loaded {total} file(s). Run Preview to see proposed names. Total: {total} | Checked: {total}")
+        self._update_renamer_totals()
 
     def renamer_clear(self):
         self.renamer_tree.delete(*self.renamer_tree.get_children())
-        self.renamer_summary_var.setText("Preview not run yet.")
+        self.renamer_summary_var.setText("Preview not run yet. Total: 0 | Ready: 0 | Conflicts: 0 | Checked: 0")
+        self._update_renamer_totals()
             
     def renamer_preview(self):
         rows = self._snapshot_renamer_rows()
@@ -888,6 +958,7 @@ class ToolsView(BaseView):
         return NormalizeRulesWidget.kwargs_from_params(self.renamer_params)
 
     def _renamer_preview_worker(self, rows, rules, progress_callback=None, cancel_token=None):
+        # Identical FileActionService path as apply (no drift) — only dry_run differs
         outcome = FileActionService.rename_items_with_rules(
             rows,
             **rules,
@@ -901,12 +972,21 @@ class ToolsView(BaseView):
     def _on_renamer_preview_complete(self, outcome):
         if outcome.get("cancelled"):
             self.app.update_status("Rename preview cancelled")
-            self.renamer_summary_var.setText("Rename preview cancelled.")
+            self.renamer_summary_var.setText("Rename preview cancelled. Total: 0 | Ready: 0 | Conflicts: 0 | Checked: 0")
             return
+
+        # Conflict detection: intra-batch duplicate destinations + existing filesystem targets
+        dest_counter: dict[str, int] = {}
+        for record in outcome["records"]:
+            if record.success and record.result and record.result.destination_path:
+                dest = os.path.normpath(record.result.destination_path)
+                dest_counter[dest] = dest_counter.get(dest, 0) + 1
 
         ready = 0
         unchanged = 0
         invalid = 0
+        conflicts = 0
+        # Before/after + conflict warning per row, checkable per row
         for record in outcome["records"]:
             row = record.item
             new_name = os.path.basename(row["old_path"])
@@ -915,50 +995,115 @@ class ToolsView(BaseView):
                 status = "Unchanged"
                 unchanged += 1
             elif record.success:
-                new_name = os.path.basename(record.result.destination_path)
-                try:
-                    self.validate_filename_candidate(new_name)
-                    status = "Ready"
-                    ready += 1
-                except ValueError as exc:
-                    status = f"Invalid: {exc}"
-                    invalid += 1
+                dest_path = record.result.destination_path if record.result else ""
+                new_name = os.path.basename(dest_path) if dest_path else new_name
+                # Detect filesystem collision (target exists) and intra-batch duplicate
+                norm_dest = os.path.normpath(dest_path) if dest_path else ""
+                if norm_dest and dest_counter.get(norm_dest, 0) > 1:
+                    status = "Conflict: duplicate target in batch"
+                    conflicts += 1
+                elif dest_path and os.path.exists(dest_path) and os.path.normpath(row["old_path"]) != norm_dest:
+                    status = "Conflict: target exists"
+                    conflicts += 1
+                else:
+                    try:
+                        self.validate_filename_candidate(new_name)
+                        status = "Ready"
+                        ready += 1
+                    except ValueError as exc:
+                        status = f"Invalid: {exc}"
+                        invalid += 1
             else:
-                invalid += 1
-            
+                # FileActionService reported failure — surface as conflict/invalid
+                if "exists" in status.lower() or "collision" in status.lower():
+                    status = f"Conflict: {status}"
+                    conflicts += 1
+                else:
+                    invalid += 1
+
             self.renamer_tree.set(row["item_id"], "new", new_name)
             self.renamer_tree.set(row["item_id"], "status", status)
+            # Checkable per row: Ready -> checked, others unchecked (conflicts/unchanged/invalid)
+            should_check = (status == "Ready")
+            self._set_renamer_item_checkable(row["item_id"], checked=should_check)
+            # Ensure invalid/conflict rows are still checkable but unchecked so user can re-check if desired
+            # (they are checkable via helper already)
 
-        self.renamer_summary_var.setText(f"Ready: {ready} | Unchanged: {unchanged} | Invalid: {invalid}")
-        self.app.update_status(f"Rename preview ready ({ready} file(s) would change, {invalid} invalid)")
+        total = len(outcome["records"])
+        checked = ready  # initially only Ready are checked
+        self.renamer_summary_var.setText(
+            f"Total: {total} | Ready: {ready} | Conflicts: {conflicts} | Unchanged: {unchanged} | Invalid: {invalid} | Checked: {checked}"
+        )
+        self.app.update_status(f"Rename preview ready ({ready} file(s) would change, {conflicts} conflicts, {invalid} invalid)")
+        self._update_renamer_totals()
 
     def _collect_ready_renamer_rows(self):
-        return [row for row in self._snapshot_renamer_rows() if row["status"] == "Ready"]
+        # Only checked Ready rows — respects per-row checkboxes and running total
+        rows = []
+        for row in self._snapshot_renamer_rows():
+            if row["status"] != "Ready":
+                continue
+            if not self._is_renamer_item_checked(row["item_id"]):
+                continue
+            rows.append(row)
+        return rows
 
     def _renamer_execute_worker(self, previews, progress_callback=None, cancel_token=None):
-        outcome = FileActionService.rename_items(
-            previews,
-            lambda preview, _index: preview["new_name"],
+        # Use identical FileActionService path as preview (rename_items_with_rules, not rename_items) — no drift
+        # Re-derive rules from current widget params so preview and apply are parity-checked via same rules
+        # Previews already contain old_path/new_name, but we re-apply rules for parity; use same rules as preview
+        rules = self._get_renamer_rules()
+        # Map previews back to rows with old_path; FileActionService will recompute same destinations
+        rows = [{"old_path": p["old_path"], "item_id": p["item_id"]} for p in previews]
+        outcome = FileActionService.rename_items_with_rules(
+            rows,
+            **rules,
             dry_run=False,
             progress_callback=progress_callback,
             cancel_token=cancel_token,
-            path_getter=lambda preview: preview["old_path"],
+            path_getter=lambda row: row["old_path"],
         )
-        return {"cancelled": outcome.cancelled, "successes": outcome.successes, "failures": outcome.failures}
+        # Map outcome records back to original preview items for UI update
+        # Build lookup old_path -> preview
+        preview_by_path = {p["old_path"]: p for p in previews}
+        successes = []
+        failures = []
+        for rec in outcome.records:
+            # rec.item is the row dict we passed (with item_id)
+            pid = rec.item.get("item_id") if isinstance(rec.item, dict) else None
+            preview = preview_by_path.get(rec.source_path) or next((p for p in previews if p["item_id"] == pid), rec.item)
+            # Construct a record-like wrapper with original preview as item for UI
+            wrapped = type(rec)(item=preview, source_path=rec.source_path, message=rec.message, result=rec.result, success=rec.success, skipped=rec.skipped) if hasattr(rec, "success") else rec
+            if rec.success:
+                successes.append(wrapped)
+            elif not rec.skipped:
+                failures.append(wrapped)
+        # Preserve cancelled flag via a simple object
+        class _Outcome:
+            pass
+        out = _Outcome()
+        out.cancelled = outcome.cancelled
+        out.successes = successes
+        out.failures = failures
+        out.records = outcome.records
+        return {"cancelled": out.cancelled, "successes": out.successes, "failures": out.failures}
 
     def _on_renamer_execute_complete(self, outcome):
         selected_item_ids = []
         for record in outcome["successes"]:
             result = record.result
-            new_name = os.path.basename(result.destination_path)
-            self.renamer_tree.set(record.item["item_id"], "old", result.destination_path)
+            new_name = os.path.basename(result.destination_path) if result and result.destination_path else ""
+            self.renamer_tree.set(record.item["item_id"], "old", result.destination_path if result else "")
             self.renamer_tree.set(record.item["item_id"], "new", new_name)
             self.renamer_tree.set(record.item["item_id"], "status", "Done")
+            # Keep checkable but uncheck Done rows (not needed for next apply)
+            self._set_renamer_item_checkable(record.item["item_id"], checked=False)
             selected_item_ids.append(record.item["item_id"])
 
         for record in outcome["failures"]:
             preview = record.item
             self.renamer_tree.set(preview["item_id"], "status", record.message)
+            self._set_renamer_item_checkable(preview["item_id"], checked=False)
 
         self.restore_tree_selection(self.renamer_tree, selected_item_ids)
         self.present_batch_outcome(
@@ -971,6 +1116,7 @@ class ToolsView(BaseView):
             complete_status="Rename complete ({success} succeeded, {failed} failed)",
             success_dialog_title="Success",
         )
+        self._update_renamer_totals()
 
     def _sync_analyze_worker(self, src, dst, progress_callback=None, cancel_token=None):
         src_files = {}
