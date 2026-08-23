@@ -3,9 +3,10 @@ import logging
 import os
 import queue
 import stat as stat_mod
+import unicodedata
 from typing import Callable, Generator, Optional
 
-from .common import FileEntry
+from .common import FileEntry, is_bidi_suspicious, is_reflink_suspicious, is_sparse
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,30 @@ def _get_max_workers() -> int:
 
 
 def _build_from_stat(path: str, filename: str, extension: str, st: os.stat_result) -> FileEntry:
+    # F10: NFC normalization + bidi detection
+    try:
+        normalized = unicodedata.normalize("NFC", path)
+    except Exception:
+        normalized = path
+    try:
+        bidi = is_bidi_suspicious(path) or is_bidi_suspicious(filename)
+    except Exception:
+        bidi = False
+    # F16: sparse detection via st_blocks*512 < st_size
+    try:
+        st_blocks = getattr(st, "st_blocks", 0)
+        sparse_flag = is_sparse(st_blocks, st.st_size)
+    except Exception:
+        st_blocks = getattr(st, "st_blocks", 0)
+        sparse_flag = False
+    # F21: reflink detection via FIEMAP shared extents
+    reflink_flag = False
+    try:
+        # Use helper that attempts FIEMAP ioctl; cheap fallback if not Linux or not supported
+        reflink_flag = is_reflink_suspicious(path, st_blocks, st.st_size)
+    except Exception:
+        reflink_flag = False
+
     return FileEntry(
         path=path,
         filename=filename,
@@ -73,7 +98,11 @@ def _build_from_stat(path: str, filename: str, extension: str, st: os.stat_resul
         is_dir=False,
         st_ino=getattr(st, "st_ino", 0),
         st_dev=getattr(st, "st_dev", 0),
-        st_blocks=getattr(st, "st_blocks", 0),
+        st_blocks=st_blocks,
+        normalized_path=normalized,
+        bidi_suspicious=bidi,
+        sparse=sparse_flag,
+        reflink_suspicious=reflink_flag,
     )
 
 
@@ -254,6 +283,7 @@ def _scan_single_dir(
                     _log_scan_error(entry.path, e, on_error)
                     continue
                 # Build FileEntry directly from DirEntry.stat — no double stat
+                # F10/F16/F21 handling is inside _build_from_stat
                 files.append(
                     _build_from_stat(
                         path=entry.path,
@@ -297,6 +327,9 @@ def scan_directory(
     - Work-queue of dirs processed via ThreadPoolExecutor(min(32, cpu*4))
     - Each dir scanned with os.scandir; FileEntry built from entry.stat(follow_symlinks=False)
     - Populates st_ino/st_dev/st_blocks for hardlink/sparse awareness
+    - F10: NFC-normalizes path -> FileEntry.normalized_path and flags bidi_suspicious
+    - F16: sparse detection via st_blocks*512 < st_size
+    - F21: reflink detection via FIEMAP shared extents
     - Batch emission (1k) via queue.Queue
     - Honors excluded_folders/extensions and cancel_token promptly
     - OSError during scan is logged (warning) and forwarded to on_error if provided
