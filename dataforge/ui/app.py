@@ -716,21 +716,10 @@ class DataForgeApp(QMainWindow):
         view = self.views.get(title)
         if view:
             same_view = (view is self.current_view)
-            # Freeze updates during stack switch + mount to avoid blank/see-through
-            # artifacts when heavy trees are cleared/inserted during crossfade.
-            self.setUpdatesEnabled(False)
-            try:
-                self.content_stack.setCurrentWidget(view)
-                view.mount()
-                self.current_view = view
-                self.setWindowTitle(f"DataForge - {title}")
-            finally:
-                self.setUpdatesEnabled(True)
-                try:
-                    view.update()
-                    view.repaint()
-                except Exception:
-                    pass
+            self.content_stack.setCurrentWidget(view)
+            view.mount()
+            self.current_view = view
+            self.setWindowTitle(f"DataForge - {title}")
 
             # 2e.1 view crossfade — start the new view at opacity 0 and
             # animate to 1. The first switch at startup is also faded in
@@ -783,12 +772,20 @@ class DataForgeApp(QMainWindow):
             self._drop_finished_animation(a)
             if v is not None and e == 1.0:
                 try:
-                    # Ensure final opacity is 1.0 before removing
                     eff.setOpacity(1.0)
-                    v.setGraphicsEffect(None)
-                    v.update()
                 except RuntimeError:
                     pass
+                # Defer removal to next event loop to avoid painter conflict
+                # (QGraphicsEffect is still compositing when finished fires)
+                try:
+                    from PyQt5.QtCore import QTimer
+
+                    QTimer.singleShot(0, lambda vv=v: vv.setGraphicsEffect(None) if vv.graphicsEffect() is eff else None)
+                except RuntimeError:
+                    try:
+                        v.setGraphicsEffect(None)
+                    except RuntimeError:
+                        pass
 
         anim.finished.connect(_on_finished)
         anim.start()
@@ -1012,10 +1009,9 @@ class DataForgeApp(QMainWindow):
             except Exception:
                 pass
             self._current_task_name = None
-            # Ensure repaint after heavy operation to avoid blank/artifact carryover
+            # Schedule repaint for next event loop (not immediate repaint)
             try:
                 self.update()
-                self.repaint()
             except Exception:
                 pass
 
