@@ -8,7 +8,6 @@ Acceptance criteria:
 """
 import hashlib
 import os
-import shutil
 import subprocess
 import unicodedata
 from pathlib import Path
@@ -48,7 +47,6 @@ class TestNFDAndBidi:
 
     def test_fileentry_normalized_and_bidi(self):
         nfd_name = "e\u0301.txt"
-        nfc_name = unicodedata.normalize("NFC", nfd_name)
         e = FileEntry(path=f"/tmp/{nfd_name}", filename=nfd_name, extension=".txt", size=10, created_at=0, modified_at=0, st_blocks=8)
         # normalized_path should be NFC
         assert e.normalized_path == unicodedata.normalize("NFC", e.path)
