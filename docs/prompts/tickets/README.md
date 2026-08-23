@@ -4,9 +4,9 @@
 
 **Generic prompt:** `../parallel-ticket-agent.md` / `../../../.github/prompts/parallel-ticket-agent.prompt.md` — set `{{TICKET_ID}}`.
 
-> **Status 2026-08-23 06:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1 DONE**
-> Wave 0 (69) + Wave 1 (126) + Wave 2 (98) + Wave 3 (130) + Wave 4 (635) + Wave 5 (142, +2 skipped) + Wave 6 (13) = 1213 tests green (all `validation_command` green, file parity verified). Wave 5+6 closed remaining `AUDIT_REPORT.md` Part 4 `R-CORE-3/4/6` + `FORENSIC_REVIEW.md` `F1/F4/F5/F7/F8/F9/F11/F12/F13/F14/U3/U4/U10/U11`. TICK-505 moved to Wave 6 to resolve `forensics.py` collision. See `docs/PARALLEL_BACKLOG.md` Wave 0–6 Reviews (7/7).
-> **Overall: 37/37 DONE (100%) — 0 remaining. 13 orphaned gaps deferred to Wave 7+ (R-CORE-2/5/7, F6/F10/F15/F16/F20, U5-U9, F21 dedup).**
+> **Status 2026-08-23 07:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1 DONE — Wave 7 🔜 READY (8 tickets, 20 disjoint files)**
+> Wave 0 (69) + Wave 1 (126) + Wave 2 (98) + Wave 3 (130) + Wave 4 (635) + Wave 5 (142, +2 skipped) + Wave 6 (13) = 1213 tests green (all `validation_command` green, file parity verified). Wave 7 now tickets the 13 orphaned gaps (R-CORE-2/5/7, F10/F16/F20, U5-U9, F21 dedup) + 3 proposal features (FTS index, HTTP gateway, msi/dmg packaging) as 8 disjoint tickets. See `docs/PARALLEL_BACKLOG.md` Wave 0–6 Reviews (7/7) + Wave 7 Spec.
+> **Overall: 37/45 DONE (82%) — 8 remaining (Wave 7).**
 
 ## Execution Order (Wave DAG)
 
@@ -68,7 +68,18 @@
 
 - **TICK-505** ✅ DONE 2026-08-23 — Fix ingest_disk_image list materialisation (F14) | depends: "TICK-502", "TICK-304" | writes: `dataforge/modules/forensics.py` *(sole Wave 6 writer — sequential re-entry after TICK-502 Wave 5)* → [`TICK-505.prompt.md`](./TICK-505.prompt.md)
 
-> **Wave 6+ deferred (orphaned findings, not yet ticketed — tracked in `docs/PARALLEL_BACKLOG.md` Wave 6 Spec):** R-CORE-2 (excluded_* item validation), R-CORE-5 (cache batch commit), R-CORE-7 (makedirs bare filename), F6 (carving mid-sector), F10 (NFC/NFD+bidi), F15 (keyword budget), F16 (sparse), F20 (VSS), F21 dedup remainder, U5-U9 (UX). Estimated 8-10 tickets — explicitly deferred, not forgotten.
+### Wave 7 🔜 READY 2026-08-23 — Wave 6 ✅ 1/1 gate green, 8 disjoint, unblocked
+
+> **Goal:** Close the 13 orphaned gaps now ticketed + 3 proposal features (FTS index, HTTP gateway, msi/dmg). 8 tickets, 20 unique files — verified disjoint.
+
+- **TICK-701** — R-CORE-2/5: config item validation + cache batch commit | depends: — | writes: `dataforge/core/config.py`, `dataforge/core/cache.py` → [`TICK-701.prompt.md`](./TICK-701.prompt.md)
+- **TICK-702** — R-CORE-7: logger makedirs bare filename guard | depends: — | writes: `dataforge/core/logger.py` → [`TICK-702.prompt.md`](./TICK-702.prompt.md)
+- **TICK-703** — F10/F16/F21: Unicode NFC/NFD + bidi, sparse, reflink dedup | depends: — | writes: `dataforge/core/common.py`, `dataforge/core/scanner.py`, `dataforge/core/hasher.py`, `dataforge/modules/duplicates.py` → [`TICK-703.prompt.md`](./TICK-703.prompt.md)
+- **TICK-704** — F20: locked/in-use files skipped (VSS / acquire) | depends: — | writes: `dataforge/core/acquire.py [NEW FILE]`, `dataforge/modules/recovery.py` → [`TICK-704.prompt.md`](./TICK-704.prompt.md)
+- **TICK-705** — U5-U9: UX polish — mismatch, glyph, preview, DnD, keyboard | depends: — | writes: `dataforge/ui/theme_tokens.py`, `dataforge/ui/views/base.py`, `dataforge/ui/widgets.py`, `dataforge/ui/views/forensics_view.py`, `dataforge/modules/forensics.py` → [`TICK-705.prompt.md`](./TICK-705.prompt.md)
+- **TICK-706** — Engine FTS index + incremental watch (PERF E) | depends: — | writes: `dataforge/engine/index.py [NEW FILE]` → [`TICK-706.prompt.md`](./TICK-706.prompt.md)
+- **TICK-707** — HTTP gateway + D-Bus/XPC/COM (NATIVE N2/N3) | depends: — | writes: `dataforge/api/transport/http_gateway.py [NEW FILE]` → [`TICK-707.prompt.md`](./TICK-707.prompt.md)
+- **TICK-708** — Packaging msi/dmg + version sync + native helper (I2+N4) | depends: — | writes: `packaging/wix/Product.wxs [NEW FILE]`, `packaging/dmg/create-dmg.sh [NEW FILE]`, `pyproject.toml`, `dataforge/__init__.py` → [`TICK-708.prompt.md`](./TICK-708.prompt.md)
 
 ## Relevant Documentation Per Ticket
 
@@ -78,7 +89,7 @@ Each per-ticket file now includes a **Relevant Documentation — Must Read Befor
 
 ### Sequential (default, safe)
 ```
-Wave 0 (0.1→0.2→0.3→0.4→0.5) → Wave 1 (9 agents after Wave 0 green) → Wave 2 → Wave 3 → Wave 4 → Wave 5 (11 parallel) → Wave 6 (1 sequential re-entry) → Wave 6+ (orphans)
+Wave 0 (0.1→0.2→0.3→0.4→0.5) → Wave 1 (9 agents after Wave 0 green) → Wave 2 → Wave 3 → Wave 4 → Wave 5 (11 parallel) → Wave 6 (1 sequential re-entry) → Wave 7 (8 parallel) → Wave 8+ (remaining polish)
 ```
 
 ### Parallel within a Wave

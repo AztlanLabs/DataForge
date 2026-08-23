@@ -5,7 +5,7 @@
 **Toolchain:** `pytest` (`requirements-dev.txt:4`), `pytest-cov`, `ruff`, `mypy` — all `validation_command` are `pytest`-based.  
 **Principles enforced:** Contract-first (Wave 0) → disjoint writes per wave (no file appears twice in same wave) → sequential re-entries documented → consolidation isolates central touchpoints.
 
-> **Wave Status — Updated 2026-08-23 06:30 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1 DONE**
+> **Wave Status — Updated 2026-08-23 07:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1 DONE — Wave 7 🔜 READY (8 tickets, 20 disjoint files)**
 > - **Wave 0 (Contracts): 5/5 DONE — 69 tests.** Unblocks Wave 1.
 > - **Wave 1 (Parallel Fixes): 9/9 DONE — 126 tests.** Unblocks Wave 2.
 > - **Wave 2 (Service & Mutations): 5/5 DONE — 98 tests, 5/5 `validation_command` green, file parity verified. Unblocks Wave 3.**
@@ -13,7 +13,8 @@
 > - **Wave 4 (Final Consolidation): 2/2 DONE — 635 tests (`412+223`), 2/2 `validation_command` green, file parity verified.** Unblocks Wave 5.
 > - **Wave 5 (Audit & Forensic Gap Closure): 11/11 DONE — 142 tests (+2 skipped, 1 NTFS caveat, 11/11 `validation_command` green, file parity verified, 11 disjoint files, no collision — TICK-505 moved to Wave 6 on 2026-08-23 to resolve `forensics.py` collision).** Reviewed below.
 > - **Wave 6 (Forensics Re-entry): 1/1 DONE — 13 tests, 1/1 `validation_command` green, `forensics.py` sequential re-entry after TICK-502 verified.** Reviewed below.
-> - **Overall: 37/37 tickets DONE (100%) — 0 remaining (Wave 5+6 gate green).** 13 additional orphaned gaps (R-CORE-2/5/7, F6/F10/F15/F16/F20, U5-U9, F21 dedup) deferred to Wave 7+ — tracked in Wave 6 Spec.
+> - **Wave 7 (Remaining Gaps + Engine Growth): 0/8 — 🔜 READY TO START** (8 disjoint tickets across 20 unique files: R-CORE-2/5, R-CORE-7, F10/F16/F21, F20 VSS, U5-U9 polish, FTS index, HTTP gateway, packaging msi/dmg — all 13 orphaned gaps now ticketed + 3 proposal features).
+> - **Overall: 37/45 tickets DONE (82%) — 8 remaining (Wave 7).** See `docs/prompts/tickets/README.md` for per-ticket prompts.
 
 > Read `CONSOLIDATED_SPEC.md` §2–7 for canonical definitions before picking a ticket. All `path:line` below verified at 2026-08-22.
 
@@ -60,6 +61,14 @@
 | Wave 5 | `TICK-511` | Engine / Parsers | `dataforge/engine/parsers.py [NEW FILE]` | `TICK-301` | F13 parser ProcessPool | ✅ DONE 2026-08-23 — `tests/test_parser_pool_isolation.py` 17/17, `ParserPool` lazy `ProcessPoolExecutor` + `BrokenProcessPool` handling verified |
 | Wave 5 | `TICK-512` | Docs / Cross-Platform | `docs/CLI_REFERENCE.md`, `README.md`, `docs/GUI_WORKFLOWS.md`, `dataforge/ui/views/about.py` | `TICK-202` | U10+U11 docs claim fix | ✅ DONE 2026-08-23 — `tests/test_docs_cross_platform_claims.py` 7/7, platform matrix + `TrashScanUnsupported` tooltip verified |
 | **Wave 6 — Forensics Re-entry ✅ DONE (1/1)** | `TICK-505` | Modules / Forensics | `dataforge/modules/forensics.py` *(sole Wave 6 writer — sequential re-entry after TICK-502 Wave 5)* | `TICK-502`, `TICK-304` | F14 ingest list materialisation | ✅ DONE 2026-08-23 — `tests/test_forensics_streaming.py` 13/13, queue incremental consume `O(batch)` + deadlock fix verified |
+| **Wave 7 — Remaining Gaps + Engine Growth 🔜 READY (8 disjoint)** | `TICK-701` | Core / Config+Cache | `dataforge/core/config.py`, `dataforge/core/cache.py` | None | R-CORE-2 (item validation) + R-CORE-5 (batch commit) | 🔜 Ready — sole Wave 7 writer to 2 files |
+| Wave 7 | `TICK-702` | Core / Logger | `dataforge/core/logger.py` | None | R-CORE-7 (makedirs bare) | 🔜 Ready |
+| Wave 7 | `TICK-703` | Core / Unicode+Sparse | `dataforge/core/common.py`, `dataforge/core/scanner.py`, `dataforge/core/hasher.py`, `dataforge/modules/duplicates.py` | None | F10 NFC/NFD+bidi + F16 sparse + F21 dedup reflink | 🔜 Ready — 4 files |
+| Wave 7 | `TICK-704` | Core / Acquire | `dataforge/core/acquire.py [NEW FILE]`, `dataforge/modules/recovery.py` | None | F20 VSS / locked files | 🔜 Ready — NEW file |
+| Wave 7 | `TICK-705` | UI / UX Polish | `dataforge/ui/theme_tokens.py`, `dataforge/ui/views/base.py`, `dataforge/ui/widgets.py`, `dataforge/ui/views/forensics_view.py`, `dataforge/modules/forensics.py` | None | U5-U9 (mismatch, glyph, preview, DnD, keyboard) | 🔜 Ready — 5 files |
+| Wave 7 | `TICK-706` | Engine / Index | `dataforge/engine/index.py [NEW FILE]` | None | PERF E FTS index + watch | 🔜 Ready — NEW file |
+| Wave 7 | `TICK-707` | Engine / Transport | `dataforge/api/transport/http_gateway.py [NEW FILE]` | None | NATIVE N2/N3 HTTP + D-Bus | 🔜 Ready — NEW file |
+| Wave 7 | `TICK-708` | Build / Packaging | `packaging/wix/Product.wxs [NEW FILE]`, `packaging/dmg/create-dmg.sh [NEW FILE]`, `pyproject.toml`, `dataforge/__init__.py` | None | I2+N4 msi/dmg + version 0.2.0 | 🔜 Ready — 4 files |
 
 **Disjoint guarantee (hardened):** No two tickets in the **same wave** list the same `exclusive_write_files` path. Central touchpoints (`dataforge/ui/app.py`, `pyproject.toml`, `dataforge/engine/daemon.py`, `dataforge/modules/forensics.py`, `dataforge/core/cache.py`) appear in **different waves** sequentially and are documented as re-entries. Wave 0 contracts land before any Wave 1 impl that imports them (`TICK-004` now depends on `TICK-001`).
 
@@ -147,7 +156,7 @@
 
 ---
 
-## Wave 5 Review — Completed 2026-08-23 06:30 UTC (11/11 DONE)
+## Wave 5 Review — Completed 2026-08-23 07:00 UTC (11/11 DONE)
 
 > **Reviewer:** Principal Technical Auditor · **Method:** `Read` each `exclusive_write_files` + `Read` `tests/test_*` + `PYTHONPATH=. pytest` + `git log --oneline --grep=TICK-50` + `ls -l dataforge/...` + `grep -c "exclusive_write_files"` disjoint check. Wave 5 now has **11/11 merged tickets — 142 tests (+2 skipped, 1 NTFS caveat, 11/11 `validation_command` green, file parity clean, 11 disjoint files, no collision — TICK-505 moved to Wave 6).**
 
@@ -169,7 +178,7 @@
 
 ---
 
-## Wave 6 Review — Completed 2026-08-23 06:30 UTC (1/1 DONE)
+## Wave 6 Review — Completed 2026-08-23 07:00 UTC (1/1 DONE)
 
 > **Reviewer:** Principal Technical Auditor · **Method:** `Read` `dataforge/modules/forensics.py` + `Read` `tests/test_forensics_streaming.py` + `PYTHONPATH=. pytest` + `git log --oneline --grep=TICK-505` + `ls -l dataforge/...` file-time checks. Wave 6 now has **1/1 merged ticket — 13 tests, 1/1 `validation_command` green, file parity clean, sequential re-entry verified (sole Wave 6 writer to `forensics.py` after `TICK-502` Wave 5).**
 
