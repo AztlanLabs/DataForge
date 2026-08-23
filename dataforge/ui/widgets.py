@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,
     QTreeWidget, QTreeWidgetItem, QHeaderView, QMenu, QMessageBox, QDialog,
     QLineEdit, QGroupBox, QTextEdit, QApplication, QSizePolicy,
-    QGridLayout, QCheckBox, QSpinBox, QComboBox, QLayout
+    QGridLayout, QCheckBox, QSpinBox, QComboBox, QLayout, QAbstractItemView
 )
 from PyQt5.QtCore import Qt, QSize, QRect, QPoint
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QFont, QColor, QTextCharFormat, QTextCursor
@@ -447,6 +447,12 @@ class EnhancedTreeview(QWidget):
         self.tree = QTreeWidget(self)
         self.tree.setAlternatingRowColors(True)
         self.tree.setSortingEnabled(True)
+        # U8: disable drag-and-drop (QTreeWidget allows DnD by default)
+        self.tree.setDragDropMode(QAbstractItemView.NoDragDrop)
+        self.tree.setDefaultDropAction(Qt.IgnoreAction)
+        self.tree.setDragEnabled(False)
+        self.tree.setAcceptDrops(False)
+        self.tree.setDropIndicatorShown(False)
         # Elide long cell text from the LEFT (not Qt's default right-elide).
         # File paths put the most useful part — the filename — at the end,
         # so eliding from the right ("C:/very/long/path/pref...") hides
@@ -1189,6 +1195,12 @@ class HexView(QWidget):
         self.field_inspector.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.field_inspector.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.field_inspector.header().setSectionResizeMode(2, QHeaderView.Stretch)
+        # U8: disable DnD for field inspector
+        self.field_inspector.setDragDropMode(QAbstractItemView.NoDragDrop)
+        self.field_inspector.setDefaultDropAction(Qt.IgnoreAction)
+        self.field_inspector.setDragEnabled(False)
+        self.field_inspector.setAcceptDrops(False)
+        self.field_inspector.setDropIndicatorShown(False)
         mid_layout.addWidget(self.field_inspector, 1)
 
         outer.addWidget(middle, 1)

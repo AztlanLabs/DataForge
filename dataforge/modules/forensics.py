@@ -853,19 +853,56 @@ def identify_file_by_signature(path):
     return None, "Unknown"
 
 
+def _is_extension_mismatch(ext: str, fmt: str | None) -> bool:
+    """Return True when file extension does not match detected magic type.
+
+    U5: magic-vs-ext mismatch filter. Uses ``file_signatures.SIGNATURES``
+    as ground truth: each format lists its canonical extensions. ``ext``
+    is compared case-insensitively against that list. Unknown formats
+    (``None``/``"Unknown"``) never mismatch because there is no ground
+    truth to compare against.
+    """
+    if not fmt or fmt == "Unknown":
+        return False
+    try:
+        from .file_signatures import SIGNATURES
+
+        sig = SIGNATURES.get(fmt)
+        if not sig:
+            return False
+        expected = [e.lower() for e in sig.get("extensions", [])]
+        if not expected:
+            return False
+        ext_low = (ext or "").lower()
+        # empty extension always mismatches a known format
+        if not ext_low:
+            return True
+        return ext_low not in expected
+    except Exception:
+        return False
+
+
 def profile_directory_types(path, progress_callback=None, cancel_token=None):
     """Walk a directory and group every file by detected magic-byte type.
     Useful for triage on large evidence sets (e.g. 'how many PDFs vs EXEs
-    do we actually have, regardless of extension')."""
+    do we actually have, regardless of extension').
+
+    U5: each row now carries ``mismatch`` (bool) and ``mismatch_glyph``
+    (``⚠``/``✓``) so the UI can show a non-colour signal and filter.
+    """
     summary = Counter()
     rows = []
     total = 0
+    mismatch_count = 0
     for entry in scan_directory(path, recursive=True, max_depth=-1, cancel_token=cancel_token):
         if entry.is_dir:
             continue
         total += 1
         fmt, desc = identify_file_by_signature(entry.path)
         summary[fmt or "Unknown"] += 1
+        mismatch = _is_extension_mismatch(entry.extension, fmt)
+        if mismatch:
+            mismatch_count += 1
         rows.append({
             "path": entry.path,
             "filename": os.path.basename(entry.path),
@@ -873,12 +910,14 @@ def profile_directory_types(path, progress_callback=None, cancel_token=None):
             "size": entry.size,
             "format": fmt or "Unknown",
             "description": desc,
+            "mismatch": mismatch,
+            "mismatch_glyph": "\u26A0" if mismatch else "\u2713",
         })
         if progress_callback and total % 25 == 0:
             progress_callback(total, total, f"Classifying: {entry.name}")
     if progress_callback:
         progress_callback(total, total, f"Classified {total} files")
-    return {"total": total, "by_format": dict(summary), "rows": rows}
+    return {"total": total, "by_format": dict(summary), "rows": rows, "mismatch_count": mismatch_count}
 
 
 # ---------------------------------------------------------------------------

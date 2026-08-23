@@ -167,7 +167,7 @@ class BaseView(QWidget, metaclass=QWidgetABCMeta):
         pass
 
     def make_empty_state(self, icon="", title="", body="", action_label="",
-                          action_callback=None):
+                           action_callback=None):
         """Convenience for ``EmptyState`` so views do not need to
         import the class directly. Returns a freshly-built widget
         ready to be added to the view's layout."""
@@ -176,6 +176,17 @@ class BaseView(QWidget, metaclass=QWidgetABCMeta):
             action_label=action_label, action_callback=action_callback,
             parent=self,
         )
+
+    def make_preview_panel(self, parent=None):
+        """U7: convenience helper for ``FilePreviewPanel`` so forensics
+        and other views can wire selection -> preview without importing
+        the widget directly."""
+        try:
+            from ..widgets import FilePreviewPanel
+
+            return FilePreviewPanel(parent or self)
+        except Exception:
+            return None
         
     def get_help_text(self) -> str:
         """Return Markdown help for this view. The default is a small
@@ -313,6 +324,12 @@ class BaseView(QWidget, metaclass=QWidgetABCMeta):
         table.setSelectionBehavior(QAbstractItemView.SelectRows)
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         table.setAlternatingRowColors(True)
+        # U8: disable drag-and-drop (tables previously allowed DnD by default)
+        table.setDragDropMode(QAbstractItemView.NoDragDrop)
+        table.setDefaultDropAction(Qt.IgnoreAction)
+        table.setDragEnabled(False)
+        table.setAcceptDrops(False)
+        table.setDropIndicatorShown(False)
         header = table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
