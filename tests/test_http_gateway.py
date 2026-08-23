@@ -11,7 +11,11 @@ from __future__ import annotations
 
 
 import pytest
-from fastapi.testclient import TestClient
+
+try:
+    from fastapi.testclient import TestClient  # type: ignore[import-untyped]
+except ImportError:  # pragma: no cover - optional dep graceful skip
+    TestClient = None  # type: ignore[assignment,misc]
 
 from dataforge.api.transport.base import Transport
 from dataforge.api.transport.http_gateway import (
@@ -25,6 +29,11 @@ from dataforge.api.transport.http_gateway import (
 )
 from dataforge.engine.daemon import Daemon
 
+# Skip gateway tests when FastAPI is not installed — collection must not crash
+# (CI without fastapi should skip, not error; see CI error ModuleNotFoundError).
+_requires_fastapi = pytest.mark.skipif(not HAS_FASTAPI, reason="fastapi not installed — pip install fastapi uvicorn")
+_requires_testclient = pytest.mark.skipif(TestClient is None, reason="fastapi TestClient not installed — pip install fastapi httpx")
+
 
 def _make_daemon() -> Daemon:
     d = Daemon()
@@ -33,6 +42,7 @@ def _make_daemon() -> Daemon:
 
 
 class TestFastApiOptional:
+    @_requires_fastapi
     def test_has_fastapi_true_when_installed(self) -> None:
         # In this env FastAPI is installed
         assert HAS_FASTAPI is True
@@ -95,6 +105,7 @@ class TestHttpGatewayIsTransport:
     def test_is_subclass(self) -> None:
         assert issubclass(HttpGateway, Transport)
 
+    @_requires_fastapi
     def test_implements_abstract_methods(self) -> None:
         daemon = _make_daemon()
         gw = HttpGateway(daemon)
@@ -114,6 +125,7 @@ class TestHttpGatewayIsTransport:
         # Allow either None or endpoint, but must not raise
         assert result is None or result == f"http://{DEFAULT_HOST}:{DEFAULT_PORT}"
 
+    @_requires_fastapi
     def test_default_host_port(self) -> None:
         daemon = _make_daemon()
         gw = HttpGateway(daemon)
@@ -122,6 +134,8 @@ class TestHttpGatewayIsTransport:
         daemon.stop()
 
 
+@_requires_fastapi
+@_requires_testclient
 class TestHttpGatewayEndpoints:
     def test_scan_and_poll(self, tmp_path) -> None:
         daemon = _make_daemon()
@@ -236,6 +250,7 @@ class TestHttpGatewayEndpoints:
 
 class TestHttpGatewayClient:
     @pytest.mark.asyncio
+    @_requires_fastapi
     async def test_send_jsonrpc_via_http(self, tmp_path) -> None:
         # Start a real gateway in background thread using TestClient's app?
         # We test the client `send` by using the gateway's send against its own app via TestClient transport?
@@ -248,6 +263,7 @@ class TestHttpGatewayClient:
         daemon.stop()
 
     @pytest.mark.asyncio
+    @_requires_fastapi
     async def test_recv_not_implemented(self) -> None:
         daemon = _make_daemon()
         gw = HttpGateway(daemon)
@@ -255,6 +271,7 @@ class TestHttpGatewayClient:
             await gw.recv()
         daemon.stop()
 
+    @_requires_fastapi
     def test_subscribe_returns_async_iterator(self) -> None:
         daemon = _make_daemon()
         gw = HttpGateway(daemon)
