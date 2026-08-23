@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <!-- DataForge MSI — WiX v3, per INSTALL_UPGRADE_LIFECYCLE.md §3.2 -->
+    <Product Id="*" Name="DataForge" Language="1033" Version="0.2.0"
+             Manufacturer="DataForge Contributors" UpgradeCode="A1B2C3D4-E5F6-4A5B-8C9D-0123456789AB">
+        <Package InstallerVersion="300" Compressed="yes" InstallScope="perMachine"
+                 Description="DataForge 0.2.0 — File System Management with Steroids and Superpowers"
+                 Comments="Local-first file management and forensic triage" />
+
+        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+        <Media Id="1" Cabinet="DataForge.cab" EmbedCab="yes" />
+
+        <!-- Feature tree -->
+        <Feature Id="ProductFeature" Title="DataForge" Level="1">
+            <ComponentGroupRef Id="ProductComponents" />
+            <ComponentRef Id="ApplicationShortcutComponent" />
+        </Feature>
+
+        <!-- Directory layout: ProgramFiles\DataForge + Start Menu shortcut -->
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="ProgramFilesFolder">
+                <Directory Id="INSTALLFOLDER" Name="DataForge">
+                    <Component Id="MainExecutable" Guid="B2C3D4E5-F6A7-4B8C-9D0E-123456789ABC">
+                        <File Id="DataForgeEXE" Source="dist\onedir\DataForge\DataForge.exe" KeyPath="yes">
+                        </File>
+                    </Component>
+                    <Component Id="EngineExecutable" Guid="C3D4E5F6-A7B8-4C9D-8E0F-123456789ABD">
+                        <File Id="EngineEXE" Source="dist\onedir\DataForge\dataforge-engine.exe" KeyPath="no" />
+                    </Component>
+                </Directory>
+            </Directory>
+            <Directory Id="ProgramMenuFolder">
+                <Directory Id="ApplicationProgramsFolder" Name="DataForge">
+                    <Component Id="ApplicationShortcutComponent" Guid="D4E5F6A7-B8C9-4D0E-8F01-23456789ABCE">
+                        <Shortcut Id="ApplicationStartMenuShortcut"
+                                  Name="DataForge"
+                                  Description="DataForge 0.2.0"
+                                  Target="[INSTALLFOLDER]DataForge.exe"
+                                  WorkingDirectory="INSTALLFOLDER" />
+                        <RegistryValue Root="HKCU" Key="Software\DataForge" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+                        <RemoveFolder Id="CleanUpShortCut" Directory="ApplicationProgramsFolder" On="uninstall" />
+                    </Component>
+                </Directory>
+            </Directory>
+        </Directory>
+
+        <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+            <Component Id="ProductRegistry" Guid="E5F6A7B8-C9D0-4E0F-9012-3456789ABCDE">
+                <RegistryKey Root="HKLM" Key="Software\DataForge">
+                    <RegistryValue Name="Version" Type="string" Value="0.2.0" KeyPath="yes" />
+                    <RegistryValue Name="InstallLocation" Type="string" Value="[INSTALLFOLDER]" />
+                </RegistryKey>
+            </Component>
+        </ComponentGroup>
+
+        <!-- ARP metadata -->
+        <Property Id="ARPURLINFOABOUT" Value="https://github.com/AztlanLabs/DataForge" />
+        <Property Id="ARPCOMMENTS" Value="File System Management with Steroids and Superpowers" />
+        <Property Id="ARPNOREPAIR" Value="yes" />
+        <Property Id="ARPNOMODIFY" Value="yes" />
+
+        <!-- Custom action for service registration (post-install) -->
+        <CustomAction Id="StartService" Directory="INSTALLFOLDER"
+                      ExeCommand='sc create DataForgeEngine binPath= "[INSTALLFOLDER]dataforge-engine.exe" start= delayed-auto &amp; sc start DataForgeEngine'
+                      Execute="deferred" Return="ignore" Impersonate="no" />
+        <InstallExecuteSequence>
+            <Custom Action="StartService" After="InstallFinalize">NOT Installed</Custom>
+        </InstallExecuteSequence>
+    </Product>
+</Wix>
