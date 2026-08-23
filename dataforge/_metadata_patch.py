@@ -87,7 +87,7 @@ def _install() -> None:
         def _safe_read_text(self, filename):  # type: ignore[no-untyped-def]
             try:
                 return _orig_read_text(self, filename)
-            except OSError as e:
+            except OSError:
                 # Only suppress for entry_points.txt / METADATA on corrupted NTFS;
                 # re-raise for other files? For robustness, return None for any OSError here
                 # because importlib.metadata callers treat None as "no such file".
