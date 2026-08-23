@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait
 from dataclasses import dataclass
+from datetime import datetime, timezone
+import functools
 import os
 import re
 import threading
@@ -41,6 +43,40 @@ def _default_destination_getter(_item: Any) -> Optional[str]:
     return None
 
 
+class AuditIntegrityError(RuntimeError):
+    """Raised when audit log hash chain is broken while in Evidence Mode."""
+
+# Alias for test compatibility — tests may expect IntegrityError
+IntegrityError = AuditIntegrityError
+
+
+class _HybridMethod:
+    """Descriptor that allows a method to be called both as instance and class method.
+
+    - Via instance: svc.transfer_items(...) -> func(svc, ...)
+    - Via class: FileActionService.transfer_items(...) -> func(default_instance, ...)
+    """
+
+    def __init__(self, func):
+        self.func = func
+        functools.update_wrapper(self, func)
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            @functools.wraps(self.func)
+            def class_wrapper(*args, **kwargs):
+                default = owner()
+                return self.func(default, *args, **kwargs)
+
+            return class_wrapper
+        else:
+            @functools.wraps(self.func)
+            def instance_wrapper(*args, **kwargs):
+                return self.func(instance, *args, **kwargs)
+
+            return instance_wrapper
+
+
 @dataclass
 class BatchActionRecord:
     item: Any
@@ -75,6 +111,134 @@ class BatchActionOutcome:
 
 
 class FileActionService:
+    """Central batch file-operations service with optional audit logging (TICK-503).
+
+    All public batch methods can be called either as class methods (legacy,
+    no audit) or as instance methods with an injected AuditLog/CaseContext.
+
+    Example:
+        log = AuditLog(db_path="/tmp/audit.db")
+        ctx = CaseContext(case_id="CASE-001", operator="Alice", evidence_mode=False)
+        svc = FileActionService(audit_log=log, case_context=ctx)
+        svc.transfer_items(files, "/dest", "move", dry_run=False)
+    """
+
+    def __init__(
+        self,
+        provider=None,
+        audit_log=None,
+        case_context=None,
+    ):
+        # provider is optional; keep for TICK-503 contract but not yet wired into ops
+        if provider is not None:
+            self.provider = provider
+        else:
+            try:
+                from ..provider import default_provider
+
+                self.provider = default_provider()
+            except Exception:
+                self.provider = None
+        self.audit_log = audit_log
+        self.case_context = case_context
+
+    # -- internal audit helpers ---------------------------------------------
+
+    def _is_evidence_mode(self) -> bool:
+        """True if instance case_context or global context is in evidence mode."""
+        if self.case_context is not None and getattr(self.case_context, "evidence_mode", False):
+            return True
+        try:
+            return bool(is_evidence_mode())
+        except Exception:
+            return False
+
+    def _verify_audit(self) -> None:
+        """Verify audit log chain; raises AuditIntegrityError if tampered.
+
+        Only called in Evidence Mode when audit_log is present and dry_run is False.
+        """
+        if self.audit_log is None:
+            return
+        try:
+            result = self.audit_log.verify()
+        except AuditIntegrityError:
+            raise
+        except Exception as exc:
+            raise AuditIntegrityError(f"Audit log verification failed: {exc}") from exc
+
+        # verify() returns dict {"valid": bool, ...} in current implementation
+        if isinstance(result, dict):
+            valid = result.get("valid", False)
+        else:
+            valid = bool(result)
+        if not valid:
+            raise AuditIntegrityError(f"Audit log integrity check failed: {result}")
+
+    def _record_audit(
+        self,
+        operation: str,
+        sources: list[str],
+        destinations: list[str],
+        outcome: BatchActionOutcome,
+        dry_run: bool = False,
+        error: str | None = None,
+    ) -> None:
+        """Append a single audit entry for the batch operation if audit_log is set."""
+        if self.audit_log is None:
+            return
+        try:
+            # Build payload with required fields per TICK-503
+            payload: dict[str, Any] = {
+                "operation": operation,
+                "sources": list(sources),
+                "destinations": list(destinations),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "result": "success" if len(outcome.failures) == 0 and len(outcome.successes) > 0 else "failure" if outcome.failures else "blocked" if any("Evidence Mode" in r.message for r in outcome.records) or any("Audit log integrity" in r.message for r in outcome.records) else "skipped" if outcome.skipped_records else "success",
+                "dry_run": dry_run,
+                "requested": outcome.requested,
+                "success_count": len(outcome.successes),
+                "failure_count": len(outcome.failures),
+                "cancelled": outcome.cancelled,
+            }
+            if error:
+                payload["error"] = error
+            # Include case metadata if available
+            if self.case_context is not None:
+                try:
+                    payload["case_id"] = getattr(self.case_context, "case_id", "")
+                    payload["operator"] = getattr(self.case_context, "operator", "")
+                    payload["evidence_mode"] = getattr(self.case_context, "evidence_mode", False)
+                    # host if available
+                    if hasattr(self.case_context, "host"):
+                        payload["host"] = self.case_context.host
+                except Exception:
+                    pass
+            # Fallback to global context if instance has no case_id but global does
+            if not payload.get("case_id"):
+                try:
+                    from ..case import get_context
+
+                    gctx = get_context()
+                    if gctx is not None:
+                        if not payload.get("case_id") and getattr(gctx, "case_id", ""):
+                            payload["case_id"] = gctx.case_id
+                        if not payload.get("operator") and getattr(gctx, "operator", ""):
+                            payload["operator"] = gctx.operator
+                except Exception:
+                    pass
+
+            # AuditLog.append expects (action, payload) — action is operation
+            self.audit_log.append(operation, payload)
+        except AuditIntegrityError:
+            raise
+        except Exception:
+            # Audit failures must not break file operations
+            try:
+                logger.debug("audit log append failed", exc_info=True)
+            except Exception:
+                pass
+
     @staticmethod
     def _log_record(record: BatchActionRecord):
         if record.skipped:
@@ -212,9 +376,9 @@ class FileActionService:
         for record in cls.records_for_output(outcome, include_skipped=include_skipped):
             log_func(record.source_path, action_label, record.message)
 
-    @classmethod
+    @_HybridMethod
     def transfer_items(
-        cls,
+        self,
         items: Iterable[Any],
         destination_dir: Optional[str],
         action: str,
@@ -225,9 +389,14 @@ class FileActionService:
         path_getter: Callable[[Any], str] = _default_path_getter,
         destination_getter: Callable[[Any], Optional[str]] = _default_destination_getter,
     ) -> BatchActionOutcome:
-        # F3/U2: Evidence Mode gate
-        if is_evidence_mode() and not dry_run:
-            items_list = list(items)
+        # F1/F3: Evidence Mode + audit integrity gate (TICK-503)
+        if self._is_evidence_mode() and not dry_run:
+            if self.audit_log is not None:
+                self._verify_audit()
+            items_list_ev = list(items)
+            # Preserve original items for audit
+            ev_sources = [_normalize_path_value(path_getter(it)) for it in items_list_ev]
+            ev_dests = [_normalize_path_value(destination_getter(it) or destination_dir) for it in items_list_ev]
             records = [
                 BatchActionRecord(
                     item=item,
@@ -236,19 +405,37 @@ class FileActionService:
                     result=OperationResult(action, _normalize_path_value(path_getter(item)), None, False, "Evidence Mode active"),
                     success=False,
                 )
-                for item in items_list
+                for item in items_list_ev
             ]
-            return BatchActionOutcome(action=action, records=records)
+            outcome = BatchActionOutcome(action=action, records=records)
+            # Audit the blocked attempt
+            self._record_audit("transfer", ev_sources, ev_dests, outcome, dry_run, error="Evidence Mode active")
+            return outcome
 
         reserved_paths = set()
+
         def _transfer_record(item: Any, source_path: str, _index: int) -> BatchActionRecord:
             target_dir = _normalize_path_value(destination_getter(item) or destination_dir)
             result = transfer_path(source_path, target_dir, action, dry_run=dry_run, reserved_paths=reserved_paths)
             return BatchActionRecord(item=item, source_path=source_path, message=result.message, result=result, success=result.success)
 
         items_list = list(items)
+        # Collect sources/destinations for audit (before operation, as intended destinations)
+        audit_sources = [_normalize_path_value(path_getter(it)) for it in items_list]
+        audit_dests = [_normalize_path_value(destination_getter(it) or destination_dir) for it in items_list]
+
         if dry_run or len(items_list) <= 1:
-            return cls._run_batch_operation(
+            outcome = self.__class__._run_batch_operation(
+                items_list,
+                action=action,
+                progress_message=f"{action.title()}...",
+                operation=_transfer_record,
+                cancel_token=cancel_token,
+                progress_callback=progress_callback,
+                path_getter=path_getter,
+            )
+        else:
+            outcome = self.__class__._run_batch_parallel(
                 items_list,
                 action=action,
                 progress_message=f"{action.title()}...",
@@ -258,19 +445,27 @@ class FileActionService:
                 path_getter=path_getter,
             )
 
-        return cls._run_batch_parallel(
-            items_list,
-            action=action,
-            progress_message=f"{action.title()}...",
-            operation=_transfer_record,
-            cancel_token=cancel_token,
-            progress_callback=progress_callback,
-            path_getter=path_getter,
-        )
+        # TICK-503: record operation in audit log
+        # Also handle post-operation audit verification failure recovery? No
+        # For failures due to audit tamper, we already verified pre-op.
 
-    @classmethod
+        # Build more accurate destinations from actual results if available
+        result_dests: list[str] = []
+        for rec in outcome.records:
+            if rec.result and rec.result.destination_path:
+                result_dests.append(_normalize_path_value(rec.result.destination_path))
+            else:
+                # fallback to intended dest
+                result_dests.append(audit_dests[len(result_dests)] if len(result_dests) < len(audit_dests) else "")
+
+        # Use result_dests if not empty else audit_dests
+        final_dests = result_dests if result_dests else audit_dests
+        self._record_audit("transfer", audit_sources, final_dests, outcome, dry_run)
+        return outcome
+
+    @_HybridMethod
     def delete_items(
-        cls,
+        self,
         items: Iterable[Any],
         *,
         dry_run: bool = True,
@@ -279,9 +474,11 @@ class FileActionService:
         cancel_token=None,
         path_getter: Callable[[Any], str] = _default_path_getter,
     ) -> BatchActionOutcome:
-        # F3/U2: Evidence Mode gate
-        if is_evidence_mode() and not dry_run:
-            items_list = list(items)
+        if self._is_evidence_mode() and not dry_run:
+            if self.audit_log is not None:
+                self._verify_audit()
+            items_list_ev = list(items)
+            ev_sources = [_normalize_path_value(path_getter(it)) for it in items_list_ev]
             records = [
                 BatchActionRecord(
                     item=item,
@@ -290,18 +487,33 @@ class FileActionService:
                     result=OperationResult("delete", _normalize_path_value(path_getter(item)), None, False, "Evidence Mode active"),
                     success=False,
                 )
-                for item in items_list
+                for item in items_list_ev
             ]
-            return BatchActionOutcome(action="delete", records=records)
+            outcome = BatchActionOutcome(action="delete", records=records)
+            self._record_audit("delete", ev_sources, [], outcome, dry_run, error="Evidence Mode active")
+            return outcome
 
         safe_mode = config.get("safe_mode", True) if safe_mode is None else safe_mode
+
         def _delete_record(item: Any, source_path: str, _index: int) -> BatchActionRecord:
             result = delete_path(source_path, dry_run=dry_run, safe_mode=safe_mode)
             return BatchActionRecord(item=item, source_path=source_path, message=result.message, result=result, success=result.success)
 
         items_list = list(items)
+        audit_sources = [_normalize_path_value(path_getter(it)) for it in items_list]
+
         if dry_run or len(items_list) <= 1:
-            return cls._run_batch_operation(
+            outcome = self.__class__._run_batch_operation(
+                items_list,
+                action="delete",
+                progress_message="Deleting...",
+                operation=_delete_record,
+                cancel_token=cancel_token,
+                progress_callback=progress_callback,
+                path_getter=path_getter,
+            )
+        else:
+            outcome = self.__class__._run_batch_parallel(
                 items_list,
                 action="delete",
                 progress_message="Deleting...",
@@ -311,19 +523,12 @@ class FileActionService:
                 path_getter=path_getter,
             )
 
-        return cls._run_batch_parallel(
-            items_list,
-            action="delete",
-            progress_message="Deleting...",
-            operation=_delete_record,
-            cancel_token=cancel_token,
-            progress_callback=progress_callback,
-            path_getter=path_getter,
-        )
+        self._record_audit("delete", audit_sources, [], outcome, dry_run)
+        return outcome
 
-    @classmethod
+    @_HybridMethod
     def rename_items(
-        cls,
+        self,
         items: Iterable[Any],
         name_getter: Callable[[Any, int], str],
         *,
@@ -332,7 +537,37 @@ class FileActionService:
         cancel_token=None,
         path_getter: Callable[[Any], str] = _default_path_getter,
     ) -> BatchActionOutcome:
+        # Evidence Mode gate for rename as well (TICK-503 extends F3 to all mutations)
+        if self._is_evidence_mode() and not dry_run:
+            if self.audit_log is not None:
+                self._verify_audit()
+            items_list_ev = list(items)
+            ev_sources = [_normalize_path_value(path_getter(it)) for it in items_list_ev]
+            # Try to compute intended destinations for audit
+            ev_dests: list[str] = []
+            for idx, it in enumerate(items_list_ev, start=1):
+                try:
+                    new_name = name_getter(it, idx)
+                    src = ev_sources[idx - 1]
+                    ev_dests.append(os.path.join(os.path.dirname(src), new_name) if src else new_name)
+                except Exception:
+                    ev_dests.append("")
+            records = [
+                BatchActionRecord(
+                    item=item,
+                    source_path=_normalize_path_value(path_getter(item)),
+                    message="Evidence Mode is active — rename blocked (ACPO §1)",
+                    result=OperationResult("rename", _normalize_path_value(path_getter(item)), None, False, "Evidence Mode active"),
+                    success=False,
+                )
+                for item in items_list_ev
+            ]
+            outcome = BatchActionOutcome(action="rename", records=records)
+            self._record_audit("rename", ev_sources, ev_dests, outcome, dry_run, error="Evidence Mode active")
+            return outcome
+
         reserved_paths = set()
+
         def _rename_record(item: Any, source_path: str, index: int) -> BatchActionRecord:
             try:
                 new_name = name_getter(item, index)
@@ -347,8 +582,29 @@ class FileActionService:
             return BatchActionRecord(item=item, source_path=source_path, message=result.message, result=result, success=result.success)
 
         items_list = list(items)
+        audit_sources = [_normalize_path_value(path_getter(it)) for it in items_list]
+        # Compute intended destinations for audit
+        audit_dests: list[str] = []
+        for idx, it in enumerate(items_list, start=1):
+            try:
+                new_name = name_getter(it, idx)
+                src = audit_sources[idx - 1]
+                audit_dests.append(os.path.join(os.path.dirname(src), new_name) if src else new_name)
+            except Exception:
+                audit_dests.append("")
+
         if dry_run or len(items_list) <= 1:
-            return cls._run_batch_operation(
+            outcome = self.__class__._run_batch_operation(
+                items_list,
+                action="rename",
+                progress_message="Renaming...",
+                operation=_rename_record,
+                cancel_token=cancel_token,
+                progress_callback=progress_callback,
+                path_getter=path_getter,
+            )
+        else:
+            outcome = self.__class__._run_batch_parallel(
                 items_list,
                 action="rename",
                 progress_message="Renaming...",
@@ -358,19 +614,23 @@ class FileActionService:
                 path_getter=path_getter,
             )
 
-        return cls._run_batch_parallel(
-            items_list,
-            action="rename",
-            progress_message="Renaming...",
-            operation=_rename_record,
-            cancel_token=cancel_token,
-            progress_callback=progress_callback,
-            path_getter=path_getter,
-        )
+        # Refine destinations from actual results where available
+        result_dests: list[str] = []
+        for rec in outcome.records:
+            if rec.result and rec.result.destination_path:
+                result_dests.append(_normalize_path_value(rec.result.destination_path))
+            else:
+                # fallback to intended
+                idx = len(result_dests)
+                result_dests.append(audit_dests[idx] if idx < len(audit_dests) else "")
 
-    @classmethod
+        final_dests = result_dests if result_dests else audit_dests
+        self._record_audit("rename", audit_sources, final_dests, outcome, dry_run)
+        return outcome
+
+    @_HybridMethod
     def rename_items_with_regex(
-        cls,
+        self,
         items: Iterable[Any],
         pattern: str,
         replacement: str,
@@ -386,7 +646,7 @@ class FileActionService:
             current_name = os.path.basename(path_getter(item))
             return regex.sub(replacement, current_name)
 
-        return cls.rename_items(
+        return self.rename_items(
             items,
             _name_getter,
             dry_run=dry_run,
@@ -395,9 +655,9 @@ class FileActionService:
             path_getter=path_getter,
         )
 
-    @classmethod
+    @_HybridMethod
     def rename_items_with_template(
-        cls,
+        self,
         items: Iterable[Any],
         template: str,
         *,
@@ -411,7 +671,7 @@ class FileActionService:
             counter = counter_start + index - 1
             return render_template_name(template, item, counter)
 
-        return cls.rename_items(
+        return self.rename_items(
             items,
             _name_getter,
             dry_run=dry_run,
@@ -420,9 +680,9 @@ class FileActionService:
             path_getter=path_getter,
         )
 
-    @classmethod
+    @_HybridMethod
     def rename_items_with_rules(
-        cls,
+        self,
         items: Iterable[Any],
         *,
         strip_leading_dot: bool = False,
@@ -460,7 +720,7 @@ class FileActionService:
                 suffix=suffix,
             )
 
-        return cls.rename_items(
+        return self.rename_items(
             items,
             _name_getter,
             dry_run=dry_run,
@@ -469,9 +729,9 @@ class FileActionService:
             path_getter=path_getter,
         )
 
-    @classmethod
+    @_HybridMethod
     def archive_items(
-        cls,
+        self,
         items: Iterable[Any],
         *,
         mode: str = "single",
@@ -482,6 +742,27 @@ class FileActionService:
         cancel_token=None,
         path_getter: Callable[[Any], str] = _default_path_getter,
     ) -> BatchActionOutcome:
+        # Evidence Mode gate for archive
+        if self._is_evidence_mode() and not dry_run:
+            if self.audit_log is not None:
+                self._verify_audit()
+            items_list_ev = list(items)
+            ev_sources = [_normalize_path_value(path_getter(it)) for it in items_list_ev]
+            ev_dests = [_normalize_path_value(destination) if destination else f"{os.path.splitext(s)[0]}.zip" for s in ev_sources]
+            records = [
+                BatchActionRecord(
+                    item=item,
+                    source_path=_normalize_path_value(path_getter(item)),
+                    message="Evidence Mode is active — archive blocked (ACPO §1)",
+                    result=OperationResult("archive", _normalize_path_value(path_getter(item)), None, False, "Evidence Mode active"),
+                    success=False,
+                )
+                for item in items_list_ev
+            ]
+            outcome = BatchActionOutcome(action="archive", records=records)
+            self._record_audit("archive", ev_sources, ev_dests, outcome, dry_run, error="Evidence Mode active")
+            return outcome
+
         items = list(items)
         records: list[BatchActionRecord] = []
         total = len(items)
@@ -493,17 +774,22 @@ class FileActionService:
         if normalized_mode == "single" and not destination:
             raise ValueError("destination is required for single archive mode")
 
+        audit_sources = [_normalize_path_value(path_getter(it)) for it in items]
+        audit_dests_single = [_normalize_path_value(destination) if destination else ""]
+
         if normalized_mode == "single":
             if dry_run:
                 for index, item in enumerate(items, start=1):
                     source_path = _normalize_path_value(path_getter(item))
                     message = f"Would archive: {source_path} -> {destination}"
                     record = BatchActionRecord(item=item, source_path=source_path, message=message, success=True)
-                    cls._log_record(record)
+                    self.__class__._log_record(record)
                     records.append(record)
                     if progress_callback:
                         progress_callback(index, total, "Previewing Archive...")
-                return BatchActionOutcome(action="archive", records=records)
+                outcome = BatchActionOutcome(action="archive", records=records)
+                self._record_audit("archive", audit_sources, audit_dests_single, outcome, dry_run)
+                return outcome
 
             destination = _normalize_path_value(destination)
             tmp_path = destination + ".tmp"
@@ -521,7 +807,9 @@ class FileActionService:
                                 os.remove(tmp_path)
                             except OSError:
                                 pass
-                            return BatchActionOutcome(action="archive", records=records, cancelled=True)
+                            outcome = BatchActionOutcome(action="archive", records=records, cancelled=True)
+                            self._record_audit("archive", audit_sources, audit_dests_single, outcome, dry_run)
+                            return outcome
 
                         source_path = _normalize_path_value(path_getter(item))
                         try:
@@ -532,7 +820,7 @@ class FileActionService:
                             any_failed = True
                             result = OperationResult("archive", source_path, destination, False, f"ERROR: Could not archive {source_path}: {exc}")
                             record = BatchActionRecord(item=item, source_path=source_path, message=result.message, result=result, success=False)
-                        cls._log_record(record)
+                        self.__class__._log_record(record)
                         records.append(record)
 
                         if progress_callback:
@@ -552,9 +840,11 @@ class FileActionService:
                     pass
                 failed_result = OperationResult("archive", destination, destination, False, f"ERROR: Could not archive to {destination}: {exc}")
                 record = BatchActionRecord(item=destination, source_path=destination, message=failed_result.message, result=failed_result, success=False)
-                cls._log_record(record)
+                self.__class__._log_record(record)
                 records.append(record)
-            return BatchActionOutcome(action="archive", records=records)
+            outcome = BatchActionOutcome(action="archive", records=records)
+            self._record_audit("archive", audit_sources, audit_dests_single, outcome, dry_run)
+            return outcome
 
         def _individual_record(item: Any, source_path: str, _index: int) -> BatchActionRecord:
             archive_path = _normalize_path_value(destination) or f"{os.path.splitext(source_path)[0]}.zip"
@@ -582,13 +872,17 @@ class FileActionService:
                 archive_path = _normalize_path_value(destination) or f"{os.path.splitext(source_path)[0]}.zip"
                 message = f"Would archive: {source_path} -> {archive_path}"
                 record = BatchActionRecord(item=item, source_path=source_path, message=message, success=True)
-                cls._log_record(record)
+                self.__class__._log_record(record)
                 records.append(record)
                 if progress_callback:
                     progress_callback(index, total, "Previewing Archive...")
-            return BatchActionOutcome(action="archive", records=records)
+            outcome = BatchActionOutcome(action="archive", records=records)
+            # destinations for dry_run individual: per-item zip paths
+            audit_dests_indiv = [_normalize_path_value(destination) or f"{os.path.splitext(s)[0]}.zip" for s in audit_sources]
+            self._record_audit("archive", audit_sources, audit_dests_indiv, outcome, dry_run)
+            return outcome
 
-        return cls._run_batch_parallel(
+        outcome = self.__class__._run_batch_parallel(
             items,
             action="archive",
             progress_message="Archiving...",
@@ -597,6 +891,11 @@ class FileActionService:
             progress_callback=progress_callback,
             path_getter=path_getter,
         )
+        audit_dests_indiv = [_normalize_path_value(destination) or f"{os.path.splitext(s)[0]}.zip" for s in audit_sources]
+        # Prefer actual destinations from results
+        result_dests = [r.result.destination_path if r.result and r.result.destination_path else audit_dests_indiv[i] if i < len(audit_dests_indiv) else "" for i, r in enumerate(outcome.records)]
+        self._record_audit("archive", audit_sources, result_dests, outcome, dry_run)
+        return outcome
 
     @staticmethod
     def apply_successes_to_entries(outcome: BatchActionOutcome):
