@@ -1,9 +1,10 @@
 """
-Automations GUI view — TICK-806.
+Automations GUI view — TICK-806 + TICK-907 collapsible UX.
 
 Hosts the Automation Store (exports_dir/automations/*.json) alongside the
-Action Builder and Tools. Left list of saved automations, right builder,
-buttons Save / Save As / Delete / Duplicate, with 3 default examples.
+Action Builder and Tools. Saved Automations is now a CollapsibleCard on top
+(vertical QVBoxLayout) instead of a fixed horizontal QSplitter side panel,
+to save horizontal space when the user is focused on building actions.
 
 Store file schema: {"name": str, "steps": [{"type": str, "params": dict}, ...],
 "created_at": iso, "updated_at": iso}
@@ -14,14 +15,16 @@ import re
 from pathlib import Path
 
 from PyQt5.QtWidgets import (
-    QHBoxLayout, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
-    QSplitter, QTabWidget, QVBoxLayout, QWidget, QInputDialog, QLabel
+    QListWidget, QListWidgetItem, QMessageBox, QPushButton,
+    QTabWidget, QVBoxLayout, QInputDialog, QLabel
 )
 from PyQt5.QtCore import Qt
 
 from .base import BaseView
 from .action_builder import ActionBuilderView
 from .tools import ToolsView
+from ..widgets import CollapsibleCard, FlowContainer, FlowLayout
+from ...core.config import config
 import dataforge.core.paths as _paths
 
 
@@ -156,6 +159,31 @@ def _load_all_automations() -> list[dict]:
     return out
 
 
+def _get_initial_collapsed() -> bool:
+    """Return True if Saved Automations should start collapsed.
+
+    Reads persisted state from ``config.get("ui_checkbox_states")["automations.saved_collapsed"]``
+    first, then ``collapsed_groups`` for back-compat. Default is collapsed (True) to save space.
+    """
+    try:
+        cbs = config.get("ui_checkbox_states", {}) or {}
+        if isinstance(cbs, dict) and "automations.saved_collapsed" in cbs:
+            return bool(cbs["automations.saved_collapsed"])
+        # also support alternative key without dot (defensive)
+        if isinstance(cbs, dict) and "automations_saved_collapsed" in cbs:
+            return bool(cbs["automations_saved_collapsed"])
+        # Fallback to collapsed_groups list (app.py style)
+        cg = config.get("collapsed_groups", []) or []
+        if isinstance(cg, (list, tuple, set)):
+            if "automations.saved" in cg or "Saved Automations" in cg or "automations" in cg:
+                return True
+            # if collapsed_groups exists but does not contain our key and we have no ui_checkbox_states entry,
+            # default is still collapsed True (spec default) — do not infer expanded.
+    except Exception:
+        pass
+    return True
+
+
 class AutomationsView(BaseView):
     def get_title(self):
         return "Automations"
@@ -164,91 +192,149 @@ class AutomationsView(BaseView):
         super().__init__(master, app)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setContentsMargins(6, 6, 6, 6)
+        outer.setSpacing(6)
 
-        # Top splitter: left store list, right notebook (Action Builder + Tools)
-        self.splitter = QSplitter(Qt.Horizontal, self)
-        outer.addWidget(self.splitter, 1)
+        # Top: CollapsibleCard titled "Saved Automations" (expanded=False by default)
+        initial_collapsed = _get_initial_collapsed()
+        initial_expanded = not initial_collapsed
+        self.card_saved = CollapsibleCard(self, title="Saved Automations", expanded=initial_expanded)
+        self.card_saved.setObjectName("savedAutomationsCard")
+        outer.addWidget(self.card_saved)
 
-        # Left: store panel
-        left = QWidget(self.splitter)
-        left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(6, 6, 6, 6)
-        left_layout.setSpacing(6)
+        body = self.card_saved.get_body()
+        body_layout = QVBoxLayout(body)
+        body_layout.setContentsMargins(6, 6, 6, 6)
+        body_layout.setSpacing(6)
 
-        lbl = QLabel("Saved Automations", left)
-        lbl.setStyleSheet("font-weight: bold;")
-        left_layout.addWidget(lbl)
-
-        self.list_widget = QListWidget(left)
+        # List
+        self.list_widget = QListWidget(body)
         self.list_widget.setObjectName("automationList")
-        left_layout.addWidget(self.list_widget, 1)
+        # Compact height — card hides body when collapsed, but keep expanded height reasonable
+        self.list_widget.setMinimumHeight(80)
+        self.list_widget.setMaximumHeight(180)
+        body_layout.addWidget(self.list_widget, 1)
 
-        # Buttons row 1: Save / Save As
-        row1 = QWidget(left)
-        r1 = QHBoxLayout(row1)
-        r1.setContentsMargins(0, 0, 0, 0)
-        r1.setSpacing(4)
-        self.btn_save = QPushButton("Save", row1)
+        # Buttons inside FlowContainer for wrapping (Save/Save As/Delete/Duplicate)
+        self.btn_save = QPushButton("Save", body)
         self.btn_save.setToolTip("Update selected automation with current builder steps")
         self.btn_save.clicked.connect(self._on_save)
-        r1.addWidget(self.btn_save)
-        self.btn_save_as = QPushButton("Save As", row1)
+
+        self.btn_save_as = QPushButton("Save As", body)
         self.btn_save_as.setToolTip("Save current builder as a new automation")
         self.btn_save_as.clicked.connect(self._on_save_as)
-        r1.addWidget(self.btn_save_as)
-        left_layout.addWidget(row1)
 
-        # Buttons row 2: Delete / Duplicate
-        row2 = QWidget(left)
-        r2 = QHBoxLayout(row2)
-        r2.setContentsMargins(0, 0, 0, 0)
-        r2.setSpacing(4)
-        self.btn_delete = QPushButton("Delete", row2)
+        self.btn_delete = QPushButton("Delete", body)
         self.btn_delete.setProperty("variant", "danger")
         self.btn_delete.clicked.connect(self._on_delete)
-        r2.addWidget(self.btn_delete)
-        self.btn_duplicate = QPushButton("Duplicate", row2)
-        self.btn_duplicate.clicked.connect(self._on_duplicate)
-        r2.addWidget(self.btn_duplicate)
-        left_layout.addWidget(row2)
 
-        self.lbl_store_status = QLabel("", left)
+        self.btn_duplicate = QPushButton("Duplicate", body)
+        self.btn_duplicate.clicked.connect(self._on_duplicate)
+
+        flow = FlowContainer(body)
+        flow_layout = FlowLayout(flow, margin=0, hspacing=4, vspacing=4)
+        flow_layout.addWidget(self.btn_save)
+        flow_layout.addWidget(self.btn_save_as)
+        flow_layout.addWidget(self.btn_delete)
+        flow_layout.addWidget(self.btn_duplicate)
+        body_layout.addWidget(flow)
+
+        self.lbl_store_status = QLabel("", body)
         self.lbl_store_status.setProperty("class", "muted")
         self.lbl_store_status.setWordWrap(True)
-        left_layout.addWidget(self.lbl_store_status)
+        body_layout.addWidget(self.lbl_store_status)
 
-        left.setMinimumWidth(220)
-        left.setMaximumWidth(320)
-        self.splitter.addWidget(left)
+        # Persist collapsed state on toggle — after CollapsibleCard's own toggle handler
+        try:
+            self.card_saved.btn_toggle.clicked.connect(self._on_card_toggled)
+        except Exception:
+            pass
 
-        # Right: notebook with Action Builder and Tools (preserved)
-        self.notebook = QTabWidget(self.splitter)
+        # Middle: Action Builder + Tools notebook (preserve existing tabs). Expand to fill.
+        self.notebook = QTabWidget(self)
         self.action_builder = ActionBuilderView(self.notebook, app=app)
         self.notebook.addTab(self.action_builder, "Action Builder")
 
         self.tools = ToolsView(self.notebook, app=app)
         self.notebook.addTab(self.tools, "Tools")
 
-        self.splitter.addWidget(self.notebook)
-        self.splitter.setSizes([250, 750])
-        self.splitter.setStretchFactor(0, 0)
-        self.splitter.setStretchFactor(1, 1)
-
-        # Wire selection -> load
-        self.list_widget.currentItemChanged.connect(self._on_selection_changed)
-        self.list_widget.itemDoubleClicked.connect(lambda _item: self._load_selected())
+        outer.addWidget(self.notebook, 1)
 
         # Internal state
         self._current_name: str | None = None
 
-        # Populate store (creates defaults if needed)
+        # Wire selection -> load (must work whether collapsed or not)
+        self.list_widget.currentItemChanged.connect(self._on_selection_changed)
+        self.list_widget.itemDoubleClicked.connect(lambda _item: self._load_selected())
+
+        # Populate store (creates defaults if needed) — also updates card title badge
         self._refresh_list()
 
         # Auto-select first item and load it into builder for convenience
         if self.list_widget.count() > 0:
             self.list_widget.setCurrentRow(0)
             # _on_selection_changed will load
+
+    # ------------------------------------------------------------------
+    # Collapsible persistence helpers
+    # ------------------------------------------------------------------
+    def _update_card_title(self):
+        """Update header to show count badge, e.g. 'Saved Automations (3)'."""
+        try:
+            cnt = self.list_widget.count()
+            title = f"Saved Automations ({cnt})"
+            # CollapsibleCard stores title in lbl_title and title_text
+            if hasattr(self.card_saved, "lbl_title"):
+                self.card_saved.lbl_title.setText(title)
+            if hasattr(self.card_saved, "title_text"):
+                self.card_saved.title_text = title
+        except Exception:
+            pass
+
+    def _on_card_toggled(self):
+        """Persist collapsed state via config (ui_checkbox_states + collapsed_groups)."""
+        try:
+            collapsed = not self.card_saved.is_expanded
+            cbs = config.get("ui_checkbox_states", {}) or {}
+            if not isinstance(cbs, dict):
+                cbs = {}
+            cbs["automations.saved_collapsed"] = bool(collapsed)
+            config.set("ui_checkbox_states", cbs)
+            # Also mirror into collapsed_groups for compatibility with app shell
+            cg = config.get("collapsed_groups", []) or []
+            if not isinstance(cg, list):
+                try:
+                    cg = list(cg)
+                except Exception:
+                    cg = []
+            key = "automations.saved"
+            if collapsed:
+                if key not in cg:
+                    cg.append(key)
+            else:
+                if key in cg:
+                    cg.remove(key)
+            config.set("collapsed_groups", cg)
+        except Exception:
+            pass
+
+    def _restore_collapsed_state(self):
+        """Restore collapsed/expanded from persisted config (called on mount)."""
+        try:
+            should_collapsed = _get_initial_collapsed()
+            should_expanded = not should_collapsed
+            if self.card_saved.is_expanded != should_expanded:
+                self.card_saved.toggle()
+        except Exception:
+            pass
+
+    def mount(self):
+        super().mount()
+        try:
+            self._restore_collapsed_state()
+            self._refresh_list()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Store helpers (public for tests / daemon)
@@ -277,10 +363,14 @@ class AutomationsView(BaseView):
                 if self.list_widget.item(i).text() == prev:
                     self.list_widget.setCurrentRow(i)
                     break
-        # Update status
+        # Update status and card header badge
         try:
             cnt = self.list_widget.count()
             self.lbl_store_status.setText(f"{cnt} automation(s)")
+        except Exception:
+            pass
+        try:
+            self._update_card_title()
         except Exception:
             pass
 

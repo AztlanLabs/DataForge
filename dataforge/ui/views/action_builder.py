@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 
 from .base import BaseView
+# TICK-907: toolbar already uses FlowContainer wrapping; no major layout change needed here
 from ..widgets import EnhancedTreeview, FlowLayout, FlowContainer, ElidingLabel, attach_tooltips
 from ...core.scanner import scan_directory
 from ...core.actions.base import ActionContext
