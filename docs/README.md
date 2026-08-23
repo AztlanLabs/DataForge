@@ -1,10 +1,10 @@
 # DataForge Documentation Index
 
-**Last updated:** 2026-08-23 07:00 UTC — see [`DOCUMENTATION_AUDIT_2026-08-22.md`](./DOCUMENTATION_AUDIT_2026-08-22.md) for the full audit vs. code. Wave 5 (11/11) + Wave 6 (1/1) DONE `37/37`; Wave 7 (8 tickets, 20 files) 🔜 READY.
+**Last updated:** 2026-08-23 08:00 UTC — see [`DOCUMENTATION_AUDIT_2026-08-22.md`](./DOCUMENTATION_AUDIT_2026-08-22.md) for the full audit vs. code. Wave 5 (11/11) + Wave 6 (1/1) DONE `37/37`; Wave 7 (8 tickets, 20 files) 🔜 READY.
 
 > **New (principal review):** [`CONSOLIDATED_SPEC.md`](./CONSOLIDATED_SPEC.md) is the single authoritative spec (reconciles all of `docs/` + proposals + reviews). [`PARALLEL_BACKLOG.md`](./PARALLEL_BACKLOG.md) is the DAG backlog for simultaneous agents — start there if you are picking a ticket. Generic parallel-agent prompt: [`.github/prompts/parallel-ticket-agent.prompt.md`](../.github/prompts/parallel-ticket-agent.prompt.md) — copy, set `{{TICKET_ID}}`, and run (one ticket = one branch = one PR, disjoint writes per wave).
 >
-> **Status 2026-08-23 07:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1 DONE (1213 tests) → Wave 7 🔜 READY (8 tickets: R-CORE-2/5/7, F10/F16/F21, F20 VSS, U5-U9 polish, FTS index, HTTP gateway, msi/dmg).** See `PARALLEL_BACKLOG.md` Wave 0–6 Reviews + Wave 7 Spec.
+> **Status 2026-08-23 08:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1 DONE (1213 tests) → Wave 7 🔜 READY (8 tickets) — Wave 8 🔜 READY (8 tickets: renamer, STOP, icons, cache, menus, automation, memory, hardware).** See `PARALLEL_BACKLOG.md` Wave 0–6 Reviews + Wave 7/8 Spec.
 
 ## Current truth — read these
 
@@ -20,7 +20,7 @@
 | `../README.md` | Project overview, superpowers, quick start, system-at-a-glance | Entry point |
 | `../CHANGELOG.md` | Keep-a-Changelog history | Release notes |
 
-All “current truth” docs above are green against `dataforge/` HEAD at `b373e7e` (2026-08-23 07:00 UTC, Wave 5+6 DONE). XDG migration `TICK-001` via `core/paths.py` with legacy shim, forensic engine `TICK-508` (`image_io`/`streams`/`indicators`), plugin isolation `TICK-509`, logger chain `TICK-510`, parser pool `TICK-511` all verified.
+All “current truth” docs above are green against `dataforge/` HEAD at `b373e7e` (2026-08-23 08:00 UTC, Wave 5+6 DONE). XDG migration `TICK-001` via `core/paths.py` with legacy shim, forensic engine `TICK-508` (`image_io`/`streams`/`indicators`), plugin isolation `TICK-509`, logger chain `TICK-510`, parser pool `TICK-511` all verified.
 
 ## Proposals — future architecture (partially implemented)
 

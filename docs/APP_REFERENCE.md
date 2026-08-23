@@ -1,6 +1,6 @@
 # DataForge Application Reference
 
-**Source verified:** 2026-08-23 07:00 UTC — Wave 5 (11/11) + Wave 6 (1/1) DONE, 1213 tests, Wave 7 (8 tickets) 🔜 READY + dc44be4 UI fixes (dropdown, tier, STOP, artifacts), HEAD `b373e7e`
+**Source verified:** 2026-08-23 08:00 UTC — Wave 5 (11/11) + Wave 6 (1/1) DONE, 1213 tests, Wave 7 (8 tickets) 🔜 READY + dc44be4 UI fixes (dropdown, tier, STOP, artifacts), HEAD `b373e7e`
 
 DataForge is a local-first file, storage, recovery, and system-inspection application. It has two interfaces:
 

@@ -4,9 +4,9 @@
 
 **Generic prompt:** `../parallel-ticket-agent.md` / `../../../.github/prompts/parallel-ticket-agent.prompt.md` — set `{{TICKET_ID}}`.
 
-> **Status 2026-08-23 07:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1 DONE — Wave 7 🔜 READY (8 tickets, 20 disjoint files)**
-> Wave 0 (69) + Wave 1 (126) + Wave 2 (98) + Wave 3 (130) + Wave 4 (635) + Wave 5 (142, +2 skipped) + Wave 6 (13) = 1213 tests green (all `validation_command` green, file parity verified). Wave 7 now tickets the 13 orphaned gaps (R-CORE-2/5/7, F10/F16/F20, U5-U9, F21 dedup) + 3 proposal features (FTS index, HTTP gateway, msi/dmg packaging) as 8 disjoint tickets. See `docs/PARALLEL_BACKLOG.md` Wave 0–6 Reviews (7/7) + Wave 7 Spec.
-> **Overall: 37/45 DONE (82%) — 8 remaining (Wave 7).**
+> **Status 2026-08-23 08:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1 DONE — Wave 7 🔜 READY (8 tickets, 20 disjoint) — Wave 8 🔜 READY (8 tickets, 24 disjoint)**
+> Wave 0 (69) + Wave 1 (126) + Wave 2 (98) + Wave 3 (130) + Wave 4 (635) + Wave 5 (142, +2 skipped) + Wave 6 (13) = 1213 tests green (all `validation_command` green, file parity verified). Wave 7 tickets 13 orphaned gaps + 3 proposal features (8 tickets), Wave 8 tickets next user issues (renamer, STOP, icons, cache, menus, automation, memory, hardware) as 8 disjoint tickets. See `docs/PARALLEL_BACKLOG.md` Wave 0–6 Reviews + Wave 7/8 Spec.
+> **Overall: 37/53 DONE (70%) — 16 remaining (Wave 7+8).**
 
 ## Execution Order (Wave DAG)
 
@@ -81,6 +81,19 @@
 - **TICK-707** — HTTP gateway + D-Bus/XPC/COM (NATIVE N2/N3) | depends: — | writes: `dataforge/api/transport/http_gateway.py [NEW FILE]` → [`TICK-707.prompt.md`](./TICK-707.prompt.md)
 - **TICK-708** — Packaging msi/dmg + version sync + native helper (I2+N4) | depends: — | writes: `packaging/wix/Product.wxs [NEW FILE]`, `packaging/dmg/create-dmg.sh [NEW FILE]`, `pyproject.toml`, `dataforge/__init__.py` → [`TICK-708.prompt.md`](./TICK-708.prompt.md)
 
+### Wave 8 🔜 READY 2026-08-23 — Wave 7 gate, 8 disjoint, unblocked (user-reported 2026-08-23)
+
+> **Goal:** Next user issues: bulk renamer, STOP comprehensive, view icons, cache info, context menus, automation store, UI memory, hardware crash.
+
+- **TICK-801** — Bulk Renamer update functionality | depends: — | writes: `dataforge/modules/renamer.py`, `dataforge/ui/views/tools.py` → [`TICK-801.prompt.md`](./TICK-801.prompt.md)
+- **TICK-802** — STOP comprehensive — review entire code cancel paths | depends: — | writes: `dataforge/ui/job_manager.py`, `dataforge/engine/jobs.py` → [`TICK-802.prompt.md`](./TICK-802.prompt.md)
+- **TICK-803** — Icons for forensic, file recovery, Metadata exif (weird x/?) | depends: — | writes: `dataforge/ui/resources/icons.py`, `dataforge/ui/views/forensics_view.py`, `dataforge/ui/views/recovery_view.py`, `dataforge/ui/views/metadata_view.py` → [`TICK-803.prompt.md`](./TICK-803.prompt.md)
+- **TICK-804** — Settings Performance DB Cache info + size | depends: — | writes: `dataforge/ui/views/settings.py`, `dataforge/core/cache.py`, `dataforge/modules/performance.py` → [`TICK-804.prompt.md`](./TICK-804.prompt.md)
+- **TICK-805** — Right click context menus per window | depends: — | writes: `dataforge/ui/views/base.py`, `dataforge/ui/widgets.py`, `dataforge/ui/views/search.py`, `dataforge/ui/views/storage_devices.py` → [`TICK-805.prompt.md`](./TICK-805.prompt.md)
+- **TICK-806** — Automation store custom automations | depends: — | writes: `dataforge/ui/views/automations.py`, `dataforge/ui/views/action_builder.py`, `dataforge/engine/daemon.py` → [`TICK-806.prompt.md`](./TICK-806.prompt.md)
+- **TICK-807** — Memory remember checkboxes/selections/names | depends: — | writes: `dataforge/core/config.py`, `dataforge/core/paths.py`, `dataforge/ui/views/system_cleanup.py` → [`TICK-807.prompt.md`](./TICK-807.prompt.md)
+- **TICK-808** — Hardware section crash SIGSEGV (scan comprehensive + storage + hardware) | depends: — | writes: `dataforge/ui/views/hardware_view.py`, `dataforge/modules/hardware.py`, `dataforge/ui/app.py` → [`TICK-808.prompt.md`](./TICK-808.prompt.md)
+
 ## Relevant Documentation Per Ticket
 
 Each per-ticket file now includes a **Relevant Documentation — Must Read Before Coding** section tailored to its `scope` (e.g. `UI` → `GUI_WORKFLOWS.md`, `Core` → `TECHNICAL_SOURCE_OF_TRUTH.md` + `ARCHITECTURE.md`, `Modules` → `CLI_REFERENCE.md` + module-specific GUI workflow). The generic prompt also contains a domain→docs table (`docs/prompts/parallel-ticket-agent.md` §6). Always read the listed docs before editing and update them per `CONTRIBUTING.md §8` after editing.
@@ -89,7 +102,7 @@ Each per-ticket file now includes a **Relevant Documentation — Must Read Befor
 
 ### Sequential (default, safe)
 ```
-Wave 0 (0.1→0.2→0.3→0.4→0.5) → Wave 1 (9 agents after Wave 0 green) → Wave 2 → Wave 3 → Wave 4 → Wave 5 (11 parallel) → Wave 6 (1 sequential re-entry) → Wave 7 (8 parallel) → Wave 8+ (remaining polish)
+Wave 0 (0.1→0.2→0.3→0.4→0.5) → Wave 1 (9 agents after Wave 0 green) → Wave 2 → Wave 3 → Wave 4 → Wave 5 (11 parallel) → Wave 6 (1 sequential re-entry) → Wave 7 (8 parallel) → Wave 8 (8 parallel) → Wave 9+ (STOP full sweep)
 ```
 
 ### Parallel within a Wave
