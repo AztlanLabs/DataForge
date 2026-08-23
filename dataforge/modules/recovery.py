@@ -20,6 +20,25 @@ from ..core.logger import logger
 from ..core.utils import format_size
 from .file_signatures import SIGNATURES
 
+# F20 acquire fallback — graceful if acquire module missing
+try:
+    from ..core.acquire import HAS_VSS, acquire_file  # noqa: F401
+except Exception:  # pragma: no cover
+    HAS_VSS = False
+
+    import contextlib
+
+    @contextlib.contextmanager
+    def acquire_file(path, mode="rb"):  # type: ignore[no-redef]
+        f = open(path, mode)
+        try:
+            yield f
+        finally:
+            try:
+                f.close()
+            except Exception:
+                pass
+
 
 def _get_max_workers() -> int:
     """Return adaptive thread pool size (same formula as scanner/duplicates)."""
@@ -150,7 +169,16 @@ def _scan_linux_trash(extra_paths=None, progress_callback=None, cancel_token=Non
                 if info_file.is_file():
                     try:
                         config = configparser.ConfigParser()
-                        config.read(str(info_file))
+                        # F20: use acquire_file fallback for locked trashinfo
+                        _read_ok = False
+                        try:
+                            with acquire_file(str(info_file), "r") as af:
+                                config.read_file(af)
+                                _read_ok = True
+                        except Exception:
+                            _read_ok = False
+                        if not _read_ok:
+                            config.read(str(info_file))
                         original_path = config.get("Trash Info", "Path", fallback=None)
                         date_str = config.get("Trash Info", "DeletionDate", fallback=None)
                         if date_str:
@@ -510,7 +538,8 @@ def carve_files_from_image(
         return results
 
     try:
-        with open(image_path, "rb") as f:
+        # F20: use acquire_file for locked images (VSS on Windows)
+        with acquire_file(image_path, "rb") as f:
             try:
                 mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
             except (OSError, ValueError) as exc:
@@ -535,8 +564,8 @@ def carve_files_from_image(
 
                     for fut in as_completed(futures):
                         if cancel_token and cancel_token.is_set():
-                            for f in futures:
-                                f.cancel()
+                            for _ff in futures:
+                                _ff.cancel()
                             break
 
                         ws, _ = futures[fut]

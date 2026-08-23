@@ -157,6 +157,99 @@ def _scan_single_dir(
                     continue
                 try:
                     st = entry.stat(follow_symlinks=False)
+                except PermissionError as e:
+                    # F20: try acquire_file fallback before skipping
+                    _acquired = False
+                    try:
+                        from .acquire import acquire_file  # lazy to avoid circular
+                    except Exception:
+                        acquire_file = None  # type: ignore
+                    if acquire_file is not None:
+                        try:
+                            with acquire_file(entry.path, "rb") as af:
+                                try:
+                                    fst = os.fstat(af.fileno())
+                                except Exception:
+                                    # Fallback to os.stat if fstat fails (e.g., BytesIO mock)
+                                    try:
+                                        fst = os.stat(entry.path, follow_symlinks=False)
+                                    except OSError:
+                                        fst = None  # type: ignore
+                                if fst is not None:
+                                    logger.warning(
+                                        "Permission denied for %s, acquired via fallback", entry.path
+                                    )
+                                    if on_error is not None:
+                                        try:
+                                            on_error(entry.path, e)
+                                        except Exception:
+                                            pass
+                                    files.append(
+                                        _build_from_stat(
+                                            path=entry.path,
+                                            filename=entry.name,
+                                            extension=os.path.splitext(entry.name)[1].lower(),
+                                            st=fst,
+                                        )
+                                    )
+                                    _acquired = True
+                                else:
+                                    # Fallback: build with available info (size 0)
+                                    # Create synthetic stat-like object
+                                    logger.warning(
+                                        "Acquire fallback for %s succeeded but stat unavailable, using size 0",
+                                        entry.path,
+                                    )
+                                    # Use size from file read if possible
+                                    try:
+                                        # Try to get size via seek/tell
+                                        pos = af.tell() if hasattr(af, "tell") else 0
+                                        try:
+                                            af.seek(0, os.SEEK_END)  # type: ignore
+                                            sz = af.tell()  # type: ignore
+                                            af.seek(pos)  # type: ignore
+                                        except Exception:
+                                            # Try read length
+                                            try:
+                                                data = af.read()  # type: ignore
+                                                sz = len(data) if data is not None else 0
+                                                try:
+                                                    af.seek(0)  # type: ignore
+                                                except Exception:
+                                                    pass
+                                            except Exception:
+                                                sz = 0
+                                    except Exception:
+                                        sz = 0
+                                    # Build FileEntry with synthetic values
+                                    files.append(
+                                        FileEntry(
+                                            path=entry.path,
+                                            filename=entry.name,
+                                            extension=os.path.splitext(entry.name)[1].lower(),
+                                            size=sz,
+                                            created_at=0,
+                                            modified_at=0,
+                                            is_dir=False,
+                                        )
+                                    )
+                                    _acquired = True
+                        except PermissionError as ae:
+                            logger.warning(
+                                "Acquire fallback failed for %s: %s (original: %s)", entry.path, ae, e
+                            )
+                        except OSError as ae:
+                            logger.warning(
+                                "Acquire fallback failed for %s: %s (original: %s)", entry.path, ae, e
+                            )
+                        except Exception as ae:
+                            logger.warning(
+                                "Acquire fallback error for %s: %s (original: %s)", entry.path, ae, e
+                            )
+                    if _acquired:
+                        continue
+                    _log_scan_error(entry.path, e, on_error)
+                    continue
                 except OSError as e:
                     _log_scan_error(entry.path, e, on_error)
                     continue
