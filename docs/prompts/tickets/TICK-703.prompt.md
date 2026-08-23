@@ -1,3 +1,5 @@
+> **Status: ✅ COMPLETED 2026-08-23 — Wave 7 DONE, verified (see docs/PARALLEL_BACKLOG.md Wave 7 Review). This ticket is closed — do not re-run.**
+
 # Ticket TICK-703 — F10/F16/F21: Unicode NFC/NFD + bidi, sparse, reflink dedup
 
 > **Wave 7** | **Domain:** Core / Scanner+Hasher | **Depends on:** None

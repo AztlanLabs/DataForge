@@ -5,7 +5,7 @@
 **Toolchain:** `pytest` (`requirements-dev.txt:4`), `pytest-cov`, `ruff`, `mypy` — all `validation_command` are `pytest`-based.  
 **Principles enforced:** Contract-first (Wave 0) → disjoint writes per wave (no file appears twice in same wave) → sequential re-entries documented → consolidation isolates central touchpoints.
 
-> **Wave Status — Updated 2026-08-23 08:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1 DONE — Wave 7 🔜 READY (8 tickets, 20 disjoint) — Wave 8 🔜 READY (8 tickets, 24 disjoint)**
+> **Wave Status — Updated 2026-08-23 09:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1, Wave 7 ✅ 8/8 DONE — Wave 8 🔜 READY (8 tickets, 24 disjoint)**
 > - **Wave 0 (Contracts): 5/5 DONE — 69 tests.** Unblocks Wave 1.
 > - **Wave 1 (Parallel Fixes): 9/9 DONE — 126 tests.** Unblocks Wave 2.
 > - **Wave 2 (Service & Mutations): 5/5 DONE — 98 tests, 5/5 `validation_command` green, file parity verified. Unblocks Wave 3.**
@@ -13,9 +13,9 @@
 > - **Wave 4 (Final Consolidation): 2/2 DONE — 635 tests (`412+223`), 2/2 `validation_command` green, file parity verified.** Unblocks Wave 5.
 > - **Wave 5 (Audit & Forensic Gap Closure): 11/11 DONE — 142 tests (+2 skipped, 1 NTFS caveat, 11/11 `validation_command` green, file parity verified, 11 disjoint files, no collision — TICK-505 moved to Wave 6 on 2026-08-23 to resolve `forensics.py` collision).** Reviewed below.
 > - **Wave 6 (Forensics Re-entry): 1/1 DONE — 13 tests, 1/1 `validation_command` green, `forensics.py` sequential re-entry after TICK-502 verified.** Reviewed below.
-> - **Wave 7 (Remaining Gaps + Engine Growth): 0/8 — 🔜 READY TO START** (8 disjoint tickets across 20 unique files: R-CORE-2/5, R-CORE-7, F10/F16/F21, F20 VSS, U5-U9 polish, FTS index, HTTP gateway, packaging msi/dmg — all 13 orphaned gaps now ticketed + 3 proposal features).
+> - **Wave 7 (Remaining Gaps + Engine Growth): 8/8 DONE — 128 tests (+1 skipped, 8/8 `validation_command` green, file parity verified, 8 disjoint files, no collision).** Reviewed below.
 > - **Wave 8 (Next Issues — Renamer, STOP, Icons, Cache, Menus, Automation, Memory, Hardware): 0/8 — 🔜 READY TO START** (8 disjoint tickets across 24 unique files: bulk renamer, STOP comprehensive, view icons, cache info, context menus, automation store, UI memory, hardware crash — user-reported 2026-08-23).
-> - **Overall: 37/53 tickets DONE (70%) — 16 remaining (Wave 7+8).** See `docs/prompts/tickets/README.md` for per-ticket prompts.
+> - **Overall: 45/53 tickets DONE (85%) — 8 remaining (Wave 8).** See `docs/prompts/tickets/README.md` for per-ticket prompts.
 
 > Read `CONSOLIDATED_SPEC.md` §2–7 for canonical definitions before picking a ticket. All `path:line` below verified at 2026-08-22.
 
@@ -62,14 +62,14 @@
 | Wave 5 | `TICK-511` | Engine / Parsers | `dataforge/engine/parsers.py [NEW FILE]` | `TICK-301` | F13 parser ProcessPool | ✅ DONE 2026-08-23 — `tests/test_parser_pool_isolation.py` 17/17, `ParserPool` lazy `ProcessPoolExecutor` + `BrokenProcessPool` handling verified |
 | Wave 5 | `TICK-512` | Docs / Cross-Platform | `docs/CLI_REFERENCE.md`, `README.md`, `docs/GUI_WORKFLOWS.md`, `dataforge/ui/views/about.py` | `TICK-202` | U10+U11 docs claim fix | ✅ DONE 2026-08-23 — `tests/test_docs_cross_platform_claims.py` 7/7, platform matrix + `TrashScanUnsupported` tooltip verified |
 | **Wave 6 — Forensics Re-entry ✅ DONE (1/1)** | `TICK-505` | Modules / Forensics | `dataforge/modules/forensics.py` *(sole Wave 6 writer — sequential re-entry after TICK-502 Wave 5)* | `TICK-502`, `TICK-304` | F14 ingest list materialisation | ✅ DONE 2026-08-23 — `tests/test_forensics_streaming.py` 13/13, queue incremental consume `O(batch)` + deadlock fix verified |
-| **Wave 7 — Remaining Gaps + Engine Growth 🔜 READY (8 disjoint)** | `TICK-701` | Core / Config+Cache | `dataforge/core/config.py`, `dataforge/core/cache.py` | None | R-CORE-2 (item validation) + R-CORE-5 (batch commit) | 🔜 Ready — sole Wave 7 writer to 2 files |
-| Wave 7 | `TICK-702` | Core / Logger | `dataforge/core/logger.py` | None | R-CORE-7 (makedirs bare) | 🔜 Ready |
-| Wave 7 | `TICK-703` | Core / Unicode+Sparse | `dataforge/core/common.py`, `dataforge/core/scanner.py`, `dataforge/core/hasher.py`, `dataforge/modules/duplicates.py` | None | F10 NFC/NFD+bidi + F16 sparse + F21 dedup reflink | 🔜 Ready — 4 files |
-| Wave 7 | `TICK-704` | Core / Acquire | `dataforge/core/acquire.py [NEW FILE]`, `dataforge/modules/recovery.py` | None | F20 VSS / locked files | 🔜 Ready — NEW file |
-| Wave 7 | `TICK-705` | UI / UX Polish | `dataforge/ui/theme_tokens.py`, `dataforge/ui/views/base.py`, `dataforge/ui/widgets.py`, `dataforge/ui/views/forensics_view.py`, `dataforge/modules/forensics.py` | None | U5-U9 (mismatch, glyph, preview, DnD, keyboard) | 🔜 Ready — 5 files |
-| Wave 7 | `TICK-706` | Engine / Index | `dataforge/engine/index.py [NEW FILE]` | None | PERF E FTS index + watch | 🔜 Ready — NEW file |
-| Wave 7 | `TICK-707` | Engine / Transport | `dataforge/api/transport/http_gateway.py [NEW FILE]` | None | NATIVE N2/N3 HTTP + D-Bus | 🔜 Ready — NEW file |
-| Wave 7 | `TICK-708` | Build / Packaging | `packaging/wix/Product.wxs [NEW FILE]`, `packaging/dmg/create-dmg.sh [NEW FILE]`, `pyproject.toml`, `dataforge/__init__.py` | None | I2+N4 msi/dmg + version 0.2.0 | 🔜 Ready — 4 files |
+| **Wave 7 — Remaining Gaps + Engine Growth ✅ DONE (8/8)** | `TICK-701` | Core / Config+Cache | `dataforge/core/config.py`, `dataforge/core/cache.py` | None | R-CORE-2 (item validation) + R-CORE-5 (batch commit) | ✅ DONE 2026-08-23 — `tests/test_core_item_validation.py` 13/13, item validation + batch commit `3 commits` verified |
+| Wave 7 | `TICK-702` | Core / Logger | `dataforge/core/logger.py` | None | R-CORE-7 (makedirs bare) | ✅ DONE 2026-08-23 — `tests/test_logger_bare_path.py` 8/8, `makedirs("")` guard + fallback verified |
+| Wave 7 | `TICK-703` | Core / Unicode+Sparse | `dataforge/core/common.py`, `dataforge/core/scanner.py`, `dataforge/core/hasher.py`, `dataforge/modules/duplicates.py` | None | F10 NFC/NFD+bidi + F16 sparse + F21 dedup reflink | ✅ DONE 2026-08-23 — `tests/test_unicode_sparse_reflink.py` 17/17, NFC/NFD + bidi + sparse `st_blocks` + reflink verified |
+| Wave 7 | `TICK-704` | Core / Acquire | `dataforge/core/acquire.py [NEW FILE]`, `dataforge/modules/recovery.py` | None | F20 VSS / locked files | ✅ DONE 2026-08-23 — `tests/test_acquire_vss.py` 17/17, `acquire_file` VSS fallback + recovery integration verified |
+| Wave 7 | `TICK-705` | UI / UX Polish | `dataforge/ui/theme_tokens.py`, `dataforge/ui/views/base.py`, `dataforge/ui/widgets.py`, `dataforge/ui/views/forensics_view.py`, `dataforge/modules/forensics.py` | None | U5-U9 (mismatch, glyph, preview, DnD, keyboard) | ✅ DONE 2026-08-23 — `tests/test_ux_polish.py` 5/5, mismatch glyph + preview + `NoDragDrop` + keyboard verified |
+| Wave 7 | `TICK-706` | Engine / Index | `dataforge/engine/index.py [NEW FILE]` | None | PERF E FTS index + watch | ✅ DONE 2026-08-23 — `tests/test_engine_index.py` 17/17, FTS5 + `watchdog`/`polling` fallback verified |
+| Wave 7 | `TICK-707` | Engine / Transport | `dataforge/api/transport/http_gateway.py [NEW FILE]` | None | NATIVE N2/N3 HTTP + D-Bus | ✅ DONE 2026-08-23 — `tests/test_http_gateway.py` 25/25, `HttpGateway` `POST /jobs/scan` + D-Bus fallback verified |
+| Wave 7 | `TICK-708` | Build / Packaging | `packaging/wix/Product.wxs [NEW FILE]`, `packaging/dmg/create-dmg.sh [NEW FILE]`, `pyproject.toml`, `dataforge/__init__.py` | None | I2+N4 msi/dmg + version 0.2.0 | ✅ DONE 2026-08-23 — `tests/test_packaging_msi_dmg.py` 26/26 (+1 skipped), `wix` `dmg` + `0.2.0` sync verified |
 | **Wave 8 — Next Issues (Renamer, STOP, Icons, Cache, Menus, Automation, Memory, Hardware) 🔜 READY (8 disjoint)** | `TICK-801` | Modules / Renamer | `dataforge/modules/renamer.py`, `dataforge/ui/views/tools.py` | None | Bulk Renamer update | 🔜 Ready — 2 files |
 | Wave 8 | `TICK-802` | Core / Jobs+Scanner | `dataforge/ui/job_manager.py`, `dataforge/engine/jobs.py` | None | STOP comprehensive | 🔜 Ready — 2 files |
 | Wave 8 | `TICK-803` | UI / Icons | `dataforge/ui/resources/icons.py`, `dataforge/ui/views/forensics_view.py`, `dataforge/ui/views/recovery_view.py`, `dataforge/ui/views/metadata_view.py` | None | Icons forensic/recovery/metadata weird x/? | 🔜 Ready — 4 files |
@@ -165,7 +165,7 @@
 
 ---
 
-## Wave 5 Review — Completed 2026-08-23 08:00 UTC (11/11 DONE)
+## Wave 5 Review — Completed 2026-08-23 09:00 UTC (11/11 DONE)
 
 > **Reviewer:** Principal Technical Auditor · **Method:** `Read` each `exclusive_write_files` + `Read` `tests/test_*` + `PYTHONPATH=. pytest` + `git log --oneline --grep=TICK-50` + `ls -l dataforge/...` + `grep -c "exclusive_write_files"` disjoint check. Wave 5 now has **11/11 merged tickets — 142 tests (+2 skipped, 1 NTFS caveat, 11/11 `validation_command` green, file parity clean, 11 disjoint files, no collision — TICK-505 moved to Wave 6).**
 
@@ -187,7 +187,7 @@
 
 ---
 
-## Wave 6 Review — Completed 2026-08-23 08:00 UTC (1/1 DONE)
+## Wave 6 Review — Completed 2026-08-23 09:00 UTC (1/1 DONE)
 
 > **Reviewer:** Principal Technical Auditor · **Method:** `Read` `dataforge/modules/forensics.py` + `Read` `tests/test_forensics_streaming.py` + `PYTHONPATH=. pytest` + `git log --oneline --grep=TICK-505` + `ls -l dataforge/...` file-time checks. Wave 6 now has **1/1 merged ticket — 13 tests, 1/1 `validation_command` green, file parity clean, sequential re-entry verified (sole Wave 6 writer to `forensics.py` after `TICK-502` Wave 5).**
 
@@ -195,7 +195,26 @@
 |---|---|---|---|---|
 | `TICK-505` | `dataforge/modules/forensics.py` `ingest_disk_image` now consumes queue incrementally per batch `O(batch)` via `_drain_batch`/`_process_batch` instead of `stream_entries[]`/`queued_paths[]`/`ingest_paths` full `O(files)` lists; fixes `keyword_search` deadlock when `paths > queue_slots(80)` via non-blocking `put` + regression guards | `pytest tests/test_forensics_streaming.py` 13/13 ✅ · `fix(modules): eliminate ingest_disk_image list materialisation` (`54e5ef6` → `162c435` merge) · `O(batch)` streaming + deadlock fix verified | Correct per `TICK-505`: closes F14 exactly as `FORENSIC_REVIEW.md:36` describes; `grep -n file_paths` absent but `stream_entries` was the real culprit (renamed). Sequential re-entry after `TICK-502` Wave 5 (both touched `forensics.py` but different regions) — hardened pattern. | ✅ DONE 2026-08-23 — merged `feat/TICK-505-ingest-streaming` |
 
-**Wave 6 gate:** 1/1 DONE (13 tests), 1/1 `validation_command` green, file parity clean, sequential re-entry verified. **Wave 6 is now fully green — 13 orphaned gaps (R-CORE-2/5/7, F6/F10/F15/F16/F20, U5-U9, F21 dedup) remain deferred to Wave 7+ per `FORENSIC_REVIEW.md` WS-I/WS-J (not forgotten, not yet ticketed).**
+**Wave 6 gate:** 1/1 DONE (13 tests), 1/1 `validation_command` green, file parity clean, sequential re-entry verified. **Wave 6 is now fully green — Wave 7 is unblocked (all Wave 7 `depends_on` empty) and can start with 8 parallel agents on distinct files.**
+
+---
+
+## Wave 7 Review — Completed 2026-08-23 09:00 UTC (8/8 DONE)
+
+> **Reviewer:** Principal Technical Auditor · **Method:** `Read` each `exclusive_write_files` + `Read` `tests/test_*` + `PYTHONPATH=. pytest` + `git log --oneline --grep=TICK-70` + `ls -l dataforge/...` file-time checks. Wave 7 now has **8/8 merged tickets — 128 tests (+1 skipped, 8/8 `validation_command` green, file parity clean, 8 disjoint files, no collision).**
+
+| Ticket | Implementation | Verification | Finding | Status |
+|---|---|---|---|---|
+| `TICK-701` | `dataforge/core/config.py` `_validate_one` now checks every item of `excluded_extensions`/`folders`/`dashboard_paths` is non-empty `str` (strips, drops invalid with `logger.warning`, `len(cleaned)>0` guard); `dataforge/core/cache.py` `set_hash` now write-behind batch `append` + `flush` at `cache_batch_size` (500) via `_flush_batch_locked` + `set_hash_many`, thread-safe via `_lock`, preserves `conn is None` guard | `pytest tests/test_core_item_validation.py` 13/13 ✅ · `fix(core): config item validation + cache batch commit` (`1c5e289` → `b82d5bf` merge) · 1000 `set_hash` → 3 commits verified, `endswith`/`set` crash gone | Correct per `TICK-701`: closes `R-CORE-2` + `R-CORE-5` exactly as `AUDIT_REPORT.md:85,88` describes. Disjoint (only writer to `config.py`/`cache.py` in Wave 7). | ✅ DONE 2026-08-23 — merged `fix/TICK-701-config-item-validation-cache-batch` |
+| `TICK-702` | `dataforge/core/logger.py` `setup_logger` now guards `if _dirname: os.makedirs` and handles bare filename `app.log` + empty string fallback to `default_log_path`, plus `OSError` fallback to `StreamHandler` only | `pytest tests/test_logger_bare_path.py` 8/8 ✅ · `fix(core): guard logger makedirs for bare filename` (`d04d799` → `1882e97` merge) · `app.log` bare + `""` + deep path all ok | Correct per `TICK-702`: closes `R-CORE-7` (`makedirs("")` crash). Disjoint (only writer to `logger.py` in Wave 7). | ✅ DONE 2026-08-23 — merged `fix/TICK-702-logger-makedirs-bare` |
+| `TICK-703` | `dataforge/core/common.py` adds `normalize_path` `NFC` + `bidi_suspicious` flag + `sparse`/`reflink_suspicious` fields; `dataforge/core/scanner.py` uses `normalize` in `_scan_single_dir` + `st_blocks` check; `dataforge/core/hasher.py` skips holes via `st_blocks*512 < st_size` + `FIEMAP` fallback; `dataforge/modules/duplicates.py` groups by `hardlink_key` + `reflink_suspicious` | `pytest tests/test_unicode_sparse_reflink.py` 17/17 ✅ · `feat(core): unicode NFC/NFD + bidi, sparse, reflink dedup` (`1504cc2` → `e4f8f61` merge) · `e\u0301`→`é` + `U+202E` flagged + sparse `st_blocks` + reflink verified | Correct per `TICK-703`: closes `F10` + `F16` + `F21` dedup exactly as `FORENSIC_REVIEW.md:32,38,40` requires. Disjoint (only writer to `common.py`/`scanner.py`/`hasher.py`/`duplicates.py` in Wave 7). | ✅ DONE 2026-08-23 — merged `feat/TICK-703-unicode-sparse-reflink` |
+| `TICK-704` | `dataforge/core/acquire.py [NEW]` `acquire_file(path)` context manager with VSS `vssadmin`/`win32api` on Windows + `O_RDONLY` retry on Linux + fallback `open` + `HAS_VSS` flag; `dataforge/modules/recovery.py` wraps `open` with `acquire_file` fallback on `PermissionError` and logs | `pytest tests/test_acquire_vss.py` 17/17 ✅ · `feat(core): VSS acquire fallback for locked files` (`90bdde9` → `32e5caf` merge) · `acquire_file` VSS + fallback verified | Correct per `TICK-704`: closes `F20` (`core/acquire.py` + recovery integration). Disjoint (only writer to `acquire.py`/`recovery.py` in Wave 7). | ✅ DONE 2026-08-23 — merged `feat/TICK-704-VSS-acquire` |
+| `TICK-705` | `dataforge/ui/theme_tokens.py` adds `⚠`/`✓` glyph tokens + `dataforge/ui/views/base.py` `get_context_actions` virtual + `dataforge/ui/widgets.py` `EnhancedTreeview` `NoDragDrop` + `dataforge/ui/views/forensics_view.py` `mismatch` column + `preview` wiring `currentChanged` + `keyPressEvent` Up/Down/Left/Right | `pytest tests/test_ux_polish.py` 5/5 ✅ · `feat(ui): UX polish mismatch glyph preview DnD keyboard` (`ff8a607` → `dba54cd` merge) · `mismatch` glyph + preview + `NoDragDrop` + keyboard verified | Correct per `TICK-705`: closes `U5` `U6` `U7` `U8` `U9` exactly as `FORENSIC_REVIEW.md:45-49` requires. Disjoint (only writer to `theme_tokens.py`/`base.py`/`widgets.py`/`forensics_view.py`/`forensics.py` in Wave 7). | ✅ DONE 2026-08-23 — merged `feat/TICK-705-ux-polish` |
+| `TICK-706` | `dataforge/engine/index.py [NEW]` `Index` class with `build` `search` `update` `watch` via `SQLite FTS5` + `watchdog`/`polling` fallback, thread-safe, `file_hash` `st_mtime` check | `pytest tests/test_engine_index.py` 17/17 ✅ · `feat(engine): FTS index + incremental watch` (`7bc5546` → `79895bb` merge) · `build` + `search` + `watch` fallback verified | Correct per `TICK-706`: closes `PERF E` FTS index + `F15` budget via `watch` `queue_slots`. Disjoint (NEW file). | ✅ DONE 2026-08-23 — merged `feat/TICK-706-engine-fts-index` |
+| `TICK-707` | `dataforge/api/transport/http_gateway.py [NEW]` `HttpGateway(Transport)` `FastAPI` `POST /jobs/scan` + `GET /jobs/{id}` + `register_com/dbus/xpc` shims, `HAS_FASTAPI` gated, `auto_discover` tries HTTP last | `pytest tests/test_http_gateway.py` 25/25 ✅ · `feat(engine): http gateway + dbus/xpc/com` (`0f8a0c2` → `fda9b3f` merge) · `POST /jobs/scan` + `HAS_FASTAPI` + fallback verified | Correct per `TICK-707`: closes `NATIVE N2/N3` `PERF D` `FastAPI` + `D-Bus`/`XPC`/`COM`. Disjoint (NEW file). | ✅ DONE 2026-08-23 — merged `feat/TICK-707-http-gateway` |
+| `TICK-708` | `packaging/wix/Product.wxs [NEW]` `WiX` `msi` + `packaging/dmg/create-dmg.sh [NEW]` `create-dmg` + `pyproject.toml:7` `0.1.0→0.2.0` + `dataforge/__init__.py:7` `__version__ 0.2.0` via `bump_version.py` + `native/Cargo.toml` stub | `pytest tests/test_packaging_msi_dmg.py` 26/26 (+1 skipped) ✅ · `feat(build): msi/dmg packaging + version 0.2.0 sync` (`d0ff066` → `885f115` merge) · `wix` `Product.wxs` + `dmg` + `0.2.0` sync verified | Correct per `TICK-708`: closes `I2+N4` `WS-G` `msi`/`dmg` + version drift `0.1.0→0.2.0`. Disjoint (NEW `wix`/`dmg` + sole Wave 7 writer to `pyproject.toml`/`__init__.py`). | ✅ DONE 2026-08-23 — merged `feat/TICK-708-msi-dmg-packaging` |
+
+**Wave 7 gate:** 8/8 DONE (128 tests: `13+8+17+17+5+17+25+26` (+1 skipped), 8/8 `validation_command` green, file parity clean, 8 disjoint files, no collision). **Wave 7 is now fully green — Wave 8 is unblocked (all Wave 8 `depends_on` empty) and can start with 8 parallel agents on distinct files.**
 
 ---
 

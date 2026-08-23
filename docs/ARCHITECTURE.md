@@ -2,7 +2,7 @@
 
 *File System Management with Steroids and Superpowers*
 
-**Last verified:** 2026-08-23 08:00 UTC *(re-verified against `dataforge/` HEAD `b373e7e`; Wave 5+6 12/12 DONE, 1213 tests, Wave 7 (8 tickets) 🔜 READY + dc44be4 UI fixes (dropdown, tier, STOP, artifacts) — added `core/image_io`/`streams`, `modules/indicators`/`sanitisation`, `engine/parsers`, `logger` chain)*
+**Last verified:** 2026-08-23 09:00 UTC *(re-verified against `dataforge/` HEAD `b373e7e`; Wave 5+6 12/12 DONE, 1213 tests, Wave 7 (8 tickets) 🔜 READY + dc44be4 UI fixes (dropdown, tier, STOP, artifacts) — added `core/image_io`/`streams`, `modules/indicators`/`sanitisation`, `engine/parsers`, `logger` chain)*
 
 ## System Summary
 

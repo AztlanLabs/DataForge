@@ -4,9 +4,9 @@
 
 **Generic prompt:** `../parallel-ticket-agent.md` / `../../../.github/prompts/parallel-ticket-agent.prompt.md` — set `{{TICKET_ID}}`.
 
-> **Status 2026-08-23 08:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1 DONE — Wave 7 🔜 READY (8 tickets, 20 disjoint) — Wave 8 🔜 READY (8 tickets, 24 disjoint)**
-> Wave 0 (69) + Wave 1 (126) + Wave 2 (98) + Wave 3 (130) + Wave 4 (635) + Wave 5 (142, +2 skipped) + Wave 6 (13) = 1213 tests green (all `validation_command` green, file parity verified). Wave 7 tickets 13 orphaned gaps + 3 proposal features (8 tickets), Wave 8 tickets next user issues (renamer, STOP, icons, cache, menus, automation, memory, hardware) as 8 disjoint tickets. See `docs/PARALLEL_BACKLOG.md` Wave 0–6 Reviews + Wave 7/8 Spec.
-> **Overall: 37/53 DONE (70%) — 16 remaining (Wave 7+8).**
+> **Status 2026-08-23 09:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1, Wave 7 ✅ 8/8 DONE — Wave 8 🔜 READY (8 tickets, 24 disjoint)**
+> Wave 0 (69) + Wave 1 (126) + Wave 2 (98) + Wave 3 (130) + Wave 4 (635) + Wave 5 (142, +2 skipped) + Wave 6 (13) + Wave 7 (128, +1 skipped) = 1341 tests green (all `validation_command` green, file parity verified). Wave 7 closed 13 orphaned gaps + 3 proposal features (8/8), Wave 8 now ready for 8 next user issues (renamer, STOP, icons, cache, menus, automation, memory, hardware). See `docs/PARALLEL_BACKLOG.md` Wave 0–7 Reviews (8/8) + Wave 8 Spec.
+> **Overall: 45/53 DONE (85%) — 8 remaining (Wave 8).**
 
 ## Execution Order (Wave DAG)
 
@@ -68,18 +68,16 @@
 
 - **TICK-505** ✅ DONE 2026-08-23 — Fix ingest_disk_image list materialisation (F14) | depends: "TICK-502", "TICK-304" | writes: `dataforge/modules/forensics.py` *(sole Wave 6 writer — sequential re-entry after TICK-502 Wave 5)* → [`TICK-505.prompt.md`](./TICK-505.prompt.md)
 
-### Wave 7 🔜 READY 2026-08-23 — Wave 6 ✅ 1/1 gate green, 8 disjoint, unblocked
+### Wave 7 ✅ DONE 2026-08-23 09:00 UTC (8/8 — 128 tests, +1 skipped, 8/8 validation_command green)
 
-> **Goal:** Close the 13 orphaned gaps now ticketed + 3 proposal features (FTS index, HTTP gateway, msi/dmg). 8 tickets, 20 unique files — verified disjoint.
-
-- **TICK-701** — R-CORE-2/5: config item validation + cache batch commit | depends: — | writes: `dataforge/core/config.py`, `dataforge/core/cache.py` → [`TICK-701.prompt.md`](./TICK-701.prompt.md)
-- **TICK-702** — R-CORE-7: logger makedirs bare filename guard | depends: — | writes: `dataforge/core/logger.py` → [`TICK-702.prompt.md`](./TICK-702.prompt.md)
-- **TICK-703** — F10/F16/F21: Unicode NFC/NFD + bidi, sparse, reflink dedup | depends: — | writes: `dataforge/core/common.py`, `dataforge/core/scanner.py`, `dataforge/core/hasher.py`, `dataforge/modules/duplicates.py` → [`TICK-703.prompt.md`](./TICK-703.prompt.md)
-- **TICK-704** — F20: locked/in-use files skipped (VSS / acquire) | depends: — | writes: `dataforge/core/acquire.py [NEW FILE]`, `dataforge/modules/recovery.py` → [`TICK-704.prompt.md`](./TICK-704.prompt.md)
-- **TICK-705** — U5-U9: UX polish — mismatch, glyph, preview, DnD, keyboard | depends: — | writes: `dataforge/ui/theme_tokens.py`, `dataforge/ui/views/base.py`, `dataforge/ui/widgets.py`, `dataforge/ui/views/forensics_view.py`, `dataforge/modules/forensics.py` → [`TICK-705.prompt.md`](./TICK-705.prompt.md)
-- **TICK-706** — Engine FTS index + incremental watch (PERF E) | depends: — | writes: `dataforge/engine/index.py [NEW FILE]` → [`TICK-706.prompt.md`](./TICK-706.prompt.md)
-- **TICK-707** — HTTP gateway + D-Bus/XPC/COM (NATIVE N2/N3) | depends: — | writes: `dataforge/api/transport/http_gateway.py [NEW FILE]` → [`TICK-707.prompt.md`](./TICK-707.prompt.md)
-- **TICK-708** — Packaging msi/dmg + version sync + native helper (I2+N4) | depends: — | writes: `packaging/wix/Product.wxs [NEW FILE]`, `packaging/dmg/create-dmg.sh [NEW FILE]`, `pyproject.toml`, `dataforge/__init__.py` → [`TICK-708.prompt.md`](./TICK-708.prompt.md)
+- **TICK-701** ✅ DONE 2026-08-23 — R-CORE-2/5: config item validation + cache batch commit | depends: — | writes: `dataforge/core/config.py`, `dataforge/core/cache.py` → [`TICK-701.prompt.md`](./TICK-701.prompt.md)
+- **TICK-702** ✅ DONE 2026-08-23 — R-CORE-7: logger makedirs bare filename guard | depends: — | writes: `dataforge/core/logger.py` → [`TICK-702.prompt.md`](./TICK-702.prompt.md)
+- **TICK-703** ✅ DONE 2026-08-23 — F10/F16/F21: Unicode NFC/NFD + bidi, sparse, reflink dedup | depends: — | writes: `dataforge/core/common.py`, `dataforge/core/scanner.py`, `dataforge/core/hasher.py`, `dataforge/modules/duplicates.py` → [`TICK-703.prompt.md`](./TICK-703.prompt.md)
+- **TICK-704** ✅ DONE 2026-08-23 — F20: locked/in-use files skipped (VSS / acquire) | depends: — | writes: `dataforge/core/acquire.py [NEW FILE]`, `dataforge/modules/recovery.py` → [`TICK-704.prompt.md`](./TICK-704.prompt.md)
+- **TICK-705** ✅ DONE 2026-08-23 — U5-U9: UX polish — mismatch, glyph, preview, DnD, keyboard | depends: — | writes: `dataforge/ui/theme_tokens.py`, `dataforge/ui/views/base.py`, `dataforge/ui/widgets.py`, `dataforge/ui/views/forensics_view.py`, `dataforge/modules/forensics.py` → [`TICK-705.prompt.md`](./TICK-705.prompt.md)
+- **TICK-706** ✅ DONE 2026-08-23 — Engine FTS index + incremental watch (PERF E) | depends: — | writes: `dataforge/engine/index.py [NEW FILE]` → [`TICK-706.prompt.md`](./TICK-706.prompt.md)
+- **TICK-707** ✅ DONE 2026-08-23 — HTTP gateway + D-Bus/XPC/COM (NATIVE N2/N3) | depends: — | writes: `dataforge/api/transport/http_gateway.py [NEW FILE]` → [`TICK-707.prompt.md`](./TICK-707.prompt.md)
+- **TICK-708** ✅ DONE 2026-08-23 — Packaging msi/dmg + version sync + native helper (I2+N4) | depends: — | writes: `packaging/wix/Product.wxs [NEW FILE]`, `packaging/dmg/create-dmg.sh [NEW FILE]`, `pyproject.toml`, `dataforge/__init__.py` → [`TICK-708.prompt.md`](./TICK-708.prompt.md)
 
 ### Wave 8 🔜 READY 2026-08-23 — Wave 7 gate, 8 disjoint, unblocked (user-reported 2026-08-23)
 

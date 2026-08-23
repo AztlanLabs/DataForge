@@ -438,7 +438,11 @@ class DataForgeApp(QMainWindow):
         # QGraphicsOpacityEffect on every view forces offscreen pixmap
         # composition and breaks QComboBox popup geometry (QTBUG-80786:
         # popup at 0,0 / top-right when ancestor has effect). No effect at
-        # rest means popups map correctly and paint is faster.
+        # rest means popups map correctly and paint is faster. Views are
+        # made opaque so crossfade does not show previous view/desktop
+        # through semi-transparent new view (visual glitch 2026-08-23).
+        view_instance.setAttribute(Qt.WA_StyledBackground, True)
+        view_instance.setAutoFillBackground(True)
         self.content_stack.addWidget(view_instance)
         self.views[title] = view_instance
 
@@ -531,10 +535,13 @@ class DataForgeApp(QMainWindow):
 
             # Collapse state
             is_collapsed = (group_name in collapsed_groups)
-            arrow = "▶ " if is_collapsed else "▼ "
 
-            # Group Header Button
-            header_btn = QPushButton(f"{arrow}{group_name.upper()}", self.nav_btn_widget)
+            # Group Header Button — icon only (2e.7 chevron), no text triangle.
+            # The old "▶"/"▼" text arrow is removed; the SVG icon via
+            # _apply_button_icon is the single source for expand/collapse
+            # glyph (TONE-aware, AA contrast). Keeps header clean and avoids
+            # double-glyph (text + icon) reported as bug.
+            header_btn = QPushButton(group_name.upper(), self.nav_btn_widget)
             header_btn.setObjectName("groupHeader")
             color = HEADER_COLORS[theme_key].get(group_name, "#6b7280")
             header_btn.setStyleSheet(f"color: {color};")
@@ -615,11 +622,11 @@ class DataForgeApp(QMainWindow):
 
         config.set("collapsed_groups", collapsed_groups)
 
-        # Update text/arrow
+        # Update header — text only (icon is the glyph, no triangle)
         is_dark = self.theme_chk.isChecked()
         theme_key = "dark" if is_dark else "light"
         color = HEADER_COLORS[theme_key].get(group_name, "#6b7280")
-        header_button.setText(f"{'▶' if is_collapsed else '▼'}  {group_name.upper()}")
+        header_button.setText(group_name.upper())
         header_button.setStyleSheet(f"color: {color};")
         # 2e.7 — swap the chevron icon to match the new state.
         self._apply_button_icon(header_button, "expand" if is_collapsed else "collapse")
@@ -631,17 +638,34 @@ class DataForgeApp(QMainWindow):
         container = self.group_containers.get(group_name)
         if container is not None:
             if is_collapsed:
-                container.setVisible(True)
-                self._animate_max_height(container, container.maximumHeight(), 0, restore_to=None)
+                # Collapsing: animate maxHeight to 0, then hide to remove from layout
+                # Keep visible during animation so height animates, hide on finished
+                def _hide_on_collapsed_finished(anim=None, w=container):
+                    try:
+                        w.setVisible(False)
+                    except RuntimeError:
+                        pass
+
+                anim = self._animate_max_height(container, container.maximumHeight(), 0, restore_to=None)
+                if anim is not None:
+                    # Hook hide after animation (if reduced motion, anim is None and we hide immediately)
+                    try:
+                        anim.finished.connect(lambda w=container: w.setVisible(False))
+                    except RuntimeError:
+                        container.setVisible(False)
+                else:
+                    container.setVisible(False)
             else:
+                # Expanding: make visible before animating to target height
+                container.setVisible(True)
+                # Ensure layout recalculates before measuring target
+                container.adjustSize()
                 target = max(container.sizeHint().height(), container.minimumSizeHint().height())
                 if target <= 0:
-                    # sizeHint not yet realised — give the layout a turn
-                    container.adjustSize()
-                    target = max(container.sizeHint().height(), container.minimumSizeHint().height())
+                    target = 200  # fallback reasonable height
                 self._animate_max_height(
                     container,
-                    container.maximumHeight(),
+                    0,
                     target,
                     restore_to=16777215,
                 )
@@ -657,7 +681,8 @@ class DataForgeApp(QMainWindow):
 
         When :attr:`_reduce_motion` is True, the animation runs with a
         zero duration so the constraint snaps to its end value
-        immediately (2e.3)."""
+        immediately (2e.3). Returns the animation for caller to hook
+        finished."""
         anim = QPropertyAnimation(widget, b"maximumHeight")
         anim.setDuration(0 if getattr(self, "_reduce_motion", False) else self.SIDEBAR_ANIM_MS)
         anim.setEasingCurve(self.ANIM_EASING)
@@ -668,6 +693,7 @@ class DataForgeApp(QMainWindow):
         self._active_animations.append(anim)
         anim.finished.connect(lambda a=anim: self._drop_finished_animation(a))
         anim.start()
+        return anim
 
     def apply_motion_preference(self, reduce_motion: bool) -> None:
         """Update :attr:`_reduce_motion` at runtime (2e.3).
