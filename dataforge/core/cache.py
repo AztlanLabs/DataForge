@@ -108,6 +108,8 @@ class CacheManager:
         return self._pending_migrations
 
     def get_hash(self, path, size, mtime, algo='md5'):
+        if self.conn is None:
+            return None
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute(
@@ -118,6 +120,8 @@ class CacheManager:
             return row[0] if row else None
 
     def set_hash(self, path, size, mtime, hash_val, algo='md5'):
+        if self.conn is None:
+            return
         try:
             with self._lock:
                 self.conn.execute(
@@ -129,6 +133,8 @@ class CacheManager:
             logger.error(f"Failed to cache hash for {path}: {e}")
 
     def set_hash_many(self, rows: List[tuple[str, int, float, str, str]]) -> None:
+        if self.conn is None:
+            return None
         if not isinstance(rows, list):
             raise TypeError("rows must be a list of tuples")
         for idx, row in enumerate(rows):
@@ -161,6 +167,8 @@ class CacheManager:
         return None
 
     def clear(self):
+        if self.conn is None:
+            return
         try:
             with self._lock:
                 self.conn.execute("DELETE FROM file_hashes")

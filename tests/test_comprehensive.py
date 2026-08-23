@@ -425,7 +425,9 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cfg.data["hash_algorithm"], "sha256")
         self.assertEqual(cfg.data["max_thread_workers"], ConfigManager.DEFAULT_CONFIG["max_thread_workers"])
         self.assertEqual(cfg.data["log_level"], ConfigManager.DEFAULT_CONFIG["log_level"])
-        self.assertNotIn("totally_unknown_key", cfg.data)
+        # R-CORE-3 fix: unknown keys are now preserved (e.g., collapsed_groups)
+        self.assertIn("totally_unknown_key", cfg.data)
+        self.assertEqual(cfg.data["totally_unknown_key"], "value")
         self.assertEqual(cfg.data["theme"], "midnight")
 
 
