@@ -10,10 +10,26 @@ _VALID_SIZE_UNITS = {"Auto", "Bytes", "KB", "MB", "GB"}
 _VALID_PATH_MODES = {"full", "relative"}
 _VALID_TIERS = {"Simple", "Standard", "Everything"}
 
+# Transient / sensitive keys that must never be persisted (TICK-807)
+_TRANSIENT_KEYS = {"progress", "transient_progress", "transient", "file_list", "one_off_file_list", "sensitive_paths"}
+_TRANSIENT_PREFIXES = ("transient_", "progress_", "password_")
+
+
+def _is_transient_key(key: str) -> bool:
+    if key in _TRANSIENT_KEYS:
+        return True
+    for prefix in _TRANSIENT_PREFIXES:
+        if key.startswith(prefix):
+            return True
+    # sensitive password tool paths
+    if "password" in key.lower() and "tool" in key.lower():
+        return True
+    return False
+
 # ---------------------------------------------------------------------------
 # Schema versioning — INSTALL_UPGRADE_LIFECYCLE §7.1
 # ---------------------------------------------------------------------------
-CONFIG_SCHEMA_VERSION: int = 2
+CONFIG_SCHEMA_VERSION: int = 3
 
 
 def _cpu_count() -> int:
@@ -46,8 +62,32 @@ def _migrate_v1_to_v2(data: dict) -> dict:
     return migrated
 
 
+def _migrate_v2_to_v3(data: dict) -> dict:
+    """Migrate config from schema v2 to v3 — add UI memory keys (TICK-807).
+
+    New keys are additive; existing values are preserved. Transient keys are not added.
+    """
+    migrated = dict(data)
+    migrated["_schema_version"] = 3
+    if "ui_last_paths" not in migrated:
+        migrated["ui_last_paths"] = {}
+    if "ui_checkbox_states" not in migrated:
+        migrated["ui_checkbox_states"] = {}
+    if "ui_filter_names" not in migrated:
+        migrated["ui_filter_names"] = {}
+    if "ui_recent_searches" not in migrated:
+        migrated["ui_recent_searches"] = []
+    # Additional UI memory that is worth storing (window geometry, recent automations)
+    if "ui_recent_automations" not in migrated:
+        migrated["ui_recent_automations"] = []
+    if "window_geometry" not in migrated:
+        migrated["window_geometry"] = {}
+    return migrated
+
+
 MIGRATIONS: Dict[int, Callable[[dict], dict]] = {
     1: _migrate_v1_to_v2,
+    2: _migrate_v2_to_v3,
 }
 
 
@@ -72,6 +112,13 @@ class ConfigManager:
         "ui_reduce_motion": False,
         "hash_block_size": 1 << 20,
         "cache_batch_size": 1000,
+        # TICK-807 — UI memory (persisted across restarts)
+        "ui_last_paths": {},  # dict view_name -> last used path string
+        "ui_checkbox_states": {},  # dict "view.checkbox_name" -> bool
+        "ui_filter_names": {},  # dict view -> filter string
+        "ui_recent_searches": [],  # list of recent search strings
+        "ui_recent_automations": [],  # list of recent automation/workflow names
+        "window_geometry": {},  # dict with geometry state (x, y, w, h)
         "_schema_version": CONFIG_SCHEMA_VERSION,
     }
 
@@ -186,13 +233,17 @@ class ConfigManager:
         for key, default_val in self.DEFAULT_CONFIG.items():
             if key not in loaded:
                 continue
+            if _is_transient_key(key):
+                continue
             val = loaded[key]
             if not self._validate_one(key, val, default_val):
                 continue
             self.data[key] = val
-        # Preserve unknown keys (user-defined, plugins, collapsed_groups, etc.)
+        # Preserve unknown keys (user-defined, plugins, collapsed_groups, etc.) but exclude transient
         for key, val in loaded.items():
             if key not in self.DEFAULT_CONFIG:
+                if _is_transient_key(key):
+                    continue
                 self.data[key] = val
 
     def _validate_one(self, key: str, val: Any, default: Any) -> bool:
@@ -250,13 +301,78 @@ class ConfigManager:
             return isinstance(val, str) and len(val) > 0
         if key == "duplicate_default_keep_strategy":
             return isinstance(val, str)
+        if key in ("ui_last_paths", "ui_filter_names"):
+            if not isinstance(val, dict):
+                return False
+            # clean: keep str->str only, drop invalid
+            cleaned = {str(k): str(v) for k, v in val.items() if isinstance(k, str) and isinstance(v, str) and v.strip()}
+            # replace in place if needed
+            try:
+                val.clear()
+                val.update(cleaned)
+            except Exception:
+                pass
+            return True
+        if key == "ui_checkbox_states":
+            if not isinstance(val, dict):
+                return False
+            cleaned = {}
+            for k, v in val.items():
+                if not isinstance(k, str):
+                    continue
+                if isinstance(v, bool):
+                    cleaned[str(k)] = bool(v)
+                elif isinstance(v, int):
+                    cleaned[str(k)] = int(v)
+            try:
+                val.clear()
+                val.update(cleaned)
+            except Exception:
+                pass
+            return True
+        if key == "window_geometry":
+            if not isinstance(val, dict):
+                return False
+            cleaned = {}
+            for k, v in val.items():
+                if not isinstance(k, str):
+                    continue
+                if isinstance(v, int):
+                    cleaned[k] = v
+                elif isinstance(v, dict):
+                    # nested geometry like {"x": 100, "y": 100}
+                    inner = {ik: iv for ik, iv in v.items() if isinstance(ik, str) and isinstance(iv, int)}
+                    if inner:
+                        cleaned[k] = inner
+            try:
+                val.clear()
+                val.update(cleaned)
+            except Exception:
+                pass
+            return True
+        if key in ("ui_recent_searches", "ui_recent_automations"):
+            if not isinstance(val, list):
+                return False
+            cleaned = [str(x).strip() for x in val if isinstance(x, str) and str(x).strip()]
+            # cap at 100 recent items
+            if len(cleaned) > 100:
+                cleaned = cleaned[:100]
+            try:
+                val[:] = cleaned  # type: ignore[index]
+            except Exception:
+                pass
+            return True
+        if _is_transient_key(key):
+            return False
         return isinstance(val, type(default))
 
     def save(self):
         try:
             os.makedirs(self.config_dir, exist_ok=True)
+            # Exclude transient keys from persistence (TICK-807)
+            to_save = {k: v for k, v in self.data.items() if not _is_transient_key(k)}
             with open(self.config_file, 'w') as f:
-                json.dump(self.data, f, indent=4)
+                json.dump(to_save, f, indent=4)
         except OSError as e:
             logger.error(f"Failed to save config: {e}")
 

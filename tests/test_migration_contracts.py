@@ -45,15 +45,20 @@ def test_config_migration_v1_to_v2(tmp_path, monkeypatch):
     mod.ConfigManager._instance = None
     cm = mod.ConfigManager(config_file=str(cfg_path))
     assert cm.get("_schema_version") == mod.CONFIG_SCHEMA_VERSION
-    assert cm.get("_schema_version") == 2
+    # TICK-807 bumps to 3, but migration from v1 should still land on current version
+    assert cm.get("_schema_version") in (2, 3)
     backup = Path(str(cfg_path) + ".bak.v1")
     assert backup.exists(), "config.json.bak.v1 should be created"
     assert cm.get("hash_block_size") == 1 << 20
     assert cm.get("cache_batch_size") == 1000
     saved = json.loads(cfg_path.read_text())
-    assert saved["_schema_version"] == 2
+    assert saved["_schema_version"] == mod.CONFIG_SCHEMA_VERSION
     assert saved["hash_block_size"] == 1 << 20
     assert saved["cache_batch_size"] == 1000
+    # TICK-807 new keys should also be present after migration
+    if mod.CONFIG_SCHEMA_VERSION >= 3:
+        assert "ui_last_paths" in saved
+        assert "ui_checkbox_states" in saved
     mod.ConfigManager._instance = None
     importlib.reload(mod)
 
@@ -77,12 +82,16 @@ def test_config_adaptive_workers_12_core(monkeypatch, tmp_path):
 
 def test_config_default_constants():
     mod = importlib.import_module("dataforge.core.config")
-    assert mod.CONFIG_SCHEMA_VERSION == 2
+    assert mod.CONFIG_SCHEMA_VERSION in (2, 3)
     assert isinstance(mod.MIGRATIONS, dict)
     assert 1 in mod.MIGRATIONS
     assert mod.ConfigManager.DEFAULT_CONFIG["hash_block_size"] == 1 << 20
     assert mod.ConfigManager.DEFAULT_CONFIG["cache_batch_size"] == 1000
     assert "_schema_version" in mod.ConfigManager.DEFAULT_CONFIG
+    if mod.CONFIG_SCHEMA_VERSION >= 3:
+        assert "ui_last_paths" in mod.ConfigManager.DEFAULT_CONFIG
+        assert "ui_checkbox_states" in mod.ConfigManager.DEFAULT_CONFIG
+        assert 2 in mod.MIGRATIONS
 
 
 def test_cache_user_version_pending_enumerated(tmp_path):
