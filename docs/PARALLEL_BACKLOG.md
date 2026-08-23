@@ -5,14 +5,15 @@
 **Toolchain:** `pytest` (`requirements-dev.txt:4`), `pytest-cov`, `ruff`, `mypy` — all `validation_command` are `pytest`-based.  
 **Principles enforced:** Contract-first (Wave 0) → disjoint writes per wave (no file appears twice in same wave) → sequential re-entries documented → consolidation isolates central touchpoints.
 
-> **Wave Status — Updated 2026-08-22 22:30 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2 DONE**
+> **Wave Status — Updated 2026-08-23 00:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2 DONE — Wave 5 11/11 disjoint FIXED, Wave 6 1/1 ready**
 > - **Wave 0 (Contracts): 5/5 DONE — 69 tests.** Unblocks Wave 1.
 > - **Wave 1 (Parallel Fixes): 9/9 DONE — 126 tests.** Unblocks Wave 2.
-> - **Wave 2 (Service & Mutations): 5/5 DONE — 98 tests (`19+10+30+20+19`), 5/5 `validation_command` green, file parity verified. Unblocks Wave 3.**
+> - **Wave 2 (Service & Mutations): 5/5 DONE — 98 tests, 5/5 `validation_command` green, file parity verified. Unblocks Wave 3.**
 > - **Wave 3 (Integration & Packaging): 4/4 DONE — 130 tests.** Unblocks Wave 4.
-> - **Wave 4 (Final Consolidation): 2/2 DONE — 635 tests (`412+223`), 2/2 `validation_command` green, file parity verified (`TICK-401` JobManager + `TICK-402` version sync).** Unblocks Wave 5.
-> - **Wave 5 (Audit & Forensic Gap Closure): 0/12 — 🔜 READY TO START** (Wave 4 gate green; `TICK-501..507` initial Wave-5 set already pushed by `ca69d90`/`f581496`; `TICK-508..512` engine/plugin/parser/docs complement added — 12 disjoint tickets across 24 unique files covering R-CORE-3/4/6 + F1 + F4 + F9 + F14 + U3 + U4 + F5 + F7 + F8 + F11 + F12 + F13 + U10 + U11).
-> - **Overall: 25/37 tickets DONE (68%) — 12 remaining.** See `docs/prompts/tickets/README.md` for per-ticket prompts.
+> - **Wave 4 (Final Consolidation): 2/2 DONE — 635 tests (`412+223`), 2/2 `validation_command` green, file parity verified.** Unblocks Wave 5.
+> - **Wave 5 (Audit & Forensic Gap Closure): 0/11 — 🔜 READY TO START** (11 disjoint tickets across 24 unique files: TICK-501,502,503,504,506,507,508,509,510,511,512 — TICK-505 moved to Wave 6 on 2026-08-23 to resolve `forensics.py` same-wave collision with TICK-502; now verified disjoint).
+> - **Wave 6 (Forensics re-entry): 0/1 — 🔜 READY TO START** (TICK-505 F14 sequential re-entry after TICK-502 Wave 5; `forensics.py` sole Wave 6 writer — hardened sequential pattern).
+> - **Overall: 25/37 tickets DONE (68%) — 12 remaining (11 Wave 5 + 1 Wave 6).** See `docs/prompts/tickets/README.md` for per-ticket prompts. 13 additional orphaned gaps (R-CORE-2/5/7, F6/F10/F15/F16/F20, U5-U9, F21 dedup) deferred to Wave 6+ — tracked in Wave 6 Spec.
 
 > Read `CONSOLIDATED_SPEC.md` §2–7 for canonical definitions before picking a ticket. All `path:line` below verified at 2026-08-22.
 
@@ -45,8 +46,20 @@
 | Wave 3 | `TICK-302` | Service / Lifecycle | `dataforge/service/linux/dataforge.socket [NEW FILE]`, `dataforge/service/linux/dataforge.service [NEW FILE]`, `dataforge/service/linux/com.dataforge.Engine.service [NEW FILE]`, `dataforge/service/windows/service.py [NEW FILE]`, `dataforge/service/macos/com.dataforge.engine.plist [NEW FILE]` | `TICK-301` | `systemd`/`launchd`/Service | ✅ DONE 2026-08-22 — `tests/test_service_lifecycle.py` 34/34, systemd socket/service + launchd plist + Windows ServiceFramework verified |
 | Wave 3 | `TICK-303` | Build / Packaging | `build_exe.py`, `packaging/nfpm.yaml [NEW FILE]`, `packaging/README.md [NEW FILE]` | `TICK-001` | Onefile+onedir, deb/rpm | ✅ DONE 2026-08-22 — `tests/test_packaging_nfpm.py` 51/51, onefile+onedir profiles + nfpm deb/rpm + postinst/prerm scripts verified |
 | Wave 3 | `TICK-304` | Forensic / Audit & Evidence | `dataforge/core/audit.py [NEW FILE]`, `dataforge/core/case.py [NEW FILE]`, `dataforge/modules/forensics.py` *(sequential second writer after TICK-109)* | `TICK-005`, `TICK-109` | F1–F3/U2 + F9 — single seam, isolated | ✅ DONE 2026-08-22 — `tests/test_audit_evidence_mode.py` 21/21, hash-chained audit log + CaseContext + Evidence Mode gate + UTC provenance verified |
-| **Wave 4 — Final Consolidation ⏳ Pending** | `TICK-401` | UI / Job Manager | `dataforge/ui/app.py`, `dataforge/ui/job_manager.py [NEW FILE]` | `TICK-301`, `TICK-304` | Replace `is_busy` + virtualize tables | ⏳ Pending |
-| Wave 4 | `TICK-402` | Docs / Version Sync | `scripts/bump_version.py [NEW FILE]`, `pyproject.toml` *(sole writer this wave)* | `TICK-001`, `TICK-303` | Central version source | ⏳ Pending |
+| **Wave 4 — Final Consolidation ✅ DONE** | `TICK-401` | UI / Job Manager | `dataforge/ui/app.py`, `dataforge/ui/job_manager.py [NEW FILE]` | `TICK-301`, `TICK-304` | Replace `is_busy` + virtualize tables | ✅ DONE 2026-08-22 — `tests/test_ui_job_manager.py` 412/412, `JobManager` queue + virtualised views verified |
+| Wave 4 | `TICK-402` | Docs / Version Sync | `scripts/bump_version.py [NEW FILE]`, `pyproject.toml` *(sole writer this wave)* | `TICK-001`, `TICK-303` | Central version source | ✅ DONE 2026-08-22 — `tests/test_version_sync.py` 223/223, version bump + `pyproject.toml` sync verified |
+| **Wave 5 — Audit & Forensic Gap Closure 🔜 READY (11 disjoint)** | `TICK-501` | Core / Infrastructure | `dataforge/core/config.py`, `dataforge/core/cache.py`, `dataforge/core/scanner.py` | None | R-CORE-3/4/6 (config persist, cache null-guard, scanner OSError) | 🔜 Ready — sole Wave 5 writer to 3 files |
+| Wave 5 | `TICK-502` | Modules / Sanitisation | `dataforge/modules/sanitisation.py [NEW FILE]`, `dataforge/modules/forensics.py` *(sole Wave 5 writer to `forensics.py`)* | `TICK-304` | F4 + F21 secure_delete move + hardlink-aware | 🔜 Ready — sole Wave 5 writer to `forensics.py` |
+| Wave 5 | `TICK-503` | Service / Audit | `dataforge/core/services/file_actions.py` | `TICK-304` | F1 audit wiring (remainder) | 🔜 Ready |
+| Wave 5 | `TICK-504` | Core / Modules | `dataforge/modules/system_cleanup.py`, `dataforge/modules/search.py`, `dataforge/modules/recovery.py`, `dataforge/modules/integrity.py`, `dataforge/modules/performance.py`, `dataforge/ui/views/search.py` | None | F9 tz-naive remainder (6 files) | 🔜 Ready |
+| Wave 5 | `TICK-506` | UI / Forensics | `dataforge/ui/views/forensics_view.py` | None | U3 virtualise timeline >5k | 🔜 Ready |
+| Wave 5 | `TICK-507` | UI / Widgets | `dataforge/ui/widgets.py` | None | U4 hex field inspector | 🔜 Ready |
+| Wave 5 | `TICK-508` | Forensic / Engine | `dataforge/core/image_io.py [NEW FILE]`, `dataforge/core/streams.py [NEW FILE]`, `dataforge/modules/indicators.py [NEW FILE]` | `TICK-002`, `TICK-102`, `TICK-103` | F5+F7+F8 (E01/AFF4 + ADS/xattrs/MotW + YARA/SSDEEP/NSRL) | 🔜 Ready — 3 NEW files |
+| Wave 5 | `TICK-509` | UI / Plugin Loader | `dataforge/ui/plugin_loader.py` | `TICK-401` | F12 subprocess + signing remainder | 🔜 Ready |
+| Wave 5 | `TICK-510` | Core / Logger | `dataforge/core/logger.py` | `TICK-101`, `TICK-304` | F11 hash-chain app.log remainder | 🔜 Ready |
+| Wave 5 | `TICK-511` | Engine / Parsers | `dataforge/engine/parsers.py [NEW FILE]` | `TICK-301` | F13 parser ProcessPool | 🔜 Ready — NEW file |
+| Wave 5 | `TICK-512` | Docs / Cross-Platform | `docs/CLI_REFERENCE.md`, `README.md`, `docs/GUI_WORKFLOWS.md`, `dataforge/ui/views/about.py` | `TICK-202` | U10+U11 docs claim fix | 🔜 Ready — docs only |
+| **Wave 6 — Forensics Re-entry 🔜 READY (sequential)** | `TICK-505` | Modules / Forensics | `dataforge/modules/forensics.py` *(sole Wave 6 writer — sequential re-entry after TICK-502 Wave 5)* | `TICK-502`, `TICK-304` | F14 ingest list materialisation | 🔜 Ready — sequential re-entry (hardened) |
 
 **Disjoint guarantee (hardened):** No two tickets in the **same wave** list the same `exclusive_write_files` path. Central touchpoints (`dataforge/ui/app.py`, `pyproject.toml`, `dataforge/engine/daemon.py`, `dataforge/modules/forensics.py`, `dataforge/core/cache.py`) appear in **different waves** sequentially and are documented as re-entries. Wave 0 contracts land before any Wave 1 impl that imports them (`TICK-004` now depends on `TICK-001`).
 

@@ -4,9 +4,9 @@
 
 **Generic prompt:** `../parallel-ticket-agent.md` / `../../../.github/prompts/parallel-ticket-agent.prompt.md` — set `{{TICKET_ID}}`.
 
-> **Status 2026-08-22 22:30 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2 DONE → Wave 5 🔜 READY (12 tickets, 24 disjoint files)**
-> Wave 0 (69) + Wave 1 (126) + Wave 2 (98) + Wave 3 (130) + Wave 4 (635) = 1058 tests green. After Wave 4 a regression-audit of `AUDIT_REPORT.md` Part 4 + `FORENSIC_REVIEW.md` index surfaced 26 actionable gaps; Wave 5 design covers them with 12 disjoint tickets across 24 unique files: TICK-501..507 (R-CORE-3/4/6, F1, F4, F9, F14, U3, U4) + TICK-508..512 (F5/F7/F8 engine modules, F12 plugin isolation, F11 logger chain, F13 parser pool, U10/U11 docs). See `docs/PARALLEL_BACKLOG.md` Wave 0–4 Reviews (5/5) + Wave 5 Spec (12 tickets).
-> **Overall: 25/37 DONE (68%) — 12 remaining.**
+> **Status 2026-08-23 00:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2 DONE → Wave 5 🔜 READY (11 tickets, 24 disjoint files) → Wave 6 🔜 READY (1 ticket, sequential re-entry)**
+> Wave 0 (69) + Wave 1 (126) + Wave 2 (98) + Wave 3 (130) + Wave 4 (635) = 1058 tests green. After Wave 4 a regression-audit of `AUDIT_REPORT.md` Part 4 + `FORENSIC_REVIEW.md` index surfaced 26 actionable gaps; Wave 5 now 11 disjoint tickets (TICK-501..504,506..512 — TICK-505 moved to Wave 6 to resolve `forensics.py` collision with TICK-502) + Wave 6 (TICK-505 F14 sequential re-entry) + 13 orphaned gaps deferred to Wave 6+ (R-CORE-2/5/7, F6/F10/F15/F16/F20, U5-U9). See `docs/PARALLEL_BACKLOG.md` Wave 0–4 Reviews + Wave 5/6 Spec.
+> **Overall: 25/37 DONE (68%) — 12 remaining (11 Wave 5 + 1 Wave 6).**
 
 ## Execution Order (Wave DAG)
 
@@ -50,15 +50,14 @@
 - **TICK-401** ✅ DONE 2026-08-22 — Replace single BackgroundWorker is_busy with JobManager + virtualized views | depends: "TICK-301", "TICK-304" | writes: `dataforge/ui/app.py`, `dataforge/ui/job_manager.py [NEW FILE]` → [`TICK-401.prompt.md`](./TICK-401.prompt.md)
 - **TICK-402** ✅ DONE 2026-08-22 — Centralize version bump (pyproject → __init__ → Info.plist/wxs) | depends: "TICK-001", "TICK-303" | writes: `scripts/bump_version.py [NEW FILE]`, `pyproject.toml` → [`TICK-402.prompt.md`](./TICK-402.prompt.md)
 
-### Wave 5 🔜 READY 2026-08-22 — Wave 4 ✅ 2/2 gate green, 12 disjoint, unblocked
+### Wave 5 🔜 READY 2026-08-23 — Wave 4 ✅ 2/2 gate green, 11 disjoint, unblocked
 
-> **Goal:** Close remaining `AUDIT_REPORT.md` Part 4 (R-CORE/R-OPS) + `FORENSIC_REVIEW.md` F/U gaps surfaced by the 2026-08-22 audit. 12 tickets, 24 unique files (verified disjoint against the 7-ticket set pushed by `ca69d90`+`f581496`).
+> **Goal:** Close remaining `AUDIT_REPORT.md` Part 4 (R-CORE/R-OPS) + `FORENSIC_REVIEW.md` F/U gaps surfaced by the 2026-08-22 audit. 11 tickets, 24 unique files — verified disjoint (TICK-505 moved to Wave 6 on 2026-08-23 to resolve `forensics.py` same-wave collision with TICK-502).
 
 - **TICK-501** — Fix R-CORE-3/4/6: config persistence, cache null-guard, scanner error reporting | depends: — | writes: `dataforge/core/config.py`, `dataforge/core/cache.py`, `dataforge/core/scanner.py` → [`TICK-501.prompt.md`](./TICK-501.prompt.md)
-- **TICK-502** — Move secure_delete to dedicated sanitisation module (F4) | depends: "TICK-304" | writes: `dataforge/modules/sanitisation.py [NEW FILE]`, `dataforge/modules/forensics.py` → [`TICK-502.prompt.md`](./TICK-502.prompt.md)
+- **TICK-502** — Move secure_delete to dedicated sanitisation module (F4) | depends: "TICK-304" | writes: `dataforge/modules/sanitisation.py [NEW FILE]`, `dataforge/modules/forensics.py` *(sole Wave 5 writer to `forensics.py`)* → [`TICK-502.prompt.md`](./TICK-502.prompt.md)
 - **TICK-503** — Wire AuditLog into FileActionService (F1) | depends: "TICK-304" | writes: `dataforge/core/services/file_actions.py` → [`TICK-503.prompt.md`](./TICK-503.prompt.md)
-- **TICK-504** — Fix tz-naive timestamps in non-forensic modules (F9) | depends: — | writes: `dataforge/modules/system_cleanup.py`, `dataforge/modules/search.py`, `dataforge/modules/recovery.py`, `dataforge/modules/integrity.py`, `dataforge/modules/performance.py`, `dataforge/ui/views/search.py` → [`TICK-504.prompt.md`](./TICK-504.prompt.md)
-- **TICK-505** — Fix ingest_disk_image list materialisation (F14) | depends: "TICK-304" | writes: `dataforge/modules/forensics.py` → [`TICK-505.prompt.md`](./TICK-505.prompt.md)
+- **TICK-504** — Fix tz-naive timestamps in non-forensic modules (F9 remainder) | depends: — | writes: `dataforge/modules/system_cleanup.py`, `dataforge/modules/search.py`, `dataforge/modules/recovery.py`, `dataforge/modules/integrity.py`, `dataforge/modules/performance.py`, `dataforge/ui/views/search.py` → [`TICK-504.prompt.md`](./TICK-504.prompt.md)
 - **TICK-506** — Virtualise timeline for >5k events (U3) | depends: — | writes: `dataforge/ui/views/forensics_view.py` → [`TICK-506.prompt.md`](./TICK-506.prompt.md)
 - **TICK-507** — Add hex field inspector / HexView widget (U4) | depends: — | writes: `dataforge/ui/widgets.py` → [`TICK-507.prompt.md`](./TICK-507.prompt.md)
 - **TICK-508** — Forensic engine: image_io (E01/AFF4) + streams (ADS/xattrs/MotW) + indicators (YARA/SSDEEP/NSRL) (F5 + F7 + F8) | depends: "TICK-002", "TICK-102", "TICK-103" | writes: `dataforge/core/image_io.py [NEW FILE]`, `dataforge/core/streams.py [NEW FILE]`, `dataforge/modules/indicators.py [NEW FILE]` → [`TICK-508.prompt.md`](./TICK-508.prompt.md)
@@ -66,6 +65,14 @@
 - **TICK-510** — Hash-chain app.log (extends AuditLog chain) (F11 remainder) | depends: "TICK-101", "TICK-304" | writes: `dataforge/core/logger.py` → [`TICK-510.prompt.md`](./TICK-510.prompt.md)
 - **TICK-511** — Parser ProcessPool isolation (F13) | depends: "TICK-301" | writes: `dataforge/engine/parsers.py [NEW FILE]` → [`TICK-511.prompt.md`](./TICK-511.prompt.md)
 - **TICK-512** — Docs cross-platform claim fix for --parse-artifacts + trash (U10 + U11) | depends: "TICK-202" | writes: `docs/CLI_REFERENCE.md`, `README.md`, `docs/GUI_WORKFLOWS.md`, `dataforge/ui/views/about.py` → [`TICK-512.prompt.md`](./TICK-512.prompt.md)
+
+### Wave 6 🔜 READY 2026-08-23 — Wave 5 gate (forensics.py sequential re-entry)
+
+> **Sequential re-entry:** `dataforge/modules/forensics.py` is a central touchpoint — TICK-502 is sole Wave 5 writer, TICK-505 is sole Wave 6 writer (hardened disjoint guarantee: same file in different waves → sequential).
+
+- **TICK-505** — Fix ingest_disk_image list materialisation (F14) | depends: "TICK-502", "TICK-304" | writes: `dataforge/modules/forensics.py` *(sole Wave 6 writer — sequential re-entry after TICK-502 Wave 5)* → [`TICK-505.prompt.md`](./TICK-505.prompt.md)
+
+> **Wave 6+ deferred (orphaned findings, not yet ticketed — tracked in `docs/PARALLEL_BACKLOG.md` Wave 6 Spec):** R-CORE-2 (excluded_* item validation), R-CORE-5 (cache batch commit), R-CORE-7 (makedirs bare filename), F6 (carving mid-sector), F10 (NFC/NFD+bidi), F15 (keyword budget), F16 (sparse), F20 (VSS), F21 dedup remainder, U5-U9 (UX). Estimated 8-10 tickets — explicitly deferred, not forgotten.
 
 ## Relevant Documentation Per Ticket
 
@@ -75,7 +82,7 @@ Each per-ticket file now includes a **Relevant Documentation — Must Read Befor
 
 ### Sequential (default, safe)
 ```
-Wave 0 (0.1→0.2→0.3→0.4→0.5) → Wave 1 (9 agents after Wave 0 green) → Wave 2 → Wave 3 → Wave 4 → Wave 5
+Wave 0 (0.1→0.2→0.3→0.4→0.5) → Wave 1 (9 agents after Wave 0 green) → Wave 2 → Wave 3 → Wave 4 → Wave 5 (11 parallel) → Wave 6 (1 sequential re-entry) → Wave 6+ (orphans)
 ```
 
 ### Parallel within a Wave

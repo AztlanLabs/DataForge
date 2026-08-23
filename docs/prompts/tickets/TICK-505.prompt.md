@@ -1,7 +1,8 @@
 # Ticket TICK-505 — Fix ingest_disk_image list materialisation (F14)
 
-> **Wave 5** | **Domain:** Modules / Forensics | **Depends on:** "TICK-304"
+> **Wave 6** | **Domain:** Modules / Forensics | **Depends on:** "TICK-502", "TICK-304"
 > **Source:** `docs/reviews/FORENSIC_REVIEW.md` F14
+> **Note:** Moved from Wave 5 → Wave 6 on 2026-08-23 to resolve same-wave `dataforge/modules/forensics.py` collision with TICK-502 (both exclusive writers in Wave 5). TICK-502 remains sole Wave 5 writer to `forensics.py`; TICK-505 is sole Wave 6 writer (sequential re-entry, hardened disjoint guarantee).
 
 ---
 
@@ -9,11 +10,11 @@
 
 ```
 TICKET_ID: TICK-505
-WAVE: 5
+WAVE: 6
 TITLE: Fix ingest_disk_image list materialisation (F14)
 ```
 
-**Exclusive write files (SOLE writer for Wave 5):**
+**Exclusive write files (SOLE writer for Wave 6 — sequential re-entry after TICK-502 Wave 5):**
 - `dataforge/modules/forensics.py`
 
 **Read-only references (do not edit):**
@@ -23,7 +24,7 @@ TITLE: Fix ingest_disk_image list materialisation (F14)
 **Test target:** `tests/test_forensics_streaming.py` (extend existing)
 **Validation:** `python -m pytest tests/test_forensics_streaming.py -q`
 
-**Depends on:** "TICK-304"
+**Depends on:** "TICK-502", "TICK-304" *(Wave 6 gate: TICK-502 Wave 5 must merge first due to `forensics.py` sequential re-entry)*
 
 ---
 
@@ -43,8 +44,8 @@ TITLE: Fix ingest_disk_image list materialisation (F14)
 ticket_id: "TICK-505"
 title: "Fix ingest_disk_image list materialisation (F14)"
 type: "Bugfix"
-execution_wave: 5
-depends_on: ["TICK-304"]
+execution_wave: 6
+depends_on: ["TICK-502", "TICK-304"]  # Wave 6 — sequential after TICK-502 Wave 5 (forensics.py re-entry)
 scope:
   domain: "Modules / Forensics"
   exclusive_write_files:
