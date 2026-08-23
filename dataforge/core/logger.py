@@ -137,26 +137,51 @@ def setup_logger(
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
+    # Normalize empty/whitespace log_file to fallback (R-CORE-7)
+    if isinstance(log_file, str) and not log_file.strip():
+        try:
+            _fallback = globals().get("default_log_path")
+            if not _fallback:
+                _fallback = os.path.join(os.path.expanduser("~"), ".dataforge", "app.log")
+        except Exception:
+            _fallback = os.path.join(os.path.expanduser("~"), ".dataforge", "app.log")
+        log_file = _fallback
+
     # File Handler
     if log_file:
-        _dirname = os.path.dirname(log_file)
+        _dirname = os.path.dirname(log_file) if log_file else ""
+        _should_add_file_handler = True
         if _dirname:
-            os.makedirs(_dirname, exist_ok=True)
-        # Ensure file exists with 0o600 before handler opens it (handler creates file on first emit)
-        if not os.path.exists(log_file):
             try:
-                fd = os.open(log_file, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-                os.close(fd)
-            except OSError:
-                pass
-        fh = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=3)
-        fh.setLevel(level)
-        fh.setFormatter(formatter)
-        logger.addHandler(fh)
-        try:
-            os.chmod(log_file, 0o600)
-        except OSError:
-            pass
+                os.makedirs(_dirname, exist_ok=True)
+            except OSError as e:
+                _should_add_file_handler = False
+                try:
+                    logger.warning("Could not create log dir %s: %s", _dirname, e)
+                except Exception:
+                    pass
+        if _should_add_file_handler:
+            try:
+                # Ensure file exists with 0o600 before handler opens it (handler creates file on first emit)
+                if not os.path.exists(log_file):
+                    try:
+                        fd = os.open(log_file, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+                        os.close(fd)
+                    except OSError:
+                        pass
+                fh = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=3)
+                fh.setLevel(level)
+                fh.setFormatter(formatter)
+                logger.addHandler(fh)
+                try:
+                    os.chmod(log_file, 0o600)
+                except OSError:
+                    pass
+            except OSError as e:
+                try:
+                    logger.warning("Could not create log file %s: %s", log_file, e)
+                except Exception:
+                    pass
 
     # Chain filter — only when explicitly opted-in. The filter itself checks
     # Evidence Mode and DATAFORGE_CHAIN_APP_LOG at record time so that
