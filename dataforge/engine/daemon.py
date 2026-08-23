@@ -14,8 +14,12 @@ Depends: TICK-205 (UDS/Named Pipe), TICK-201 (FileActionService)
 
 from __future__ import annotations
 
+import json
 import logging
+import os
+import re
 import threading
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from dataforge.engine.jobs import Job, JobQueue
@@ -91,6 +95,190 @@ class Daemon:
         return self.queue.list_jobs()
 
     # ------------------------------------------------------------------
+    # Automation store (TICK-806) — JSON at exports_dir/automations
+    # ------------------------------------------------------------------
+    def _automation_store_dir(self) -> Path:
+        try:
+            import dataforge.core.paths as _paths
+            base = Path(_paths.exports_dir)
+        except Exception:
+            base = Path.home() / "Documents" / "DataForge"
+        return base / "automations"
+
+    def _sanitize_automation_name(self, name: str) -> str:
+        s = (name or "").strip() or "automation"
+        s = re.sub(r'[^a-zA-Z0-9._-]', '_', s)
+        s = re.sub(r'_+', '_', s).strip('._')
+        return s[:80] if len(s) > 80 else s or "automation"
+
+    def list_automations(self) -> List[Dict[str, Any]]:
+        """List all stored automations (from exports_dir/automations/*.json)."""
+        store = self._automation_store_dir()
+        try:
+            store.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+        out: List[Dict[str, Any]] = []
+        try:
+            for p in sorted(store.glob("*.json")):
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    if isinstance(data, dict):
+                        if not data.get("name"):
+                            data["name"] = p.stem
+                        if "steps" not in data:
+                            data["steps"] = []
+                        out.append(data)
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        out.sort(key=lambda d: d.get("name", "").lower())
+        return out
+
+    def get_automation(self, name: str) -> Optional[Dict[str, Any]]:
+        """Load a single automation by name (sanitized filename)."""
+        if not name:
+            return None
+        store = self._automation_store_dir()
+        path = store / f"{self._sanitize_automation_name(name)}.json"
+        # Try exact file, then case-insensitive search
+        try:
+            if path.is_file():
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+            # Fallback scan for case differences
+            for p in store.glob("*.json"):
+                if p.stem.lower() == self._sanitize_automation_name(name).lower():
+                    with open(p, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    if isinstance(data, dict):
+                        return data
+        except Exception:
+            pass
+        return None
+
+    def schedule_automation(
+        self,
+        name: str,
+        source: str = "",
+        dry_run: bool = True,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Schedule a stored automation as a JobQueue job.
+
+        Loads ``name`` from the automation store and submits a worker that
+        replays its steps via ``ActionContext``. Returns ``{"job_id": ...}``.
+
+        Args:
+            name: automation name (matches file ``<sanitized>.json``)
+            source: source path for the pipeline (passed to scanner)
+            dry_run: if True, steps run in dry-run mode
+            params: optional override params merged into submission
+        """
+        data = self.get_automation(name)
+        if data is None:
+            raise ValueError(f"Automation not found: {name}")
+        steps_data = data.get("steps", []) or []
+        # Build worker that lazily imports step classes to avoid circular deps
+        def _automation_worker(
+            source: str = source,
+            steps_data: List[Dict[str, Any]] = steps_data,
+            dry_run: bool = dry_run,
+            progress_callback: Any = None,
+            cancel_token: Any = None,
+            **_: Any,
+        ) -> Dict[str, Any]:
+            from dataforge.core.scanner import scan_directory
+            from dataforge.core.actions.base import ActionContext
+            # Local registry (mirrors action_builder)
+            try:
+                from dataforge.core.actions.filters import (
+                    SearchFilter, SizeFilter, DateFilter, ImagePropFilter,
+                    ExtensionFilter, DuplicateFilter, SignatureMismatchFilter,
+                    EmptyFileFilter, EmptyFolderFilter,
+                )
+                from dataforge.core.actions.modifications import RenameStep, MetaCleanStep, HashLogStep, NormalizeNameStep
+                from dataforge.core.actions.io import MoveStep, CopyStep, DeleteStep, ZipStep
+                from dataforge.core.actions.organize import OrganizeStep
+                from dataforge.core.actions.media import ConvertImageStep
+                _reg = {
+                    "SearchFilter": SearchFilter, "SizeFilter": SizeFilter, "DateFilter": DateFilter,
+                    "ImagePropFilter": ImagePropFilter, "ExtensionFilter": ExtensionFilter,
+                    "DuplicateFilter": DuplicateFilter, "SignatureMismatchFilter": SignatureMismatchFilter,
+                    "EmptyFileFilter": EmptyFileFilter, "EmptyFolderFilter": EmptyFolderFilter,
+                    "RenameStep": RenameStep, "MetaCleanStep": MetaCleanStep, "HashLogStep": HashLogStep,
+                    "NormalizeNameStep": NormalizeNameStep, "MoveStep": MoveStep, "CopyStep": CopyStep,
+                    "DeleteStep": DeleteStep, "ZipStep": ZipStep, "OrganizeStep": OrganizeStep,
+                    "ConvertImageStep": ConvertImageStep,
+                }
+            except Exception:
+                _reg = {}
+            # Rebuild steps
+            steps = []
+            for entry in steps_data:
+                if not isinstance(entry, dict):
+                    continue
+                t = entry.get("type")
+                p = entry.get("params", {}) if isinstance(entry.get("params"), dict) else {}
+                cls = _reg.get(t)
+                if cls is None:
+                    continue
+                try:
+                    step = cls(p)
+                    step.params = dict(p)
+                except Exception:
+                    try:
+                        step = cls()
+                        step.params = dict(p)
+                    except Exception:
+                        continue
+                steps.append(step)
+            # Scan source if provided
+            files = []
+            if source and os.path.exists(source):
+                try:
+                    for entry in scan_directory(source, recursive=True, max_depth=-1, cancel_token=cancel_token):
+                        if cancel_token and cancel_token.is_set():
+                            break
+                        files.append(entry)
+                        if progress_callback and len(files) % 50 == 0:
+                            progress_callback(len(files), 0, "Scanning...")
+                except Exception:
+                    pass
+            # If no source/files, just log empty run
+            ctx = ActionContext(files, update_progress=progress_callback)
+            ctx.is_dry_run = bool(dry_run)
+            ctx.cancel_token = cancel_token
+            ctx.variables["source_path"] = source
+            total = len(steps)
+            for i, step in enumerate(steps):
+                if ctx.should_cancel():
+                    break
+                if progress_callback:
+                    try:
+                        progress_callback(i, total, f"Running {getattr(step, 'name', str(step))}")
+                    except Exception:
+                        pass
+                try:
+                    step.execute(ctx)
+                except Exception as e:
+                    try:
+                        ctx.log("Pipeline", "Error", f"Step {getattr(step,'name', '')} failed: {e}")
+                    except Exception:
+                        pass
+            return {"automation": name, "dry_run": dry_run, "source": source, "results": getattr(ctx, "results", []), "files": len(files)}
+
+        job = self.queue.submit(
+            _automation_worker,
+            params={"source": source, "dry_run": dry_run, **(params or {})},
+        )
+        return {"job_id": job.job_id, "automation": name}
+
+    # ------------------------------------------------------------------
     # JSON-RPC 2.0 dispatch
     # ------------------------------------------------------------------
 
@@ -133,6 +321,9 @@ class Daemon:
             "status": self._handle_status,
             "cancel": self._handle_cancel,
             "list_jobs": self._handle_list_jobs,
+            "list_automations": self._handle_list_automations,
+            "get_automation": self._handle_get_automation,
+            "schedule_automation": self._handle_schedule_automation,
         }
         return handlers.get(method)
 
@@ -414,6 +605,31 @@ class Daemon:
             "total": len(jobs),
             "jobs": [j.json_safe() for j in jobs],
         }
+
+    async def _handle_list_automations(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle ``list_automations`` — list stored automations."""
+        items = self.list_automations()
+        return {"total": len(items), "automations": items}
+
+    async def _handle_get_automation(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle ``get_automation`` — load one automation."""
+        name = params.get("name", "")
+        if not name:
+            raise ValueError("name is required")
+        data = self.get_automation(name)
+        if data is None:
+            return {"error": f"Automation not found: {name}"}
+        return {"automation": data}
+
+    async def _handle_schedule_automation(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle ``schedule_automation`` — schedule stored automation as job."""
+        name = params.get("name", "")
+        if not name:
+            raise ValueError("name is required")
+        source = params.get("source", "") or params.get("root", "")
+        dry_run = bool(params.get("dry_run", True))
+        result = self.schedule_automation(name, source=source, dry_run=dry_run)
+        return result
 
 
 EngineDaemon = Daemon
