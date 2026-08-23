@@ -301,18 +301,26 @@ fm performance --processes
 fm recover [--trash] [--restore-trash] [--carve PATH --out DIR] [--types LIST]
 ```
 
-Recovers deleted files from the system trash or carves file types from a disk image.
+Recovers deleted files from the platform Trash (see matrix) or carves file types from a disk image.
 
 ### Options
 
-- `--trash` - scan the system trash
-- `--restore-trash` - restore all scanned trash items (requires `--trash`, prompts for confirmation)
+- `--trash` - scan Trash
+- `--restore-trash` - restore all scanned Trash items (requires `--trash`, prompts for confirmation)
 - `--carve PATH` - carve files from a disk image or device path
 - `--out DIR` - required output directory when using `--carve`
 - `--types jpg,png,pdf` - restrict carving to specific extensions
 
+> **Platform support — Trash scan**
+>
+> | Platform | Status | Details |
+> |---|---|---|
+> | Linux | ✓ | XDG Trash (`~/.local/share/Trash`, `.Trash-UID` on external volumes) via `recovery.py:88` |
+> | macOS | ✓ | Finder Trash (`~/.Trash`); PyObjC optional for richer metadata |
+> | Windows | ✗ | Raises `TrashScanUnsupported` (`recovery.py:208` — pywin32 / `$Recycle.Bin` `$I` parsing is a planned follow-up) |
+
 > [!CAUTION]
-> `--restore-trash` restores to the original path recorded in `.trashinfo`. Since WS-B, paths with `..` traversal or targeting system directories are confined to `~/Recovered` (`recovery.py:205`). Still, prefer reviewing targets first — see [`reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md) (S4).
+> `--restore-trash` restores to the original path recorded in `.trashinfo`. Since WS-B, paths with `..` traversal or targeting protected locations are confined to `~/Recovered` (`recovery.py:205`). Still, prefer reviewing targets first — see [`reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md) (S4).
 
 ### Example
 
@@ -368,6 +376,14 @@ Forensic utilities for OS artifact parsing, keyword search, and file-signature l
 - `--parse-artifacts` - parse OS artifacts under `PATH`
 - `--search-keyword TEXT` - search for a keyword under `PATH`
 - `--list-types` - list known file-signature categories (from `dataforge/modules/file_signatures.py`); `PATH` is not required with this flag
+
+> **Platform support — OS artifact parsing**
+>
+> | Platform | Status | Details |
+> |---|---|---|
+> | Linux | ✓ | Full support (`/etc/passwd`, `/var/log/auth.log`, `dpkg` status, `systemd` units) |
+> | macOS | △ Partial | Users and shell history; richer parsing is a follow-up |
+> | Windows | ✗ | Not yet supported — returns error if `PATH` is not a directory (`forensics.py:602`) |
 
 ### Example
 

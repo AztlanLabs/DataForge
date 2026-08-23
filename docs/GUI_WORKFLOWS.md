@@ -213,6 +213,20 @@ The plugin system (`dataforge/ui/plugin_loader.py:13` `PluginLoader`):
 
 Current plugin behavior mirrors the metadata cleaning capability that also exists inside `ToolsView`.
 
+## About & Help
+
+`AboutView` (`dataforge/ui/views/about.py`) shows system diagnostics and a feature guide. The feature cards are platform-aware:
+
+> **Platform support — Trash & OS artifacts**
+>
+> | Platform | Trash scan | OS artifacts | Notes |
+> |---|---|---|---|
+> | Linux | ✓ | ✓ | XDG Trash (`~/.local/share/Trash`, `.Trash-UID`), full `parse_os_artifacts` |
+> | macOS | ✓ | △ Partial | Finder Trash (`~/.Trash`); users/shell history only |
+> | Windows | ✗ | ✗ | Raises `TrashScanUnsupported` (`recovery.py:208` — pywin32 / `$Recycle.Bin` `$I` parsing is a planned follow-up); `forensics.py:602` returns error if `PATH` is not a directory |
+
+The File Recovery card title shows “(Linux/macOS only)” and its tooltip quotes `raise TrashScanUnsupported` (`recovery.py:208`).
+
 ## UI infrastructure worth knowing
 
 Shared widget infrastructure lives in `dataforge/ui/widgets.py`.

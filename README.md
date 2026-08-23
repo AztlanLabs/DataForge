@@ -47,12 +47,12 @@ The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5**, and new modules (ha
 
 ### 🔐 Data Integrity & Recovery (Fort Knox Edition)
 - **Integrity snapshots** — create SHA-256 baselines (MD5 legacy supported), verify changes (NEW/MODIFIED/DELETED detection) — **detect tampering**
-- **Trash recovery** — restore deleted files from system trash or external media — **get files back**
+- **Trash recovery (Linux/macOS only)** — restore deleted files from Trash or external media — **get files back** — Windows raises `TrashScanUnsupported` (`recovery.py:208` — pywin32 follow-up)
 - **File carving** — recover files from disk images by signature (JPEG, PNG, PDF, ZIP, and 30+ more types) — **resurrect lost data**
 - **Metadata cleaning** — strip EXIF (including GPS), PDF metadata, and other embedded data — **sanitize before sharing**
 
 ### 🔬 Forensics & System Analysis (Full Arsenal)
-- **OS artifact parsing** — registry, logs, temporary artifacts analysis — **uncover system secrets**
+- **OS artifact parsing (Linux/macOS only)** — registry, logs, temporary artifacts analysis — **uncover system secrets** — Linux: full (`/etc/passwd`, `auth.log`, `dpkg`, `systemd`); macOS: partial; Windows: not yet supported (`forensics.py:602`)
 - **Keyword search** — full-text search across a directory or disk image — **hunt for evidence**
 - **Hash calculation** — MD5, SHA-1, SHA-256, SHA-512 cryptographic file hashing with caching — **verify file integrity**
 - **File signatures** — identify file types by magic bytes across 40+ categories — **know what you're looking at**
