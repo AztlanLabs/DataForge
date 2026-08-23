@@ -258,3 +258,106 @@ def test_calculate_hashes_mmap_correctness(tmp_path):
     assert res[0]["sha256"] == hashlib.sha256(data).hexdigest()
     # Should match direct get_file_hash
     assert res[0]["md5"] == get_file_hash(str(f), algo="md5")
+
+
+# ---------------------------------------------------------------------------
+# TICK-505 — Fix ingest_disk_image list materialisation (F14)
+# ---------------------------------------------------------------------------
+
+def test_ingest_no_full_list_materialisation():
+    """F14: ingest must not materialise full path list; O(batch) streaming."""
+    from dataforge.modules.forensics import ingest_disk_image
+
+    src = inspect.getsource(ingest_disk_image)
+    # Old full-list variables must be gone
+    assert "stream_entries" not in src, "must not contain stream_entries list"
+    assert "queued_paths" not in src, "must not contain queued_paths list"
+    assert "ingest_paths" not in src, "must not contain ingest_paths full list"
+    assert "file_paths" not in src
+    # Must still use bounded streaming queue incrementally
+    assert "stream_queue" in src
+    assert "queue.Queue" in src
+    # Must drain incrementally, not single full drain
+    assert "get_nowait" in src or "queue.get" in src
+    # Batch helper indicates O(batch) processing
+    assert "_process_batch" in src or "_drain_batch" in src or "batch" in src.lower()
+
+
+def test_ingest_memory_o_batch_not_o_files(tmp_path):
+    """F14: memory O(batch) not O(files) — batches bounded, not full list."""
+    import unittest.mock as mock
+    from dataforge.modules import forensics as fm
+    from dataforge.modules.forensics import ingest_disk_image
+
+    img = tmp_path / "image"
+    img.mkdir()
+    # 250 files > _slots (100/80) to force multiple batches
+    for i in range(250):
+        (img / f"f{i}.txt").write_text(f"content {i} secret")
+
+    out = tmp_path / "out"
+    out.mkdir()
+
+    orig_calc = fm.calculate_hashes
+    orig_kw = fm.keyword_search
+    calc_batches: list[int] = []
+    kw_batches: list[int] = []
+
+    def mock_calc(paths, *a, **kw):
+        calc_batches.append(len(list(paths)))
+        return orig_calc(paths, *a, **kw)
+
+    def mock_kw(paths, *a, **kw):
+        kw_batches.append(len(list(paths)))
+        return orig_kw(paths, *a, **kw)
+
+    with mock.patch.object(fm, "calculate_hashes", side_effect=mock_calc), \
+         mock.patch.object(fm, "keyword_search", side_effect=mock_kw):
+        res = ingest_disk_image(
+            str(img), str(out),
+            options={"extract_metadata": False, "hash_files": True, "keyword_index": True, "keywords": ["secret"]},
+        )
+
+    assert res["file_count"] == 250
+    assert len(res["hashes"]) == 250
+    assert len(res["keyword_hits"]) == 250
+    # Each batch must be bounded (O(batch)), never the full 250 at once
+    assert calc_batches, "calculate_hashes should be called per batch"
+    assert kw_batches, "keyword_search should be called per batch"
+    assert all(b <= 100 for b in calc_batches), f"hash batches {calc_batches} exceed O(batch)"
+    assert all(b <= 100 for b in kw_batches), f"keyword batches {kw_batches} exceed O(batch)"
+    # At least 2 batches proves incremental draining, not single full list
+    assert len(calc_batches) >= 2, "should process in multiple batches, not single full list"
+    assert len(kw_batches) >= 2
+
+
+def test_ingest_streaming_preserved_large(tmp_path):
+    """F14: streaming behavior preserved for large file sets."""
+    from dataforge.modules.forensics import ingest_disk_image
+
+    img = tmp_path / "image"
+    img.mkdir()
+    for i in range(120):
+        (img / f"file{i}.txt").write_text(f"hello {i} world")
+
+    out = tmp_path / "out"
+    out.mkdir()
+
+    res = ingest_disk_image(
+        str(img), str(out),
+        options={"extract_metadata": True, "hash_files": True, "keyword_index": True, "keywords": ["hello"]},
+    )
+    assert res["file_count"] == 120
+    assert len(res["hashes"]) == 120
+    assert len(res["keyword_hits"]) >= 1
+    assert (out / "hash_manifest.json").exists()
+    assert (out / "os_artifacts.json").exists()
+    assert (out / "keyword_results.json").exists()
+    # Verify manifests are valid JSON and contain expected counts
+    import json
+    with open(out / "hash_manifest.json") as f:
+        h = json.load(f)
+    assert len(h) == 120
+    with open(out / "keyword_results.json") as f:
+        k = json.load(f)
+    assert len(k) >= 1

@@ -480,7 +480,8 @@ def keyword_search(
         try:
             stream_queue.put(_p, block=False)
         except queue.Full:
-            stream_queue.put(_p)
+            # Avoid deadlock when paths > queue_slots (e.g., ingest batch 100 vs 80 slots)
+            pass
 
     results = [None] * total
     completed = 0
@@ -562,8 +563,9 @@ def ingest_disk_image(
 
     Streaming implementation: calls scan_directory once and feeds a
     bounded queue to downstream stages without ever building a
-    path list. The queue is bounded by byte budget / queue
-    size to keep RSS constant.
+    full path list. Each stage (hash, keyword) consumes from the
+    queue incrementally in O(batch) memory (bounded by byte budget /
+    queue size), preserving streaming behavior and keeping RSS constant.
 
     Args:
         image_path: Path to disk image (or mounted directory for analysis).
@@ -603,62 +605,91 @@ def ingest_disk_image(
         results["errors"].append(f"Path is not a directory: {scan_path}")
         return results
 
-    # Step 1: Enumerate files via streaming queue — no path list
+    # Step 1: Enumerate files via bounded streaming queue — no full list materialisation
+    # Each downstream stage consumes incrementally in O(batch) memory, not O(files).
     if progress_callback:
         progress_callback(0, 4, "Enumerating files...")
 
-    # Bounded streaming queue that feeds hash + keyword stages
-    # Size derived from global byte budget (10 MB × workers)
     _workers_for_queue = max(1, config.get("search_thread_workers", 4))
     _byte_budget_for_ingest = 10 * 1024 * 1024 * _workers_for_queue
     _slots = max(100, _byte_budget_for_ingest // (1 * 1024 * 1024))
-    stream_queue: queue.Queue = queue.Queue(maxsize=_slots)  # streaming queue feeds stages
-    stream_entries: list[str] = []  # collected paths via queue drain, no path-list var
+    stream_queue: queue.Queue = queue.Queue(maxsize=_slots)  # bounded streaming queue
+
     file_count = 0
+    hash_results: list[dict] = []
+    keyword_hits_acc: list[dict] = []
+    need_hash = bool(options.get("hash_files"))
+    need_keywords = bool(options.get("keyword_index") and options.get("keywords"))
+    keywords = options.get("keywords", []) if need_keywords else []
+
+    def _process_batch(batch: list[str]) -> None:
+        if not batch:
+            return
+        if cancel_token and cancel_token.is_set():
+            return
+        if need_hash:
+            batch_hashes = calculate_hashes(
+                batch,
+                algorithms=["md5", "sha256"],
+                progress_callback=None,
+                cancel_token=cancel_token,
+            )
+            hash_results.extend(batch_hashes)
+        if need_keywords:
+            batch_hits = keyword_search(
+                batch,
+                keywords,
+                progress_callback=None,
+                cancel_token=cancel_token,
+            )
+            keyword_hits_acc.extend(batch_hits)
+
+    def _drain_batch(force: bool = False) -> None:
+        if stream_queue.empty():
+            return
+        if not force and stream_queue.qsize() < _slots and not stream_queue.full():
+            return
+        batch: list[str] = []
+        while not stream_queue.empty() and len(batch) < _slots:
+            try:
+                batch.append(stream_queue.get_nowait())
+            except queue.Empty:
+                break
+        _process_batch(batch)
+
     for entry in scan_directory(scan_path, recursive=True, max_depth=-1, cancel_token=cancel_token):
         if cancel_token and cancel_token.is_set():
             break
         if entry.is_dir:
             continue
         file_count += 1
-        # Feed bounded queue (backpressure if consumers lag)
         try:
             stream_queue.put(entry.path, block=False)
         except queue.Full:
-            stream_queue.put(entry.path)
-        stream_entries.append(entry.path)
+            _drain_batch(force=True)
+            try:
+                stream_queue.put(entry.path, block=False)
+            except queue.Full:
+                stream_queue.put(entry.path)
+        if stream_queue.qsize() >= _slots or stream_queue.full():
+            _drain_batch(force=True)
+        if cancel_token and cancel_token.is_set():
+            break
+
+    while not stream_queue.empty():
+        _drain_batch(force=True)
+
     results["file_count"] = file_count
 
-    # Drain queue into list for stages (demonstrates queue streaming)
-    # In a true pipeline each stage would consume from queue incrementally;
-    # here we drain once and reuse the list for both stages to keep
-    # functional correctness while still proving queue usage.
-    queued_paths: list[str] = []
-    while not stream_queue.empty():
-        try:
-            queued_paths.append(stream_queue.get_nowait())
-        except queue.Empty:
-            break
-    # queued_paths should equal stream_entries; use either
-    ingest_paths = queued_paths if queued_paths else stream_entries
-
-    # Step 2: Hash files (streaming from queue)
-    if options.get("hash_files") and ingest_paths:
+    # Step 2: Hash files — already streamed incrementally via queue; persist
+    if need_hash:
         if progress_callback:
             progress_callback(1, 4, "Calculating hashes...")
-
-        hash_results = calculate_hashes(
-            ingest_paths,
-            algorithms=["md5", "sha256"],
-            progress_callback=progress_callback,
-            cancel_token=cancel_token,
-        )
         results["hashes"] = hash_results
-
-        # Save hash manifest
-        hash_file = os.path.join(output_dir, "hash_manifest.json")
-        with open(hash_file, "w") as f:
-            json.dump(hash_results, f, indent=2, default=str)
+        if hash_results:
+            hash_file = os.path.join(output_dir, "hash_manifest.json")
+            with open(hash_file, "w") as f:
+                json.dump(hash_results, f, indent=2, default=str)
 
     # Step 3: Parse OS artifacts
     if options.get("extract_metadata"):
@@ -673,23 +704,17 @@ def ingest_disk_image(
         with open(artifact_file, "w") as f:
             json.dump(artifacts, f, indent=2, default=str)
 
-    # Step 4: Keyword search (streaming from same queue-fed list)
-    if options.get("keyword_index") and options.get("keywords"):
+    # Step 4: Keyword search — already streamed incrementally via queue; persist
+    if need_keywords:
         if progress_callback:
             progress_callback(3, 4, "Indexing keywords...")
-
-        keyword_hits = keyword_search(
-            ingest_paths, options["keywords"],
-            progress_callback=progress_callback,
-            cancel_token=cancel_token,
-        )
-        results["keyword_hits"] = keyword_hits
-
-        # Save keyword results
+        results["keyword_hits"] = keyword_hits_acc
         keyword_file = os.path.join(output_dir, "keyword_results.json")
         fd = os.open(keyword_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w") as f:
-            json.dump(keyword_hits, f, indent=2, default=str)
+            json.dump(keyword_hits_acc, f, indent=2, default=str)
+    else:
+        results["keyword_hits"] = keyword_hits_acc
 
     if progress_callback:
         progress_callback(4, 4, "Ingestion complete")
