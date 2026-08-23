@@ -9,7 +9,7 @@ import platform
 import subprocess
 import time
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # psutil is an optional dependency — degrade gracefully
@@ -211,7 +211,7 @@ def _get_uptime():
     minutes = int((uptime_seconds % 3600) // 60)
 
     return {
-        "boot_time": datetime.fromtimestamp(boot_time).isoformat(),
+        "boot_time": datetime.fromtimestamp(boot_time, tz=timezone.utc).isoformat(),
         "uptime_seconds": int(uptime_seconds),
         "uptime_formatted": f"{days}d {hours}h {minutes}m",
     }
@@ -491,5 +491,5 @@ def get_live_resource_snapshot():
             "used": psutil.swap_memory().used,
             "percent": psutil.swap_memory().percent,
         },
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }

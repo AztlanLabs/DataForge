@@ -4,7 +4,7 @@ import json
 import mmap
 import os
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 from ..core.common import FileEntry
@@ -189,7 +189,7 @@ def build_search_query(
 
     query.set_size_range(min_size_bytes, max_size_bytes)
 
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     after = now - timedelta(days=float(newer_than_days)) if newer_than_days is not None else None
     before = now - timedelta(days=float(older_than_days)) if older_than_days is not None else None
     query.set_modified_date(after=after, before=before)

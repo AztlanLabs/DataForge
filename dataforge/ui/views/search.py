@@ -607,7 +607,7 @@ Once files are found, use the 'Bulk Actions' card to:
 
         name_val = self.entry_zip_name.text().strip()
         if not name_val:
-             name_val = f"Archive_{datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')}"
+             name_val = f"Archive_{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d_%H%M%S')}"
         
         if not name_val.lower().endswith(".zip"):
             name_val += ".zip"
