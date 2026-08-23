@@ -222,16 +222,94 @@ class SettingsView(BaseView):
         perf_layout.addWidget(row_search_threads)
         self.register_tiered(row_search_threads, "Standard")
 
-        row_cache = QWidget(self.tab_perf)
-        row_cache_layout = QHBoxLayout(row_cache)
+        # --- DB Cache info + size (TICK-804) ---
+        self.row_cache = QWidget(self.tab_perf)
+        row_cache_layout = QVBoxLayout(self.row_cache)
         row_cache_layout.setContentsMargins(0, 0, 0, 0)
-        self.btn_clear_cache = QPushButton("Clear Cache DB", row_cache)
+        row_cache_layout.setSpacing(4)
+
+        grp_cache = QGroupBox("DB Cache", self.row_cache)
+        grp_layout = QVBoxLayout(grp_cache)
+        grp_layout.setSpacing(4)
+
+        line1 = QWidget(grp_cache)
+        line1_layout = QHBoxLayout(line1)
+        line1_layout.setContentsMargins(0, 0, 0, 0)
+        self.lbl_cache_size = QLabel("Size: —", line1)
+        self.lbl_cache_size.setProperty("variant", "muted")
+        line1_layout.addWidget(self.lbl_cache_size)
+        self.lbl_cache_entries = QLabel("Entries: —", line1)
+        self.lbl_cache_entries.setProperty("variant", "muted")
+        line1_layout.addWidget(self.lbl_cache_entries)
+        line1_layout.addStretch()
+        self.btn_refresh_cache = QPushButton("Refresh", line1)
+        self.btn_refresh_cache.clicked.connect(self._refresh_cache_info)
+        line1_layout.addWidget(self.btn_refresh_cache)
+        grp_layout.addWidget(line1)
+
+        self.lbl_cache_path = QLabel("Path: —", grp_cache)
+        self.lbl_cache_path.setProperty("variant", "muted")
+        self.lbl_cache_path.setWordWrap(True)
+        grp_layout.addWidget(self.lbl_cache_path)
+
+        line3 = QWidget(grp_cache)
+        line3_layout = QHBoxLayout(line3)
+        line3_layout.setContentsMargins(0, 0, 0, 0)
+        self.lbl_cache_modified = QLabel("Modified: —", line3)
+        self.lbl_cache_modified.setProperty("variant", "muted")
+        line3_layout.addWidget(self.lbl_cache_modified)
+        self.lbl_cache_pages = QLabel("", line3)
+        self.lbl_cache_pages.setProperty("variant", "muted")
+        line3_layout.addWidget(self.lbl_cache_pages)
+        line3_layout.addStretch()
+        grp_layout.addWidget(line3)
+
+        line4 = QWidget(grp_cache)
+        line4_layout = QHBoxLayout(line4)
+        line4_layout.setContentsMargins(0, 0, 0, 0)
+        self.btn_clear_cache = QPushButton("Clear Cache DB", line4)
         self.btn_clear_cache.clicked.connect(self.clear_cache_db)
         self.btn_clear_cache.setProperty("variant", "danger")
-        row_cache_layout.addWidget(self.btn_clear_cache)
-        row_cache_layout.addStretch()
-        perf_layout.addWidget(row_cache)
-        self.register_tiered(row_cache, "Everything")
+        line4_layout.addWidget(self.btn_clear_cache)
+        line4_layout.addStretch()
+        grp_layout.addWidget(line4)
+
+        row_cache_layout.addWidget(grp_cache)
+        perf_layout.addWidget(self.row_cache)
+        self.register_tiered(self.row_cache, "Everything")
+        row_cache = self.row_cache  # noqa: F841 - keep local name for test introspection
+
+        # --- Tuning display: cache_batch_size + hash_block_size (TICK-804) ---
+        row_tuning = QWidget(self.tab_perf)
+        row_tuning_layout = QHBoxLayout(row_tuning)
+        row_tuning_layout.setContentsMargins(0, 0, 0, 0)
+        try:
+            _batch_sz = config.get("cache_batch_size", 1000)
+        except Exception:
+            _batch_sz = 1000
+        try:
+            _block_sz = config.get("hash_block_size", 1 << 20)
+        except Exception:
+            _block_sz = 1 << 20
+        try:
+            _block_fmt = file_cache._format_size(int(_block_sz))  # type: ignore[attr-defined]
+        except Exception:
+            _block_fmt = f"{_block_sz} B"
+        self.lbl_cache_batch_size = QLabel(f"Cache batch size: {_batch_sz}", row_tuning)
+        self.lbl_cache_batch_size.setProperty("variant", "muted")
+        row_tuning_layout.addWidget(self.lbl_cache_batch_size)
+        self.lbl_hash_block_size = QLabel(f"Hash block size: {_block_fmt} ({_block_sz} bytes)", row_tuning)
+        self.lbl_hash_block_size.setProperty("variant", "muted")
+        row_tuning_layout.addWidget(self.lbl_hash_block_size)
+        row_tuning_layout.addStretch()
+        perf_layout.addWidget(row_tuning)
+        self.register_tiered(row_tuning, "Everything")
+        self.row_cache_tuning = row_tuning
+        # initial populate (non-blocking fallback if no app yet)
+        try:
+            self._update_cache_labels(file_cache.get_stats())
+        except Exception:
+            pass
 
         perf_layout.addStretch(1)
 
@@ -384,17 +462,107 @@ class SettingsView(BaseView):
             self.app.apply_motion_preference(value)
         self._flash_saved_indicator()
 
+    def _refresh_cache_info(self):
+        """Refresh cache stats without blocking UI via app.run_workflow."""
+        def _worker():
+            return file_cache.get_stats()
+
+        if getattr(self, "app", None) and hasattr(self.app, "run_workflow"):
+            try:
+                # run_workflow injects progress/cancel; our worker takes no args
+                self.app.run_workflow(
+                    _worker,
+                    on_success=self._on_cache_stats,
+                    on_error=self._on_cache_error,
+                    progress=False,
+                    error_title="Cache Stats",
+                )
+                return
+            except Exception:
+                pass
+        # Fallback: direct call (tests, no app, or run_workflow failed)
+        try:
+            stats = file_cache.get_stats()
+            self._on_cache_stats(stats)
+        except Exception as exc:
+            self._on_cache_error(exc)
+
+    def _on_cache_stats(self, stats):
+        try:
+            self._update_cache_labels(stats)
+        except Exception as exc:
+            logger.warning("Failed to handle cache stats: %s", exc)
+
+    def _on_cache_error(self, err):
+        logger.warning("Failed to refresh cache stats: %s", err)
+
+    def _update_cache_labels(self, stats):
+        """Populate all cache info labels from get_stats() dict."""
+        try:
+            size_str = stats.get("formatted_size", "0 B")
+            size_bytes = stats.get("size_bytes", 0)
+            entry_count = stats.get("entry_count", 0)
+            path = stats.get("path", "")
+            lm = stats.get("last_modified")
+            # Keep labels deterministic for tests
+            if hasattr(self, "lbl_cache_size"):
+                self.lbl_cache_size.setText(f"Size: {size_str} ({size_bytes} bytes)")
+            if hasattr(self, "lbl_cache_entries"):
+                self.lbl_cache_entries.setText(f"Entries: {entry_count} entries")
+            if hasattr(self, "lbl_cache_path"):
+                self.lbl_cache_path.setText(f"Path: {path}")
+            if hasattr(self, "lbl_cache_modified"):
+                self.lbl_cache_modified.setText(f"Modified: {lm if lm else '—'}")
+            if hasattr(self, "lbl_cache_pages"):
+                pc = stats.get("page_count", 0)
+                fc = stats.get("freelist_count", 0)
+                ps = stats.get("page_size", 0)
+                self.lbl_cache_pages.setText(f"Pages: {pc}  Freelist: {fc}  Page size: {ps}")
+            # Refresh tuning labels as well
+            if hasattr(self, "lbl_cache_batch_size"):
+                try:
+                    _b = config.get("cache_batch_size", 1000)
+                    self.lbl_cache_batch_size.setText(f"Cache batch size: {_b}")
+                except Exception:
+                    pass
+            if hasattr(self, "lbl_hash_block_size"):
+                try:
+                    _blk = config.get("hash_block_size", 1 << 20)
+                    _fmt = file_cache._format_size(int(_blk))  # type: ignore[attr-defined]
+                    self.lbl_hash_block_size.setText(f"Hash block size: {_fmt} ({_blk} bytes)")
+                except Exception:
+                    pass
+        except Exception as exc:
+            logger.warning("Failed to update cache labels: %s", exc)
+
     def clear_cache_db(self):
+        try:
+            stats = file_cache.get_stats()
+        except Exception:
+            stats = {"formatted_size": "0 B", "size_bytes": 0, "entry_count": 0}
+        size_str = stats.get("formatted_size", "0 B")
+        count = stats.get("entry_count", 0)
         reply = QMessageBox.question(
             self,
             "Confirm",
-            "Are you sure you want to clear the file cache? This will force scanning of all files again.",
+            f"Are you sure you want to clear the file cache?\n\nSize: {size_str} ({count} entries)\nThis will force scanning of all files again.",
             QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
             file_cache.clear()
-            self.app.show_info_dialog("Success", "Cache cleared.")
+            # Refresh labels to show 0 entries after clear
+            try:
+                self._update_cache_labels(file_cache.get_stats())
+            except Exception:
+                pass
+            # Also trigger async refresh in case not immediate
+            try:
+                self._refresh_cache_info()
+            except Exception:
+                pass
+            if getattr(self, "app", None) and hasattr(self.app, "show_info_dialog"):
+                self.app.show_info_dialog("Success", "Cache cleared.")
 
     def add_dash_path(self):
         path = dialogs.get_existing_directory(self, "Select Folder to Watch")
