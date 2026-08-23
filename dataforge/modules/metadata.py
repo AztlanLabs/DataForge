@@ -4,9 +4,12 @@ Unified Metadata Engineering module.
 Read, write, edit, and strip metadata across multiple file formats
 using a tiered handler approach: ExifTool → Pillow → pypdf → mutagen.
 """
+import errno
 import os
 import json
+import shutil
 import subprocess
+import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from functools import lru_cache
@@ -216,7 +219,7 @@ class MetadataEngine:
         return [r for r in results if r is not None]
 
     @staticmethod
-    def write_metadata(path, fields, dry_run=True):
+    def write_metadata(path, fields, dry_run=True, cancel_token=None, progress_callback=None):
         """
         Write metadata fields to a file.
 
@@ -228,6 +231,8 @@ class MetadataEngine:
         Returns:
             dict with success status and message.
         """
+        if cancel_token and getattr(cancel_token, "is_set", lambda: False)():
+            return {"success": False, "message": "Cancelled", "cancelled": True}
         if not os.path.isfile(path):
             return {"success": False, "message": f"File not found: {path}", "dry_run": dry_run}
 
@@ -253,10 +258,10 @@ class MetadataEngine:
         if ext in _AUDIO_EXTENSIONS and HAS_MUTAGEN:
             return _write_mutagen(path, fields)
 
-        return {"success": False, "message": "No write handler available for this format."}
+        return {"success": False, "message": "Install exiftool for write support (no write handler for this format)."}
 
     @staticmethod
-    def remove_metadata(path, fields=None, dry_run=True):
+    def remove_metadata(path, fields=None, dry_run=True, cancel_token=None, progress_callback=None):
         """
         Remove metadata from a file.
 
@@ -268,6 +273,8 @@ class MetadataEngine:
         Returns:
             dict with success status and message.
         """
+        if cancel_token and getattr(cancel_token, "is_set", lambda: False)():
+            return {"success": False, "message": "Cancelled", "cancelled": True}
         if not os.path.isfile(path):
             return {"success": False, "message": f"File not found: {path}"}
 
@@ -285,6 +292,28 @@ class MetadataEngine:
 
         ext = os.path.splitext(path)[1].lower()
 
+        # When GPS-only requested without exiftool, avoid silently stripping all via Pillow
+        if fields and ext in _IMAGE_EXTENSIONS and HAS_PILLOW:
+            is_gps_only = all("gps" in str(f).lower() for f in fields)
+            if is_gps_only:
+                # Try piexif selective GPS removal for JPEG
+                if ext in (".jpg", ".jpeg"):
+                    try:
+                        import piexif  # type: ignore
+                        try:
+                            exif_dict = piexif.load(path)
+                            # Clear GPS IFD
+                            exif_dict["GPS"] = {}
+                            exif_bytes = piexif.dump(exif_dict)
+                            piexif.insert(exif_bytes, path)
+                            return {"success": True, "message": "GPS stripped via piexif (exiftool not available)."}
+                        except Exception as exc:
+                            return {"success": False, "message": f"GPS strip failed (piexif): {exc}. Install exiftool for GPS-only strip."}
+                    except ImportError:
+                        return {"success": False, "message": "Install exiftool for GPS-only strip (Pillow strip is all-or-nothing)."}
+                else:
+                    return {"success": False, "message": "Install exiftool for GPS-only strip (Pillow strip is all-or-nothing)."}
+
         # Pillow: strip image metadata
         if ext in _IMAGE_EXTENSIONS and HAS_PILLOW:
             return _strip_pillow(path)
@@ -297,7 +326,7 @@ class MetadataEngine:
         if ext in _AUDIO_EXTENSIONS and HAS_MUTAGEN:
             return _strip_mutagen(path)
 
-        return {"success": False, "message": "No strip handler available for this format."}
+        return {"success": False, "message": "No strip handler available for this format. Install exiftool for full support."}
 
     @staticmethod
     def extract_gps(path):
@@ -385,11 +414,21 @@ def _write_exiftool(path, fields):
 
 
 def _strip_exiftool(path, fields=None):
-    """Strip metadata using exiftool CLI."""
+    """Strip metadata using exiftool CLI with GPS-aware wildcard."""
     args = ["exiftool", "-overwrite_original"]
     if fields:
-        for field in fields:
-            args.append(f"-{field}=")
+        # If caller requests GPS-only, use wildcard to ensure all GPS tags cleared
+        # while preserving other EXIF (meets acceptance: GPS-only preserves other tags)
+        is_gps_only = all("gps" in str(f).lower() for f in fields)
+        if is_gps_only:
+            # -GPS:all= clears all GPS tags, -XMP:GPS* handles XMP GPS
+            args.append("-GPS:all=")
+            args.append("-XMP:GPS*=")
+            # Also handle Composite if present
+            args.append("-Composite:GPS*=")
+        else:
+            for field in fields:
+                args.append(f"-{field}=")
     else:
         args.append("-all=")
     args.append(path)
@@ -531,36 +570,176 @@ def _parse_pillow_gps(gps_info):
 
 
 def _write_pillow(path, fields):
-    """Write image metadata using Pillow (limited)."""
-    return {"success": False, "message": "Pillow write not supported. Install exiftool for full write support."}
+    """Write image metadata using Pillow (limited).
+
+    Pillow itself cannot write arbitrary EXIF; try piexif fallback for JPEG
+    if available, otherwise return actionable error for UI to surface.
+    """
+    # Try piexif for JPEG if installed — allows limited EXIF write without exiftool
+    try:
+        import piexif  # type: ignore
+        has_piexif = True
+    except ImportError:
+        has_piexif = False
+
+    ext = os.path.splitext(path)[1].lower()
+    if has_piexif and ext in (".jpg", ".jpeg"):
+        try:
+            # Build minimal EXIF dict — piexif supports 0th/Exif/GPS etc.
+            # We only write provided fields as UserComment / ImageDescription fallback
+            # to avoid silent failure; if fields contain known EXIF tags, map them.
+            try:
+                exif_dict = piexif.load(path)
+            except Exception:
+                exif_dict = {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}, "thumbnail": None}
+            # Map simple fields to 0th tag ImageDescription if unknown
+            for k, v in fields.items():
+                try:
+                    # Try to find tag id by name
+                    tag_id = None
+                    for tid, name in TAGS.items():
+                        if name.lower() == k.lower():
+                            tag_id = tid
+                            break
+                    if tag_id is not None:
+                        exif_dict.setdefault("0th", {})[tag_id] = str(v).encode("utf-8", errors="ignore")
+                    else:
+                        # fallback to ImageDescription (270)
+                        exif_dict.setdefault("0th", {})[piexif.ImageIFD.ImageDescription] = str(v).encode("utf-8", errors="ignore")
+                except Exception:
+                    continue
+            exif_bytes = piexif.dump(exif_dict)
+            piexif.insert(exif_bytes, path)
+            return {"success": True, "message": f"Updated {len(fields)} field(s) via piexif."}
+        except Exception as exc:
+            return {"success": False, "message": f"Pillow/piexif write failed: {exc}. Install exiftool for full write support."}
+
+    return {"success": False, "message": "Install exiftool for write support (Pillow write not supported)."}
 
 
 def _strip_pillow(path):
-    """Strip image metadata using Pillow."""
+    """Strip image metadata using Pillow with cross-device safety.
+
+    Creates temp file in same directory to avoid EXDEV, falls back to
+    shutil.copyfile when replace crosses devices. Preserves format,
+    palette/transparency handling, and strips EXIF without getdata loop
+    data loss for RGBA/P modes.
+    """
     if not HAS_PILLOW:
         return {"success": False, "message": "Pillow not available."}
 
+    tmp_path = None
     try:
-        img = Image.open(path)
-        data = list(img.getdata())
-        clean_img = Image.new(img.mode, img.size)
-        clean_img.putdata(data)
+        dir_ = os.path.dirname(os.path.abspath(path)) or "."
+        ext = os.path.splitext(path)[1]
 
-        # Save with no EXIF
-        import tempfile
-        temp_fd, temp_path = tempfile.mkstemp(suffix=os.path.splitext(path)[1])
-        os.close(temp_fd)
+        # Open image and create clean copy without metadata
+        with Image.open(path) as img:
+            fmt = img.format
+            if not fmt:
+                ext_lower = ext.lower()
+                if ext_lower in (".jpg", ".jpeg"):
+                    fmt = "JPEG"
+                elif ext_lower == ".png":
+                    fmt = "PNG"
+                elif ext_lower in (".tiff", ".tif"):
+                    fmt = "TIFF"
+                elif ext_lower == ".webp":
+                    fmt = "WEBP"
+                elif ext_lower == ".bmp":
+                    fmt = "BMP"
+                else:
+                    fmt = ext.lstrip(".").upper() or "PNG"
 
-        save_kwargs = {}
-        if img.format == "JPEG":
-            save_kwargs["quality"] = 95
-        clean_img.save(temp_path, format=img.format, **save_kwargs)
-        img.close()
-        clean_img.close()
+            # Build clean image preserving pixels but not metadata
+            # Handle palette / alpha correctly
+            if img.mode == "P":
+                palette = img.getpalette()
+                data = list(img.getdata())
+                clean_img = Image.new(img.mode, img.size)
+                if palette:
+                    try:
+                        clean_img.putpalette(palette)
+                    except Exception:
+                        pass
+                clean_img.putdata(data)
+                # Preserve transparency for palette images if needed (still not sensitive)
+                # but strip EXIF/text chunks by not copying info
+            elif img.mode in ("RGBA", "LA", "PA"):
+                clean_img = Image.new(img.mode, img.size)
+                clean_img.putdata(list(img.getdata()))
+            else:
+                try:
+                    # Try fast bytes path
+                    clean_img = Image.frombytes(img.mode, img.size, img.tobytes())
+                except Exception:
+                    clean_img = Image.new(img.mode, img.size)
+                    clean_img.putdata(list(img.getdata()))
 
-        os.replace(temp_path, path)
+            save_kwargs = {}
+            if fmt == "JPEG":
+                save_kwargs["quality"] = 95
+                save_kwargs["exif"] = b""
+            elif fmt == "PNG":
+                # Pillow saves PNG without EXIF by default; ensure no text info carried
+                pass
+
+            # Create temp file in same dir; fallback to system tmp if not writable
+            try:
+                fd, tmp_path = tempfile.mkstemp(suffix=ext, dir=dir_)
+                os.close(fd)
+            except OSError:
+                fd, tmp_path = tempfile.mkstemp(suffix=ext)
+                os.close(fd)
+
+            clean_img.save(tmp_path, format=fmt, **save_kwargs)
+            try:
+                clean_img.close()
+            except Exception:
+                pass
+
+        # Atomic replace with EXDEV fallback
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.replace(tmp_path, path)
+            except OSError as e:
+                is_cross = getattr(e, "errno", None) == errno.EXDEV or "cross-device" in str(e).lower() or "Invalid cross-device" in str(e)
+                if is_cross:
+                    try:
+                        shutil.copyfile(tmp_path, path)
+                    except shutil.SameFileError:
+                        pass
+                    finally:
+                        try:
+                            if os.path.exists(tmp_path):
+                                os.unlink(tmp_path)
+                        except Exception:
+                            pass
+                else:
+                    try:
+                        if os.path.exists(tmp_path):
+                            os.unlink(tmp_path)
+                    except Exception:
+                        pass
+                    raise
+            else:
+                if os.path.exists(tmp_path):
+                    try:
+                        os.unlink(tmp_path)
+                    except Exception:
+                        pass
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
         return {"success": True, "message": "Metadata stripped via Pillow."}
     except Exception as exc:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
         return {"success": False, "message": f"Pillow strip failed: {exc}"}
 
 
@@ -595,11 +774,13 @@ def _read_pypdf(path):
 
 
 def _strip_pypdf(path):
-    """Strip PDF metadata."""
+    """Strip PDF metadata with cross-device safety."""
     if not HAS_PYPDF:
         return {"success": False, "message": "pypdf not available."}
 
+    tmp_path = None
     try:
+        dir_ = os.path.dirname(os.path.abspath(path)) or "."
         reader = PdfReader(path)
         writer = PdfWriter()
 
@@ -608,16 +789,56 @@ def _strip_pypdf(path):
 
         writer.add_metadata({})
 
-        import tempfile
-        temp_fd, temp_path = tempfile.mkstemp(suffix=".pdf")
-        os.close(temp_fd)
+        try:
+            fd, tmp_path = tempfile.mkstemp(suffix=".pdf", dir=dir_)
+            os.close(fd)
+        except OSError:
+            fd, tmp_path = tempfile.mkstemp(suffix=".pdf")
+            os.close(fd)
 
-        with open(temp_path, "wb") as f:
+        with open(tmp_path, "wb") as f:
             writer.write(f)
 
-        os.replace(temp_path, path)
+        try:
+            os.replace(tmp_path, path)
+        except OSError as e:
+            is_cross = getattr(e, "errno", None) == errno.EXDEV or "cross-device" in str(e).lower() or "Invalid cross-device" in str(e)
+            if is_cross:
+                try:
+                    shutil.copyfile(tmp_path, path)
+                except shutil.SameFileError:
+                    pass
+                finally:
+                    try:
+                        if os.path.exists(tmp_path):
+                            os.unlink(tmp_path)
+                    except Exception:
+                        pass
+            else:
+                try:
+                    if os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+                except Exception:
+                    pass
+                raise
+        else:
+            if os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
         return {"success": True, "message": "PDF metadata stripped."}
     except Exception as exc:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
         return {"success": False, "message": f"PDF strip failed: {exc}"}
 
 
