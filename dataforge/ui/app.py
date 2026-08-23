@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
     QStatusBar, QMessageBox, QScrollArea, QFrame, QGraphicsOpacityEffect
 )
 from PyQt5.QtCore import QThread, pyqtSignal, Qt, QPropertyAnimation, QEasingCurve, QSize
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QPixmap
 
 from .views.base import BaseView
 from .views.dashboard import DashboardView
@@ -1089,15 +1089,39 @@ class DataForgeApp(QMainWindow):
 
         Looks the data URL up in the dict ``build_navigation_sidebar``
         populated in ``self._icons``; missing keys are silently ignored
-        so plugin views without a curated icon do not error out."""
+        so plugin views without a curated icon do not error out.
+
+        Note: ``QIcon(data_url)`` does not support ``data:image/svg+xml``
+        URLs — it treats the string as a file path and yields a null
+        pixmap (shows as “?”/“x” fallback). We must decode via
+        ``QPixmap.loadFromData`` first (as ``_update_theme_icon`` does
+        for the sun/moon label)."""
         icons = getattr(self, "_icons", None)
         if not icons or icon_key not in icons:
             return
-        btn.setIcon(QIcon(icons[icon_key]))
+        try:
+            pixmap = QPixmap()
+            pixmap.loadFromData(self._data_url_to_bytes(icons[icon_key]), "SVG")
+            if pixmap.isNull():
+                # Fallback: try SVG+XML variant (Qt 5.15.11 needs exact)
+                pixmap.loadFromData(self._data_url_to_bytes(icons[icon_key]), "SVG+XML")
+            if not pixmap.isNull():
+                btn.setIcon(QIcon(pixmap))
+            else:
+                # Last resort: direct QIcon (will show fallback but not crash)
+                btn.setIcon(QIcon(icons[icon_key]))
+        except Exception:
+            try:
+                btn.setIcon(QIcon(icons[icon_key]))
+            except Exception:
+                return
         # The icon size matches the button's font height (in device
         # pixels) so the glyph sits flush with the text label.
-        size = btn.fontMetrics().height()
-        btn.setIconSize(QSize(size, size))
+        try:
+            size = btn.fontMetrics().height()
+            btn.setIconSize(QSize(size, size))
+        except Exception:
+            btn.setIconSize(QSize(16, 16))
 
     def apply_theme(self, is_dark: bool):
         """
