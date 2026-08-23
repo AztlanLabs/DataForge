@@ -10,9 +10,10 @@ import json
 # NOTE: `json` is used by the Integrity tab to write/read baseline snapshots.
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QGroupBox, QGridLayout, QTabWidget, QLineEdit, QTextEdit,
-    QCheckBox, QComboBox, QMessageBox, QSpinBox, QSplitter
+    QCheckBox, QComboBox, QMessageBox, QSpinBox, QSplitter, QTreeView, QHeaderView, QAbstractItemView, QMenu,
+    QApplication
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QSortFilterProxyModel
 
 from .base import BaseView
 from ..theme_tokens import TOKENS, TYPE_SCALE
@@ -46,6 +47,166 @@ from ...modules.password_tools import (
     check_pdf2john_available,
     list_common_wordlists,
 )
+
+
+class TimelineModel(QAbstractTableModel):
+    """Virtualised model for timeline events (TICK-506 U3).
+
+    Lazily provides data via QAbstractTableModel so QTreeView virtualises
+    rendering — no QTreeWidgetItem per row, no 5000 hard cap. Supports
+    sorting via UserRole and filtering via proxy.
+    """
+
+    COLUMNS = ["Timestamp (UTC)", "Filename", "Size", "Ext", "UID", "GID", "Mode"]
+    _KEYS = ["timestamp_iso", "filename", "size", "extension", "owner_uid", "owner_gid", "mode"]
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._events: list[dict] = []
+
+    def rowCount(self, parent=QModelIndex()):  # noqa: N802
+        if parent.isValid():
+            return 0
+        return len(self._events)
+
+    def columnCount(self, parent=QModelIndex()):  # noqa: N802
+        return len(self.COLUMNS)
+
+    def data(self, index, role=Qt.DisplayRole):  # noqa: N802
+        if not index.isValid() or role not in (Qt.DisplayRole, Qt.UserRole):
+            return None
+        event = self._events[index.row()]
+        col = index.column()
+        if col == 0:
+            val = event.get("timestamp_iso") or event.get("timestamp", "")
+            return val
+        if col == 1:
+            val = event.get("filename", "")
+            return val.lower() if role == Qt.UserRole else val
+        if col == 2:
+            size = event.get("size", 0)
+            if role == Qt.UserRole:
+                try:
+                    return int(size)
+                except Exception:
+                    return 0
+            return format_size(int(size) if isinstance(size, (int, float)) else 0)
+        if col == 3:
+            val = event.get("extension", "") or event.get("ext", "")
+            return val.lower() if role == Qt.UserRole else val
+        if col == 4:
+            uid = event.get("owner_uid", "")
+            if role == Qt.UserRole:
+                try:
+                    return int(uid)
+                except Exception:
+                    return str(uid)
+            return str(uid)
+        if col == 5:
+            gid = event.get("owner_gid", "")
+            if role == Qt.UserRole:
+                try:
+                    return int(gid)
+                except Exception:
+                    return str(gid)
+            return str(gid)
+        if col == 6:
+            val = event.get("mode", "")
+            return val
+        return None
+
+    def headerData(self, section, orientation, role=Qt.DisplayRole):  # noqa: N802
+        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+            if 0 <= section < len(self.COLUMNS):
+                return self.COLUMNS[section]
+        return None
+
+    def set_events(self, events):
+        self.beginResetModel()
+        self._events = list(events) if events else []
+        self.endResetModel()
+
+    def get_event(self, row):
+        if 0 <= row < len(self._events):
+            return self._events[row]
+        return None
+
+    def sort(self, column, order=Qt.AscendingOrder):  # noqa: N802
+        if not self._events or column < 0 or column >= len(self.COLUMNS):
+            return
+        reverse = order == Qt.DescendingOrder
+        self.layoutAboutToBeChanged.emit()
+        try:
+            if column == 0:
+                self._events.sort(key=lambda e: e.get("timestamp_iso") or e.get("timestamp", ""), reverse=reverse)
+            elif column == 1:
+                self._events.sort(key=lambda e: str(e.get("filename", "")).lower(), reverse=reverse)
+            elif column == 2:
+                self._events.sort(key=lambda e: int(e.get("size", 0) or 0), reverse=reverse)
+            elif column == 3:
+                self._events.sort(key=lambda e: str(e.get("extension", "") or e.get("ext", "")).lower(), reverse=reverse)
+            elif column == 4:
+                self._events.sort(
+                    key=lambda e: int(e.get("owner_uid", 0)) if str(e.get("owner_uid", "")).lstrip("-").isdigit() else str(e.get("owner_uid", "")),
+                    reverse=reverse,
+                )
+            elif column == 5:
+                self._events.sort(
+                    key=lambda e: int(e.get("owner_gid", 0)) if str(e.get("owner_gid", "")).lstrip("-").isdigit() else str(e.get("owner_gid", "")),
+                    reverse=reverse,
+                )
+            elif column == 6:
+                self._events.sort(key=lambda e: str(e.get("mode", "")), reverse=reverse)
+        finally:
+            self.layoutChanged.emit()
+
+
+class TimelineProxyModel(QSortFilterProxyModel):
+    """Proxy for TimelineModel providing case-insensitive filtering across all columns."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFilterCaseSensitivity(Qt.CaseInsensitive)
+        self.setFilterKeyColumn(-1)
+        self.setSortCaseSensitivity(Qt.CaseInsensitive)
+
+    def filterAcceptsRow(self, source_row, source_parent):  # noqa: N802
+        if self.filterRegExp().isEmpty():
+            return True
+        pattern = self.filterRegExp().pattern().lower()
+        if not pattern:
+            return True
+        model = self.sourceModel()
+        for col in range(model.columnCount()):
+            idx = model.index(source_row, col, source_parent)
+            data = model.data(idx, Qt.DisplayRole)
+            if data and pattern in str(data).lower():
+                return True
+            # also check UserRole for numeric/text hidden values
+            udata = model.data(idx, Qt.UserRole)
+            if udata and pattern in str(udata).lower():
+                return True
+        return False
+
+    def lessThan(self, left, right):  # noqa: N802
+        # Prefer UserRole for numeric-aware sorting
+        model = self.sourceModel()
+        lval = model.data(left, Qt.UserRole)
+        rval = model.data(right, Qt.UserRole)
+        if lval is None:
+            lval = model.data(left, Qt.DisplayRole)
+        if rval is None:
+            rval = model.data(right, Qt.DisplayRole)
+        # Numeric compare when both are numbers
+        if isinstance(lval, (int, float)) and isinstance(rval, (int, float)):
+            return lval < rval
+        try:
+            # Try numeric string compare
+            if isinstance(lval, str) and isinstance(rval, str) and lval.isdigit() and rval.isdigit():
+                return int(lval) < int(rval)
+        except Exception:
+            pass
+        return str(lval).lower() < str(rval).lower()
 
 
 class ForensicsView(BaseView):
@@ -786,35 +947,203 @@ class ForensicsView(BaseView):
         h_layout.addWidget(self.btn_timeline)
         tab_layout.addWidget(header)
 
+        # Filter row — enables filtering without rebuilding
+        filter_row = QWidget(tab)
+        f_layout = QHBoxLayout(filter_row)
+        f_layout.setContentsMargins(0, 0, 0, 5)
+        f_layout.addWidget(QLabel("Filter:"))
+        self.timeline_filter = QLineEdit(filter_row)
+        self.timeline_filter.setPlaceholderText("Filter by filename, extension, etc. (case-insensitive)")
+        self.timeline_filter.textChanged.connect(self._on_timeline_filter_changed)
+        f_layout.addWidget(self.timeline_filter)
+        f_layout.addStretch()
+        tab_layout.addWidget(filter_row)
+
         self.lbl_timeline_status = QLabel("Builds a UTC timestamped event list for every file.", tab)
         self.lbl_timeline_status.setProperty("class", "muted")
         self.lbl_timeline_status.setWordWrap(True)
         tab_layout.addWidget(self.lbl_timeline_status)
 
-        self.timeline_tree = EnhancedTreeview(
-            tab, columns=("timestamp", "filename", "size", "ext", "uid", "gid", "mode"), app=self.app,
-        )
-        self.timeline_tree.heading("timestamp", text="Timestamp (UTC)")
-        self.timeline_tree.column("timestamp", width=200, stretch=False)
-        self.timeline_tree.heading("filename", text="Filename")
-        self.timeline_tree.heading("size", text="Size")
-        self.timeline_tree.column("size", width=70, stretch=False)
-        self.timeline_tree.heading("ext", text="Ext")
-        self.timeline_tree.column("ext", width=60, stretch=False)
-        self.timeline_tree.heading("uid", text="UID")
-        self.timeline_tree.column("uid", width=60, stretch=False)
-        self.timeline_tree.heading("gid", text="GID")
-        self.timeline_tree.column("gid", width=60, stretch=False)
-        self.timeline_tree.heading("mode", text="Mode")
-        self.timeline_tree.column("mode", width=80, stretch=False)
-        self._timeline_path_by_item = {}
-        self.timeline_tree.set_path_resolver(self._resolve_timeline_path)
-        tab_layout.addWidget(self.timeline_tree, 1)
+        # Virtualised view — QTreeView + TimelineModel (no hard cap, lazy rendering)
+        self.timeline_model = TimelineModel(self)
+        self.timeline_proxy = TimelineProxyModel(self)
+        self.timeline_proxy.setSourceModel(self.timeline_model)
+
+        self.timeline_view = QTreeView(tab)
+        self.timeline_view.setModel(self.timeline_proxy)
+        self.timeline_view.setRootIsDecorated(False)
+        self.timeline_view.setAlternatingRowColors(True)
+        self.timeline_view.setSortingEnabled(True)
+        self.timeline_view.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.timeline_view.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.timeline_view.setUniformRowHeights(True)
+        self.timeline_view.setTextElideMode(Qt.ElideLeft)
+        # Performance: QTreeView virtualises — no widget per row, handles 100k+ events
+        # Column sizing — preserve existing structure (timestamp 200, size 70, ext 60, uid 60, gid 60, mode 80, filename stretch)
+        _header = self.timeline_view.header()
+        _header.setSectionResizeMode(1, QHeaderView.Stretch)
+        for _col in (0, 2, 3, 4, 5, 6):
+            _header.setSectionResizeMode(_col, QHeaderView.Fixed)
+        self.timeline_view.setColumnWidth(0, 200)
+        self.timeline_view.setColumnWidth(2, 70)
+        self.timeline_view.setColumnWidth(3, 60)
+        self.timeline_view.setColumnWidth(4, 60)
+        self.timeline_view.setColumnWidth(5, 60)
+        self.timeline_view.setColumnWidth(6, 80)
+        self.timeline_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.timeline_view.customContextMenuRequested.connect(self._show_timeline_context_menu)
+        self.timeline_view.doubleClicked.connect(self._on_timeline_double_clicked)
+        tab_layout.addWidget(self.timeline_view, 1)
+
+        # Backward compat alias — external code/tests referencing timeline_tree still work
+        self.timeline_tree = self.timeline_view  # type: ignore[assignment]
+        self._timeline_path_by_item: dict[str, str] = {}
+        # EnhancedTreeview no longer used for timeline; virtualisation via QTreeView
 
         self.tabs.addTab(tab, "🕰 Timeline")
 
-    def _resolve_timeline_path(self, item_id):
-        return self._timeline_path_by_item.get(item_id)
+    def _resolve_timeline_path(self, item_id=None):  # noqa: ANN001
+        """Resolve filesystem path for timeline row.
+
+        Supports legacy item_id dict lookup, QModelIndex, or current selection.
+        """
+        # 1. Legacy dict (kept for compatibility / tests)
+        if isinstance(item_id, str) and item_id in getattr(self, "_timeline_path_by_item", {}):
+            return self._timeline_path_by_item.get(item_id)
+        # 2. QModelIndex (proxy or source)
+        if isinstance(item_id, QModelIndex) and item_id.isValid():
+            try:
+                src = self.timeline_proxy.mapToSource(item_id) if hasattr(self, "timeline_proxy") else item_id
+                ev = self.timeline_model.get_event(src.row()) if hasattr(self, "timeline_model") else None
+                if ev:
+                    return ev.get("path")
+            except Exception:
+                pass
+        # 3. Try current selection
+        try:
+            sel = self.timeline_view.selectionModel().selectedRows() if hasattr(self, "timeline_view") else []
+            if sel:
+                src = self.timeline_proxy.mapToSource(sel[0])
+                ev = self.timeline_model.get_event(src.row())
+                if ev:
+                    return ev.get("path")
+        except Exception:
+            pass
+        # 4. Fallback legacy
+        if isinstance(item_id, str):
+            return self._timeline_path_by_item.get(item_id)
+        return None
+
+    def _get_timeline_selected_path(self):
+        """Return path for currently selected timeline row or None."""
+        try:
+            sel = self.timeline_view.selectionModel().selectedRows()
+            if not sel:
+                return None
+            src = self.timeline_proxy.mapToSource(sel[0])
+            ev = self.timeline_model.get_event(src.row())
+            return ev.get("path") if ev else None
+        except Exception:
+            return None
+
+    def _on_timeline_filter_changed(self, text):  # noqa: ANN001
+        if not hasattr(self, "timeline_proxy"):
+            return
+        # QSortFilterProxyModel uses filterRegExp; setFixedString is case-insensitive via proxy setting
+        self.timeline_proxy.setFilterFixedString(text or "")
+        # Update status label with filtered count
+        try:
+            total = self.timeline_model.rowCount()
+            filtered = self.timeline_proxy.rowCount()
+            if text:
+                self.lbl_timeline_status.setText(f"{total} events total, {filtered} matching filter (\"{text}\").")
+            else:
+                self.lbl_timeline_status.setText(f"{total} events total (showing {total}). Newest first.")
+        except Exception:
+            pass
+
+    def _show_timeline_context_menu(self, pos):  # noqa: ANN001
+        path = self._get_timeline_selected_path()
+        has_path = bool(path and os.path.exists(path) or path and os.path.isabs(path))
+        # Build menu similar to EnhancedTreeview but minimal for timeline
+        menu = QMenu(self.timeline_view)
+        # Copy actions always available (copy cell values)
+        try:
+            idx = self.timeline_view.indexAt(pos)
+            if idx.isValid():
+                src = self.timeline_proxy.mapToSource(idx)
+                col = src.column()
+                header = self.timeline_model.headerData(col, Qt.Horizontal, Qt.DisplayRole) or f"Col {col}"
+                val = self.timeline_model.data(src, Qt.DisplayRole) or ""
+                act_copy = menu.addAction(f"Copy {header}")
+                act_copy.triggered.connect(lambda _c, t=str(val): QApplication.clipboard().setText(t))
+                menu.addSeparator()
+        except Exception:
+            pass
+        open_act = menu.addAction("Open File")
+        open_act.setEnabled(has_path)
+        open_act.triggered.connect(self._timeline_open_file)
+        open_loc_act = menu.addAction("Open Location")
+        open_loc_act.setEnabled(has_path)
+        open_loc_act.triggered.connect(self._timeline_open_location)
+        if not has_path:
+            menu.addSeparator()
+            na = menu.addAction("(No file path on this row)")
+            na.setEnabled(False)
+        menu.exec_(self.timeline_view.viewport().mapToGlobal(pos))
+
+    def _on_timeline_double_clicked(self, proxy_index):  # noqa: ANN001
+        # Double-click opens file (respects has_path check)
+        self._timeline_open_file()
+
+    def _timeline_open_file(self):
+        path = self._get_timeline_selected_path()
+        if not path:
+            if self.app:
+                self.app.show_warning_dialog("No File Path", "This row has no resolvable file path.")
+            return
+        if not os.path.exists(path):
+            if self.app:
+                self.app.show_warning_dialog("Not Found", f"File does not exist anymore:\n{path}")
+            return
+        try:
+            import subprocess
+            import sys as _sys
+
+            if _sys.platform == "win32":
+                os.startfile(path)  # type: ignore[attr-defined]
+            elif _sys.platform == "darwin":
+                subprocess.call(["open", path])
+            else:
+                subprocess.call(["xdg-open", path])
+        except Exception as exc:
+            if self.app:
+                self.app.show_error_dialog("Error", f"Could not open file: {exc}")
+
+    def _timeline_open_location(self):
+        path = self._get_timeline_selected_path()
+        if not path:
+            if self.app:
+                self.app.show_warning_dialog("No File Path", "This row has no resolvable file path.")
+            return
+        folder = os.path.dirname(path)
+        if not os.path.exists(folder):
+            if self.app:
+                self.app.show_warning_dialog("Not Found", f"Folder does not exist:\n{folder}")
+            return
+        try:
+            import subprocess
+            import sys as _sys
+
+            if _sys.platform == "win32":
+                os.startfile(folder)  # type: ignore[attr-defined]
+            elif _sys.platform == "darwin":
+                subprocess.call(["open", folder])
+            else:
+                subprocess.call(["xdg-open", folder])
+        except Exception as exc:
+            if self.app:
+                self.app.show_error_dialog("Error", f"Could not open folder: {exc}")
 
     def _build_timeline(self):
         path = self.timeline_path.text().strip()
@@ -833,24 +1162,24 @@ class ForensicsView(BaseView):
         )
 
     def _on_timeline_built(self, events):
-        self.timeline_tree.tree.clear()
-        self.timeline_tree.item_map.clear()
-        self._timeline_path_by_item.clear()
-        for ev in events[:5000]:
-            iid = self.timeline_tree.insert("", "end", values=(
-                ev.get("timestamp_iso", ""),
-                ev.get("filename", ""),
-                format_size(ev.get("size", 0)),
-                ev.get("extension", ""),
-                str(ev.get("owner_uid", "")),
-                str(ev.get("owner_gid", "")),
-                ev.get("mode", ""),
-            ))
-            self._timeline_path_by_item[iid] = ev.get("path", "")
-            self.timeline_tree.set_item_path(iid, ev.get("path"))
-        shown = min(len(events), 5000)
+        # Virtualised model — no 5000 hard cap; QTreeView handles large datasets efficiently
+        if not hasattr(self, "timeline_model"):
+            # Fallback for legacy path (should not happen after migration)
+            self.timeline_model = TimelineModel(self)  # type: ignore[attr-defined]
+        self.timeline_model.set_events(events)
+        # Keep legacy dict populated for compatibility/tests expecting entry per event
+        try:
+            self._timeline_path_by_item.clear()
+            for idx, ev in enumerate(events):
+                self._timeline_path_by_item[str(idx)] = ev.get("path", "")
+        except Exception:
+            pass
+        # Clear filter after new data so all rows visible
+        if hasattr(self, "timeline_filter") and self.timeline_filter.text():
+            # keep filter but re-apply via proxy (rowCount will update)
+            self.timeline_proxy.invalidateFilter()
         self.lbl_timeline_status.setText(
-            f"{len(events)} events total (showing {shown}). Newest first."
+            f"{len(events)} events total (showing {len(events)}). Newest first."
         )
         self.app.update_status(f"Timeline built: {len(events)} events.")
 
