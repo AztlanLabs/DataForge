@@ -438,7 +438,11 @@ class DataForgeApp(QMainWindow):
         # QGraphicsOpacityEffect on every view forces offscreen pixmap
         # composition and breaks QComboBox popup geometry (QTBUG-80786:
         # popup at 0,0 / top-right when ancestor has effect). No effect at
-        # rest means popups map correctly and paint is faster.
+        # rest means popups map correctly and paint is faster. Views are
+        # made styled/opaque so semi-transparent crossfade does not show
+        # desktop behind (visual glitch 2026-08-23).
+        view_instance.setAttribute(Qt.WA_StyledBackground, True)
+        view_instance.setAutoFillBackground(True)
         self.content_stack.addWidget(view_instance)
         self.views[title] = view_instance
 
