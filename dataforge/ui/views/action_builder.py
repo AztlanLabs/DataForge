@@ -20,6 +20,29 @@ from ...core.actions.io import MoveStep, CopyStep, DeleteStep, ZipStep
 from ...core.actions.organize import OrganizeStep
 from ...core.actions.media import ConvertImageStep
 
+# TICK-806: step type registry for JSON serialization
+_STEP_REGISTRY = {
+    "SearchFilter": SearchFilter,
+    "SizeFilter": SizeFilter,
+    "DateFilter": DateFilter,
+    "ImagePropFilter": ImagePropFilter,
+    "ExtensionFilter": ExtensionFilter,
+    "DuplicateFilter": DuplicateFilter,
+    "SignatureMismatchFilter": SignatureMismatchFilter,
+    "EmptyFileFilter": EmptyFileFilter,
+    "EmptyFolderFilter": EmptyFolderFilter,
+    "RenameStep": RenameStep,
+    "MetaCleanStep": MetaCleanStep,
+    "HashLogStep": HashLogStep,
+    "NormalizeNameStep": NormalizeNameStep,
+    "MoveStep": MoveStep,
+    "CopyStep": CopyStep,
+    "DeleteStep": DeleteStep,
+    "ZipStep": ZipStep,
+    "OrganizeStep": OrganizeStep,
+    "ConvertImageStep": ConvertImageStep,
+}
+
 class ActionBuilderView(BaseView):
     TOOLTIP_TEXTS = {
         "recursive": "Include files from subfolders when the pipeline scans the source path.",
@@ -429,3 +452,105 @@ Operations to perform on the filtered files.
              
         for path, action, status in result:
             self.action_tree.insert("", "end", values=(path, os.path.basename(path), action, status))
+
+    # --------------------------------------------------------------
+    # TICK-806: serialization for automation store
+    # --------------------------------------------------------------
+    def to_dict(self) -> dict:
+        """Serialize builder state (steps + source config) for JSON store.
+
+        Returns dict with ``steps`` list of ``{type, params}``. Used by
+        ``AutomationsView`` to persist custom automations.
+        """
+        steps_data = []
+        for s in getattr(self, "steps", []):
+            try:
+                steps_data.append({"type": type(s).__name__, "params": dict(getattr(s, "params", {}) or {})})
+            except Exception:
+                steps_data.append({"type": type(s).__name__, "params": {}})
+        data: dict = {"steps": steps_data}
+        # Persist source config if widgets exist
+        try:
+            if hasattr(self, "entry_path"):
+                data["path"] = self.entry_path.text().strip()
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "chk_recursive"):
+                data["recursive"] = bool(self.chk_recursive.isChecked())
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "spin_depth"):
+                data["depth"] = int(self.spin_depth.value())
+        except Exception:
+            pass
+        return data
+
+    def from_dict(self, data: dict) -> None:
+        """Restore builder state from dict produced by :meth:`to_dict`.
+
+        Clears current steps and rebuilds them via ``_STEP_REGISTRY``. Unknown
+        types are skipped.
+        """
+        if not isinstance(data, dict):
+            return
+        steps_data = data.get("steps", []) or []
+        new_steps = []
+        for entry in steps_data:
+            if not isinstance(entry, dict):
+                continue
+            t = entry.get("type")
+            params = entry.get("params") if isinstance(entry.get("params"), dict) else {}
+            cls = _STEP_REGISTRY.get(t)
+            if cls is None:
+                continue
+            try:
+                step = cls(params if isinstance(params, dict) else {})
+                # Ensure params is set even if cls ignores it
+                if isinstance(params, dict):
+                    step.params = dict(params)
+            except Exception:
+                try:
+                    step = cls()
+                    step.params = dict(params) if isinstance(params, dict) else {}
+                except Exception:
+                    continue
+            new_steps.append(step)
+        self.steps = new_steps
+        # Restore source config
+        try:
+            if "path" in data and hasattr(self, "entry_path"):
+                self.entry_path.setText(str(data.get("path", "")))
+        except Exception:
+            pass
+        try:
+            if "recursive" in data and hasattr(self, "chk_recursive"):
+                self.chk_recursive.setChecked(bool(data.get("recursive", True)))
+        except Exception:
+            pass
+        try:
+            if "depth" in data and hasattr(self, "spin_depth"):
+                self.spin_depth.setValue(int(data.get("depth", -1)))
+        except Exception:
+            pass
+        try:
+            self.refresh_steps_ui()
+        except Exception:
+            pass
+
+    def load_automation(self, data: dict) -> None:
+        """Load an automation dict (wrapper with ``name``/``steps`` or bare).
+
+        Wrapper form used by ``AutomationsView`` store: ``{"name": ..., "steps": [...], ...}``.
+        Bare form is the builder dict itself. Delegates to :meth:`from_dict`.
+        """
+        if not isinstance(data, dict):
+            return
+        # If wrapper contains steps as list of type/params, unwrap to builder dict
+        if "steps" in data and isinstance(data["steps"], list):
+            # Could be wrapper or builder — both have steps. Pass through.
+            # If wrapper has outer keys, from_dict will still handle steps key.
+            self.from_dict(data)
+        else:
+            self.from_dict(data)
