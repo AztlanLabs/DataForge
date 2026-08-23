@@ -7,6 +7,7 @@ GPU, network, and motherboard with upgrade recommendations.
 import platform
 import subprocess
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 from ..core.utils import format_size
 
@@ -18,7 +19,23 @@ except ImportError:
     HAS_PSUTIL = False
 
 
-def _run_cmd(cmd, timeout=10, cancel_token=None):
+def _check_cancel(cancel_token):
+    """Raise InterruptedError if cancel_token is set — TICK-901 per-step check."""
+    if cancel_token is not None and hasattr(cancel_token, "is_set") and cancel_token.is_set():
+        raise InterruptedError("Hardware scan cancelled")
+
+
+def _safe_psutil_call(fn, default=None, timeout=2.0):
+    """Run psutil call with ThreadPoolExecutor timeout — prevents SIGSEGV hang."""
+    try:
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            fut = ex.submit(fn)
+            return fut.result(timeout=timeout)
+    except Exception:
+        return default
+
+
+def _run_cmd(cmd, timeout=5, cancel_token=None):
     """Run a shell command and return stdout or None.
 
     TICK-808: check cancel_token before/after to respect STOP within 1s.
@@ -104,8 +121,7 @@ def get_hardware_report(progress_callback=None, cancel_token=None):
 
 def _get_system_overview(cancel_token=None):
     """Basic system identification."""
-    if cancel_token is not None and cancel_token.is_set():
-        raise InterruptedError("Hardware scan cancelled")
+    _check_cancel(cancel_token)
     info = {
         "os": platform.system(),
         "os_release": platform.release(),
@@ -117,8 +133,7 @@ def _get_system_overview(cancel_token=None):
 
     # Linux: get distro info
     if platform.system() == "Linux":
-        if cancel_token is not None and cancel_token.is_set():
-            raise InterruptedError("Hardware scan cancelled")
+        _check_cancel(cancel_token)
         distro = _run_cmd(["lsb_release", "-d", "-s"], cancel_token=cancel_token)
         if distro:
             info["distro"] = distro
@@ -127,8 +142,7 @@ def _get_system_overview(cancel_token=None):
             try:
                 with open("/etc/os-release", "r") as f:
                     for line in f:
-                        if cancel_token is not None and cancel_token.is_set():
-                            raise InterruptedError("Hardware scan cancelled")
+                        _check_cancel(cancel_token)
                         if line.startswith("PRETTY_NAME="):
                             info["distro"] = line.split("=", 1)[1].strip().strip('"')
                             break
@@ -140,28 +154,25 @@ def _get_system_overview(cancel_token=None):
 
 def _get_cpu_details(cancel_token=None):
     """Detailed CPU information."""
-    if cancel_token is not None and cancel_token.is_set():
-        raise InterruptedError("Hardware scan cancelled")
+    _check_cancel(cancel_token)
     cpu = {
         "architecture": platform.machine(),
         "processor": platform.processor(),
     }
 
     if HAS_PSUTIL:
-        if cancel_token is not None and cancel_token.is_set():
-            raise InterruptedError("Hardware scan cancelled")
-        cpu["physical_cores"] = psutil.cpu_count(logical=False)
-        cpu["logical_cores"] = psutil.cpu_count(logical=True)
+        _check_cancel(cancel_token)
+        cpu["physical_cores"] = _safe_psutil_call(lambda: psutil.cpu_count(logical=False))
+        cpu["logical_cores"] = _safe_psutil_call(lambda: psutil.cpu_count(logical=True))
         try:
-            freq = psutil.cpu_freq()
+            freq = _safe_psutil_call(lambda: psutil.cpu_freq(), default=None)
             if freq:
                 cpu["frequency_mhz"] = round(freq.current, 1)
                 cpu["max_frequency_mhz"] = round(freq.max, 1)
                 cpu["min_frequency_mhz"] = round(freq.min, 1)
         except Exception:
             pass
-        if cancel_token is not None and cancel_token.is_set():
-            raise InterruptedError("Hardware scan cancelled")
+        _check_cancel(cancel_token)
 
     # Linux: parse /proc/cpuinfo
     if platform.system() == "Linux":
@@ -169,8 +180,7 @@ def _get_cpu_details(cancel_token=None):
             with open("/proc/cpuinfo", "r") as f:
                 content = f.read()
                 for line in content.split("\n"):
-                    if cancel_token is not None and cancel_token.is_set():
-                        raise InterruptedError("Hardware scan cancelled")
+                    _check_cancel(cancel_token)
                     if "model name" in line:
                         cpu["model"] = line.split(":")[1].strip()
                     elif "cache size" in line:
@@ -185,48 +195,44 @@ def _get_cpu_details(cancel_token=None):
                         cpu["avx2"] = "avx2" in flags
         except OSError:
             pass
-        if cancel_token is not None and cancel_token.is_set():
-            raise InterruptedError("Hardware scan cancelled")
+        _check_cancel(cancel_token)
 
     return cpu
 
 
 def _get_ram_details(cancel_token=None):
     """Detailed RAM information."""
-    if cancel_token is not None and cancel_token.is_set():
-        raise InterruptedError("Hardware scan cancelled")
+    _check_cancel(cancel_token)
     ram = {}
 
     if HAS_PSUTIL:
-        if cancel_token is not None and cancel_token.is_set():
-            raise InterruptedError("Hardware scan cancelled")
-        mem = psutil.virtual_memory()
-        ram["total_bytes"] = mem.total
-        ram["formatted_total"] = format_size(mem.total)
-        ram["available_bytes"] = mem.available
-        ram["used_bytes"] = mem.used
-        ram["percent_used"] = mem.percent
+        _check_cancel(cancel_token)
+        mem = _safe_psutil_call(lambda: psutil.virtual_memory(), default=None)
+        if mem:
+            ram["total_bytes"] = mem.total
+            ram["formatted_total"] = format_size(mem.total)
+            ram["available_bytes"] = mem.available
+            ram["used_bytes"] = mem.used
+            ram["percent_used"] = mem.percent
 
-        swap = psutil.swap_memory()
-        ram["swap_total_bytes"] = swap.total
-        ram["swap_formatted_total"] = format_size(swap.total)
-        if cancel_token is not None and cancel_token.is_set():
-            raise InterruptedError("Hardware scan cancelled")
+        swap = _safe_psutil_call(lambda: psutil.swap_memory(), default=None)
+        if swap:
+            ram["swap_total_bytes"] = swap.total
+            ram["swap_formatted_total"] = format_size(swap.total)
+        _check_cancel(cancel_token)
 
     # Linux: try dmidecode for RAM type/speed (requires root — never use sudo here)
     # On startup this would trigger a password prompt. We try without sudo;
     # if not permitted, _run_cmd returns None and we gracefully skip
     # detailed DIMM info (sysfs fallback in _get_motherboard_details covers most).
     if platform.system() == "Linux" and _command_available("dmidecode"):
-        if cancel_token is not None and cancel_token.is_set():
-            raise InterruptedError("Hardware scan cancelled")
+        _check_cancel(cancel_token)
         dmidecode = _run_cmd(["dmidecode", "-t", "memory"], timeout=5, cancel_token=cancel_token)
         if dmidecode:
             ram["modules"] = []
             current_module = {}
             for line in dmidecode.split("\n"):
-                if cancel_token is not None and cancel_token.is_set():
-                    raise InterruptedError("Hardware scan cancelled")
+                _check_cancel(cancel_token)
                 line = line.strip()
                 if line.startswith("Size:") and "No Module" not in line:
                     current_module["size"] = line.split(":", 1)[1].strip()
@@ -245,45 +251,42 @@ def _get_ram_details(cancel_token=None):
 
 def _get_storage_details(cancel_token=None):
     """Detailed storage information."""
-    if cancel_token is not None and cancel_token.is_set():
-        raise InterruptedError("Hardware scan cancelled")
+    _check_cancel(cancel_token)
     storage = {"partitions": [], "devices": []}
 
     if HAS_PSUTIL:
-        for partition in psutil.disk_partitions(all=False):
-            if cancel_token is not None and cancel_token.is_set():
-                raise InterruptedError("Hardware scan cancelled")
+        partitions = _safe_psutil_call(lambda: psutil.disk_partitions(all=False), default=[])
+        for partition in partitions or []:
+            _check_cancel(cancel_token)
             part_info = {
                 "device": partition.device,
                 "mountpoint": partition.mountpoint,
                 "fstype": partition.fstype,
             }
             try:
-                usage = psutil.disk_usage(partition.mountpoint)
-                part_info.update({
-                    "total_bytes": usage.total,
-                    "formatted_total": format_size(usage.total),
-                    "used_bytes": usage.used,
-                    "free_bytes": usage.free,
-                    "percent_used": usage.percent,
-                })
+                usage = _safe_psutil_call(lambda: psutil.disk_usage(partition.mountpoint), default=None)
+                if usage:
+                    part_info.update({
+                        "total_bytes": usage.total,
+                        "formatted_total": format_size(usage.total),
+                        "used_bytes": usage.used,
+                        "free_bytes": usage.free,
+                        "percent_used": usage.percent,
+                    })
             except (PermissionError, OSError):
                 pass
             storage["partitions"].append(part_info)
-            if cancel_token is not None and cancel_token.is_set():
-                raise InterruptedError("Hardware scan cancelled")
+            _check_cancel(cancel_token)
 
     # Linux: lsblk for physical device info
     if platform.system() == "Linux":
-        if cancel_token is not None and cancel_token.is_set():
-            raise InterruptedError("Hardware scan cancelled")
+        _check_cancel(cancel_token)
         lsblk = _run_cmd(["lsblk", "-J", "-o", "NAME,SIZE,TYPE,ROTA,MODEL,TRAN"], cancel_token=cancel_token)
         if lsblk:
             try:
                 data = json.loads(lsblk)
                 for device in data.get("blockdevices", []):
-                    if cancel_token is not None and cancel_token.is_set():
-                        raise InterruptedError("Hardware scan cancelled")
+                    _check_cancel(cancel_token)
                     if device.get("type") == "disk":
                         storage["devices"].append({
                             "name": f"/dev/{device['name']}",
@@ -295,27 +298,23 @@ def _get_storage_details(cancel_token=None):
                         })
             except (json.JSONDecodeError, KeyError):
                 pass
-        if cancel_token is not None and cancel_token.is_set():
-            raise InterruptedError("Hardware scan cancelled")
+        _check_cancel(cancel_token)
 
     return storage
 
 
 def _get_gpu_details(cancel_token=None):
     """GPU information."""
-    if cancel_token is not None and cancel_token.is_set():
-        raise InterruptedError("Hardware scan cancelled")
+    _check_cancel(cancel_token)
     gpus = []
 
     # Linux: lspci
     if platform.system() == "Linux":
-        if cancel_token is not None and cancel_token.is_set():
-            raise InterruptedError("Hardware scan cancelled")
+        _check_cancel(cancel_token)
         lspci = _run_cmd(["lspci"], cancel_token=cancel_token)
         if lspci:
             for line in lspci.split("\n"):
-                if cancel_token is not None and cancel_token.is_set():
-                    raise InterruptedError("Hardware scan cancelled")
+                _check_cancel(cancel_token)
                 if "VGA" in line or "3D" in line or "Display" in line:
                     gpus.append({
                         "description": line.split(":", 2)[-1].strip() if ":" in line else line,
@@ -323,13 +322,11 @@ def _get_gpu_details(cancel_token=None):
                     })
 
         # Try nvidia-smi for NVIDIA GPUs
-        if cancel_token is not None and cancel_token.is_set():
-            raise InterruptedError("Hardware scan cancelled")
+        _check_cancel(cancel_token)
         nvidia = _run_cmd(["nvidia-smi", "--query-gpu=name,memory.total,driver_version", "--format=csv,noheader"], cancel_token=cancel_token)
         if nvidia:
             for line in nvidia.split("\n"):
-                if cancel_token is not None and cancel_token.is_set():
-                    raise InterruptedError("Hardware scan cancelled")
+                _check_cancel(cancel_token)
                 parts = [p.strip() for p in line.split(",")]
                 if len(parts) >= 3:
                     gpus.append({
@@ -338,27 +335,25 @@ def _get_gpu_details(cancel_token=None):
                         "driver": parts[2],
                         "source": "nvidia-smi",
                     })
-        if cancel_token is not None and cancel_token.is_set():
-            raise InterruptedError("Hardware scan cancelled")
+        _check_cancel(cancel_token)
 
     return gpus
 
 
 def _get_network_details(cancel_token=None):
     """Network interface details."""
-    if cancel_token is not None and cancel_token.is_set():
-        raise InterruptedError("Hardware scan cancelled")
+    _check_cancel(cancel_token)
     interfaces = []
 
     if HAS_PSUTIL:
-        if cancel_token is not None and cancel_token.is_set():
-            raise InterruptedError("Hardware scan cancelled")
-        addrs = psutil.net_if_addrs()
-        stats = psutil.net_if_stats()
+        _check_cancel(cancel_token)
+        addrs = _safe_psutil_call(lambda: psutil.net_if_addrs(), default={})
+        stats = _safe_psutil_call(lambda: psutil.net_if_stats(), default={})
+        addrs = addrs or {}
+        stats = stats or {}
 
         for name, addr_list in addrs.items():
-            if cancel_token is not None and cancel_token.is_set():
-                raise InterruptedError("Hardware scan cancelled")
+            _check_cancel(cancel_token)
             iface = {
                 "name": name,
                 "is_up": stats.get(name) and stats[name].isup,
@@ -372,16 +367,14 @@ def _get_network_details(cancel_token=None):
                     "address": addr.address,
                 })
             interfaces.append(iface)
-            if cancel_token is not None and cancel_token.is_set():
-                raise InterruptedError("Hardware scan cancelled")
+            _check_cancel(cancel_token)
 
     return interfaces
 
 
 def _get_motherboard_details(cancel_token=None):
     """Motherboard/BIOS information (Linux only, may require root)."""
-    if cancel_token is not None and cancel_token.is_set():
-        raise InterruptedError("Hardware scan cancelled")
+    _check_cancel(cancel_token)
     board = {}
 
     if platform.system() == "Linux":
@@ -396,8 +389,7 @@ def _get_motherboard_details(cancel_token=None):
         }
 
         for key, path in dmi_paths.items():
-            if cancel_token is not None and cancel_token.is_set():
-                raise InterruptedError("Hardware scan cancelled")
+            _check_cancel(cancel_token)
             try:
                 with open(path, "r") as f:
                     value = f.read().strip()
@@ -405,8 +397,7 @@ def _get_motherboard_details(cancel_token=None):
                         board[key] = value
             except (OSError, IOError):
                 pass
-            if cancel_token is not None and cancel_token.is_set():
-                raise InterruptedError("Hardware scan cancelled")
+            _check_cancel(cancel_token)
 
     return board
 
