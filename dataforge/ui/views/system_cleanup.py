@@ -434,6 +434,12 @@ class SystemCleanupView(BaseView):
             self.entry_path.setText(path)
 
     def _start_junk_scan(self):
+        # TICK-905: debounce — disable button while scanning, ignore rapid 3x clicks
+        try:
+            if not self.btn_scan.isEnabled():
+                return
+        except Exception:
+            pass
         selected_cats = [name for name, chk in self.category_checks.items() if chk.isChecked()]
         if not selected_cats:
             self.app.show_warning_dialog("No Categories", "Select at least one junk category to scan.")
@@ -444,12 +450,29 @@ class SystemCleanupView(BaseView):
 
         self.junk_results = {}
         self.item_entries = {}
-        self.junk_tree.tree.clear()
-        self.junk_tree.item_map.clear()
+        # TICK-905: clear with updates disabled to avoid repaint during mount/crossfade
+        try:
+            self.junk_tree.tree.setUpdatesEnabled(False)
+            self.junk_tree.tree.clear()
+            self.junk_tree.item_map.clear()
+        finally:
+            try:
+                self.junk_tree.tree.setUpdatesEnabled(True)
+            except Exception:
+                pass
+            try:
+                self.junk_tree.refresh_viewport()
+            except Exception:
+                pass
         self.lbl_junk_summary.setText("Scanning for junk files...")
         self.lbl_total_savings.setText("Reclaimable: scanning...")
         self.lbl_file_count.setText("Files: scanning...")
         self.app.update_status("Scanning for junk files...")
+        try:
+            self.btn_scan.setEnabled(False)
+            self.btn_scan.setText("SCANNING...")
+        except Exception:
+            pass
 
         self.app.run_workflow(
             scan_junk_files,
@@ -460,10 +483,44 @@ class SystemCleanupView(BaseView):
             self.spin_age.value(),
             progress=True,
             error_title="Junk Scan Failed",
+            on_error=self._on_junk_scan_error,
         )
 
+    def _on_junk_scan_error(self, error):
+        # TICK-905: re-enable button on error/cancel path
+        try:
+            self.btn_scan.setEnabled(True)
+            self.btn_scan.setText("SCAN JUNK")
+        except Exception:
+            pass
+        try:
+            # Delegate to app's default error handler
+            self.app.show_workflow_error("Junk Scan Failed", error)
+        except Exception:
+            try:
+                self.app.show_error_dialog("Junk Scan Failed", str(error))
+            except Exception:
+                pass
+
     def _on_junk_scan_complete(self, results):
-        self.junk_results = results
+        # TICK-905: always re-enable scan button (success or empty)
+        try:
+            self.btn_scan.setEnabled(True)
+            self.btn_scan.setText("SCAN JUNK")
+        except Exception:
+            pass
+        # Handle cancellation dicts from worker
+        if isinstance(results, dict) and results.get("cancelled"):
+            self.lbl_junk_summary.setText("Scan cancelled.")
+            self.lbl_total_savings.setText("Reclaimable: —")
+            self.lbl_file_count.setText("Files: —")
+            self.lbl_action_status.setText("Scan cancelled.")
+            try:
+                self.app.update_status("Junk scan cancelled.")
+            except Exception:
+                pass
+            return
+        self.junk_results = results if isinstance(results, dict) else {}
 
         if not results:
             self.lbl_junk_summary.setText("No junk files found. Your system looks clean!")
@@ -492,23 +549,50 @@ class SystemCleanupView(BaseView):
         )
 
     def _rebuild_junk_tree(self):
-        self.junk_tree.tree.clear()
-        self.junk_tree.item_map.clear()
-        self.item_entries = {}
+        # TICK-905: harden bulk insert — disable updates + sorting, refresh viewport deferred
+        try:
+            self.junk_tree.tree.setSortingEnabled(False)
+        except Exception:
+            pass
+        try:
+            self.junk_tree.tree.setUpdatesEnabled(False)
+        except Exception:
+            pass
+        try:
+            self.junk_tree.tree.clear()
+            self.junk_tree.item_map.clear()
+            self.item_entries = {}
 
-        for category, entries in self.junk_results.items():
-            total_size = sum(e.size for e in entries)
-            group_id = self.junk_tree.insert(
-                "", "end",
-                values=("GROUP", category, f"{len(entries)} files", format_size(total_size)),
-                open=False,
-            )
-            for entry in entries:
-                item_id = self.junk_tree.insert(
-                    group_id, "end",
-                    values=(entry.extension, category, entry.path, format_size(entry.size)),
+            for category, entries in self.junk_results.items():
+                total_size = sum(e.size for e in entries)
+                group_id = self.junk_tree.insert(
+                    "", "end",
+                    values=("GROUP", category, f"{len(entries)} files", format_size(total_size)),
+                    open=False,
                 )
-                self.item_entries[item_id] = entry
+                for entry in entries:
+                    item_id = self.junk_tree.insert(
+                        group_id, "end",
+                        values=(entry.extension, category, entry.path, format_size(entry.size)),
+                    )
+                    self.item_entries[item_id] = entry
+        finally:
+            try:
+                self.junk_tree.tree.setUpdatesEnabled(True)
+            except Exception:
+                pass
+            try:
+                self.junk_tree.tree.setSortingEnabled(True)
+            except Exception:
+                pass
+            try:
+                self.junk_tree.refresh_viewport()
+            except Exception:
+                try:
+                    from PyQt5.QtCore import QTimer
+                    QTimer.singleShot(0, lambda: self.junk_tree.tree.viewport().update())
+                except Exception:
+                    pass
 
     def _on_junk_selection_changed(self):
         sel = self.junk_tree.selection()
