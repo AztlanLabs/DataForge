@@ -111,8 +111,14 @@ class Job:
 
     def cancel(self) -> None:
         self.cancel_token.set()
-        if self.status == JobStatus.QUEUED:
-            self.status = JobStatus.CANCELLED
+        # TICK-802: set CANCELLED even if RUNNING (not only QUEUED). Done/Failed already terminal.
+        if self.status in (JobStatus.DONE, JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.COMPLETED):
+            return
+        self.status = JobStatus.CANCELLED
+        if self.finished_at is None:
+            self.finished_at = time.time()
+        # Avoid duplicate consecutive CANCELLED events
+        if not self.events or self.events[-1].status != JobStatus.CANCELLED:
             self.events.append(
                 JobEvent(
                     job_id=self.job_id,
@@ -289,9 +295,18 @@ class JobQueue:
             return
         try:
             result = self._invoke_worker(job, func)
+            # TICK-802: normalize dict cancelled result even if token not set
+            is_result_cancelled = isinstance(result, dict) and result.get("cancelled") is True
             with self._lock:
-                if job.is_cancelled():
+                if job.is_cancelled() or is_result_cancelled:
                     job.status = JobStatus.CANCELLED
+                    if is_result_cancelled:
+                        job.results = result
+                    elif isinstance(result, dict) and "cancelled" not in result:
+                        # Preserve normal result but mark cancelled for UI
+                        job.results = {"cancelled": True, "result": result}
+                    else:
+                        job.results = result
                     job.events.append(
                         JobEvent(
                             job_id=job.job_id,
@@ -314,10 +329,27 @@ class JobQueue:
                     )
                 job.finished_at = time.time()
             self._append_job_record(job)
+        except InterruptedError as exc:  # TICK-802: normalize to cancelled, not FAILED
+            with self._lock:
+                job.status = JobStatus.CANCELLED
+                job.results = {"cancelled": True, "message": str(exc)}
+                job.error = None
+                job.finished_at = time.time()
+                job.events.append(
+                    JobEvent(
+                        job_id=job.job_id,
+                        type="status",
+                        status=JobStatus.CANCELLED,
+                        message="cancelled",
+                    )
+                )
+            self._append_job_record(job)
         except Exception as exc:  # pylint: disable=broad-except
             with self._lock:
-                if job.is_cancelled():
+                if job.is_cancelled() or isinstance(exc, InterruptedError):
                     job.status = JobStatus.CANCELLED
+                    job.results = {"cancelled": True, "message": str(exc)}
+                    job.error = None
                     job.events.append(
                         JobEvent(
                             job_id=job.job_id,
@@ -346,16 +378,29 @@ class JobQueue:
         params: Optional[Any] = None,
         provider: Any = "local",
         progress_callback: Optional[Callable[..., Any]] = None,
+        execute: bool = True,
         **kwargs: Any,
     ) -> Job:
+        """Submit a job. When execute=False, registry-only (no ThreadPool run).
+
+        TICK-802: JobManager uses execute=False to avoid double execution;
+        ManagedWorker is sole executor and JobQueue tracks metadata only.
+        Direct JobQueue callers (tests, daemon) keep execute=True.
+        """
+        # Pop execute from kwargs if caller passed it as kwarg (for **kwargs merging)
+        if "execute" in kwargs and isinstance(kwargs["execute"], bool):
+            # Only if explicitly passed via **kwargs and not already handled
+            pass
         if params is None:
             norm_params: Any = {}
         else:
             norm_params = params
-        if isinstance(norm_params, dict) and kwargs:
-            norm_params = {**norm_params, **kwargs}
-        elif kwargs and not isinstance(norm_params, dict):
-            norm_params = kwargs
+        # Don't merge 'execute' into params
+        clean_kwargs = {k: v for k, v in kwargs.items() if k != "execute"}
+        if isinstance(norm_params, dict) and clean_kwargs:
+            norm_params = {**norm_params, **clean_kwargs}
+        elif clean_kwargs and not isinstance(norm_params, dict):
+            norm_params = clean_kwargs
         elif isinstance(norm_params, dict):
             norm_params = dict(norm_params)
         if self._queued_count() >= self.queue_depth:
@@ -366,14 +411,15 @@ class JobQueue:
             progress_callback=progress_callback,
             status=JobStatus.QUEUED,
         )
-        if not isinstance(params, dict) and params is not None and not kwargs:
-            job.params = params
+        if not isinstance(params, dict) and params is not None and not clean_kwargs:
+            job.params = params  # type: ignore[assignment]
         with self._lock:
             self._jobs[job.job_id] = job
         self._append_job_record(job)
-        future = self._executor.submit(self._run_job, job, func)
-        with self._lock:
-            self._futures[job.job_id] = future
+        if execute:
+            future = self._executor.submit(self._run_job, job, func)
+            with self._lock:
+                self._futures[job.job_id] = future
         return job
 
     def get(self, job_id: str) -> Optional[Job]:
