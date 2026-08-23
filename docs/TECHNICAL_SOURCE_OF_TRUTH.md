@@ -616,9 +616,9 @@ Plugin loading:
 
 #### `dataforge/ui/plugin_loader.py`
 
-Dynamic loader for GUI view plugins.
+Dynamic loader for GUI view plugins (F12 remainder — TICK-509).
 
-- `PluginLoader(plugin_dir)` — `load_plugins() -> List[Type[BaseView]]`. Scans for `.py` files, imports dynamically, collects `BaseView` subclasses. Skips `__init__.py`. Handles import errors gracefully.
+- `PluginLoader(plugin_dir, enabled=False, isolation='inline'|'subprocess', require_signed=False, trust_anchor=None, audit_log=None)` — `load_plugins() -> List[Type[BaseView]]`. Scans `*.py`, enforces opt-in + world-writable + owner checks (S5), verifies detached `plugin.sig` against `trust_anchor` (default `~/.local/share/DataForge/plugins-trusted.gpg` if `python-gnupg` else `plugins-trusted.sha256`; raises `PluginSignatureMissingError` / `PluginSignatureInvalidError`), optionally probes each import in `concurrent.futures.ProcessPoolExecutor(max_workers=min(2,cpu_count()-1))` + `multiprocessing.Queue` (+ `subprocess.run` fallback) and discards worker on timeout/crash, collects `BaseView` subclasses, skips `__init__.py`, handles import errors gracefully. Each outcome (load / signed / refused / failed) appends to `AuditLog` (`plugin_load`, `plugin_load_signed`, `plugin_load_unsigned_refused`, `plugin_load_failed`). Constant `HAS_PLUGINSIGN=True`.
 
 #### `dataforge/ui/widgets.py`
 
