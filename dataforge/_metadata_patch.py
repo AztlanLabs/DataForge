@@ -111,14 +111,33 @@ def _warn_once(dist, context: str) -> None:
         if key in _warned_dists:
             return
         _warned_dists.add(key)
-        import warnings
+        # Use debug-level log instead of RuntimeWarning to avoid noisy
+        # startup output on NTFS mounts with a single corrupted .dist-info.
+        # The app continues correctly; verbose `-W` will still surface it.
+        try:
+            import logging
 
-        warnings.warn(
-            f"[metadata-patch] Skipping corrupted distribution at {dist!r} ({context}): Input/output error — NTFS/fuse corruption. "
-            f"Recreate venv on ext4 or run `ntfsfix`/`chkdsk`. App continues without that plugin.",
-            RuntimeWarning,
-            stacklevel=3,
-        )
+            logging.getLogger("dataforge").debug(
+                "[metadata-patch] Skipping corrupted distribution at %r (%s): Input/output error — NTFS/fuse corruption. "
+                "Recreate venv on ext4 or run `ntfsfix`/`chkdsk`. App continues without that plugin.",
+                dist,
+                context,
+            )
+        except Exception:
+            pass
+        # Also emit a warning only when Python warnings are enabled (-W)
+        # so normal runs stay quiet (ImportWarning is ignored by default).
+        try:
+            import warnings
+
+            warnings.warn(
+                f"[metadata-patch] Skipping corrupted distribution at {dist!r} ({context}): Input/output error — NTFS/fuse corruption. "
+                f"Recreate venv on ext4 or run `ntfsfix`/`chkdsk`. App continues without that plugin.",
+                ImportWarning,
+                stacklevel=4,
+            )
+        except Exception:
+            pass
     except Exception:
         pass
 
