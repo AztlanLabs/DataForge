@@ -53,6 +53,20 @@ class _ConfigProxy:
 config = _ConfigProxy()
 
 
+def _is_private_systemd_dir(path: str) -> bool:
+    """Return True for systemd private tmp dirs that should be skipped quietly."""
+    try:
+        # systemd creates /tmp/systemd-private-<hash>-<service>-<suffix> and /var/tmp/systemd-private-*
+        # owned 0700 root, many per service. Floods warning if scanned.
+        if "/systemd-private" in path:
+            return True
+        if path.startswith("/var/tmp/systemd-private") or path.startswith("/tmp/systemd-private"):
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def _get_max_workers() -> int:
     try:
         c = os.cpu_count()
@@ -142,6 +156,15 @@ def _scan_single_dir(
     subdirs: list[tuple[str, int]] = []
     if cancel_token is not None and cancel_token.is_set():
         return files, subdirs
+    # TICK-905: skip private systemd dirs quietly before scandir to avoid warning flood
+    if _is_private_systemd_dir(dir_path):
+        logger.debug(f"Skipping private systemd dir {dir_path}")
+        if on_error is not None:
+            try:
+                on_error(dir_path, PermissionError(f"private systemd tmp: {dir_path}"))
+            except Exception:
+                pass
+        return files, subdirs
     try:
         with os.scandir(dir_path) as it:
             for entry in it:
@@ -164,6 +187,10 @@ def _scan_single_dir(
 
                 if is_dir:
                     if entry.name in excl_folders:
+                        continue
+                    # TICK-905: skip private systemd dirs entirely
+                    if _is_private_systemd_dir(entry.path):
+                        logger.debug(f"Skipping private systemd subdir {entry.path}")
                         continue
                     # Depth gating
                     if depth_remaining == 0:
@@ -292,19 +319,32 @@ def _scan_single_dir(
                         st=st,
                     )
                 )
+    except PermissionError as e:
+        # TICK-905: PermissionError on scandir is non-fatal dir skip, no acquire_file fallback
+        _log_scan_error(dir_path, e, on_error)
+        return [], []
     except OSError as e:
         _log_scan_error(dir_path, e, on_error)
+        return [], []
     return files, subdirs
 
 
 def _log_scan_error(path: str, exc: Exception, on_error=None) -> None:
     """Log a scan OSError with specific handling and invoke optional callback."""
+    # TICK-905: private systemd dirs log at debug to avoid warning flood
+    is_private = _is_private_systemd_dir(path)
     if isinstance(exc, FileNotFoundError):
         logger.warning("Path not found: %s", path)
     elif isinstance(exc, PermissionError):
-        logger.warning("Permission denied: %s", path)
+        if is_private:
+            logger.debug("Permission denied (private systemd, skipped): %s", path)
+        else:
+            logger.warning("Permission denied: %s", path)
     else:
-        logger.warning("OS error scanning %s: %s", path, exc)
+        if is_private:
+            logger.debug("OS error scanning private dir %s: %s", path, exc)
+        else:
+            logger.warning("OS error scanning %s: %s", path, exc)
     if on_error is not None:
         try:
             on_error(path, exc)
@@ -404,6 +444,44 @@ def scan_directory(
             if cancel_token is not None and cancel_token.is_set():
                 # Cancel pending futures and drain
                 return
+
+            # TICK-905: pre-filter private systemd dirs before submitting to pool
+            filtered_level: list[tuple[str, int]] = []
+            for d, depth in current_level:
+                if _is_private_systemd_dir(d):
+                    logger.debug(f"Skipping private systemd dir before submit: {d}")
+                    if on_error is not None:
+                        try:
+                            on_error(d, PermissionError(f"private systemd tmp: {d}"))
+                        except Exception:
+                            pass
+                    continue
+                # Also skip non-readable dirs via os.access probe to avoid warning flood
+                try:
+                    if not os.access(d, os.R_OK | os.X_OK):
+                        # Confirm with scandir probe to avoid false positive on weird perms
+                        try:
+                            with os.scandir(d):
+                                pass
+                        except PermissionError:
+                            logger.debug(f"Skipping unreadable dir {d}")
+                            if on_error is not None:
+                                try:
+                                    on_error(d, PermissionError(f"unreadable: {d}"))
+                                except Exception:
+                                    pass
+                            continue
+                        except OSError:
+                            logger.debug(f"Skipping unreadable dir {d}")
+                            continue
+                except Exception:
+                    pass
+                filtered_level.append((d, depth))
+            if not filtered_level:
+                # All dirs filtered, drain and exit loop, next_level will be empty
+                current_level = []
+                continue
+            current_level = filtered_level
 
             futures = {
                 executor.submit(

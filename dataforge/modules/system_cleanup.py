@@ -177,6 +177,18 @@ BROWSER_ARTIFACT_PATTERNS = {
 _SYSTEM_TEMP_DIRS = {"/tmp", "/var/tmp"}
 
 
+def _is_private_systemd_dir(path: str) -> bool:
+    """TICK-905: detect systemd private tmp dirs to skip quietly."""
+    try:
+        if "/systemd-private" in path:
+            return True
+        if path.startswith("/var/tmp/systemd-private") or path.startswith("/tmp/systemd-private"):
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def _is_socket_or_fifo(path):
     """Return True if *path* is a Unix socket, FIFO, or other special file
     that should never be classified as junk."""
@@ -258,26 +270,94 @@ def scan_junk_files(
     unique_dirs = list(dir_category_map.keys())
     total_dirs = len(unique_dirs)
 
+    # TICK-905: throttle progress to reduce status bar paint spam
+    _progress_counter = 0
+
+    def _throttled_progress(current, total, name):
+        nonlocal _progress_counter
+        if progress_callback is None:
+            return
+        # throttle to every 10 files/dirs or first/last
+        _progress_counter += 1
+        if _progress_counter % 10 == 0 or current >= total - 1 or current == 0:
+            try:
+                progress_callback(current, total, name)
+            except Exception:
+                pass
+
     for idx, scan_dir in enumerate(unique_dirs):
         if cancel_token and cancel_token.is_set():
             break
 
-        if progress_callback:
-            progress_callback(idx, total_dirs, f"Scanning: {scan_dir}")
-
+        # TICK-905: filter non-readable / private systemd dirs before walk
+        if _is_private_systemd_dir(scan_dir):
+            logger.debug(f"Skipping private systemd dir {scan_dir}")
+            continue
         if not os.path.isdir(scan_dir):
             continue
+        # Probe readability with os.access + scandir to avoid warning flood
+        try:
+            # os.access check (fast) — skip if not R+X
+            if not os.access(scan_dir, os.R_OK | os.X_OK):
+                try:
+                    with os.scandir(scan_dir):
+                        pass
+                except PermissionError as e:
+                    logger.debug(f"Skipping unreadable {scan_dir}: {e}")
+                    continue
+                except OSError as e:
+                    logger.debug(f"Skipping unreadable {scan_dir}: {e}")
+                    continue
+            else:
+                # Even if access says ok, probe scandir for private mounts
+                try:
+                    with os.scandir(scan_dir):
+                        pass
+                except PermissionError as e:
+                    if _is_private_systemd_dir(scan_dir):
+                        logger.debug(f"Skipping private systemd dir {scan_dir}: {e}")
+                    else:
+                        logger.debug(f"Skipping unreadable {scan_dir}: {e}")
+                    continue
+                except OSError as e:
+                    logger.debug(f"Skipping unreadable {scan_dir}: {e}")
+                    continue
+        except Exception:
+            pass
+
+        if progress_callback:
+            # per-dir progress, throttled via helper is not needed here but keep direct for first dir
+            try:
+                progress_callback(idx, total_dirs, f"Scanning: {scan_dir}")
+            except Exception:
+                pass
+
+        if cancel_token and cancel_token.is_set():
+            break
 
         entries = []
         try:
             for entry in scan_directory(scan_dir, recursive=True, max_depth=5, cancel_token=cancel_token):
+                if cancel_token and cancel_token.is_set():
+                    break
                 if entry.is_dir:
                     continue
                 if _is_socket_or_fifo(entry.path):
                     continue
                 entries.append(entry)
+                # throttle progress per 10 files to avoid QBackingStore spam
+                if progress_callback and len(entries) % 10 == 0:
+                    _throttled_progress(idx, total_dirs, f"Scanning: {scan_dir} ({len(entries)} files)")
         except (PermissionError, OSError) as exc:
+            if _is_private_systemd_dir(scan_dir):
+                logger.debug(f"Cannot scan private dir {scan_dir}: {exc}")
+            else:
+                logger.debug(f"Cannot scan {scan_dir}: {exc}")
+        except Exception as exc:
             logger.debug(f"Cannot scan {scan_dir}: {exc}")
+
+        if cancel_token and cancel_token.is_set():
+            break
 
         if entries:
             dir_entries[scan_dir] = entries
