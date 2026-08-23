@@ -18,7 +18,7 @@ except ImportError:
     HAS_PSUTIL = False
 
 
-def _run_cmd(cmd, timeout=10, cancel_token=None):
+def _run_cmd(cmd, timeout=5, cancel_token=None):
     """Run a shell command and return stdout or None.
 
     TICK-808: check cancel_token before/after to respect STOP within 1s.
@@ -45,6 +45,41 @@ def _command_available(cmd):
         return result.returncode == 0
     except Exception:
         return False
+
+
+def _psutil_with_timeout(func, *args, timeout=2.0, default=None, **kwargs):
+    """Run psutil function with 2s timeout to avoid SIGSEGV blocking UI thread.
+
+    TICK-901: all psutil calls wrapped with try + daemon thread 2s fallback.
+    Returns default on timeout/error so hardware report never crashes.
+    Uses daemon thread so timeout doesn't block pytest exit.
+    """
+    try:
+        import queue
+        import threading
+
+        q: queue.Queue = queue.Queue()
+
+        def _target():
+            try:
+                q.put(("result", func(*args, **kwargs)))
+            except Exception as e:
+                q.put(("error", e))
+
+        t = threading.Thread(target=_target, daemon=True)
+        t.start()
+        try:
+            kind, value = q.get(timeout=timeout)
+            if kind == "result":
+                return value
+            else:
+                return default
+        except queue.Empty:
+            return default
+        except Exception:
+            return default
+    except Exception:
+        return default
 
 
 # ---------------------------------------------------------------------------
@@ -150,10 +185,13 @@ def _get_cpu_details(cancel_token=None):
     if HAS_PSUTIL:
         if cancel_token is not None and cancel_token.is_set():
             raise InterruptedError("Hardware scan cancelled")
-        cpu["physical_cores"] = psutil.cpu_count(logical=False)
-        cpu["logical_cores"] = psutil.cpu_count(logical=True)
+        # TICK-901: wrap psutil with 2s timeout to avoid SIGSEGV blocking UI
+        cpu["physical_cores"] = _psutil_with_timeout(psutil.cpu_count, logical=False, default=None)
+        if cancel_token is not None and cancel_token.is_set():
+            raise InterruptedError("Hardware scan cancelled")
+        cpu["logical_cores"] = _psutil_with_timeout(psutil.cpu_count, logical=True, default=None)
         try:
-            freq = psutil.cpu_freq()
+            freq = _psutil_with_timeout(psutil.cpu_freq, default=None)
             if freq:
                 cpu["frequency_mhz"] = round(freq.current, 1)
                 cpu["max_frequency_mhz"] = round(freq.max, 1)
@@ -200,16 +238,21 @@ def _get_ram_details(cancel_token=None):
     if HAS_PSUTIL:
         if cancel_token is not None and cancel_token.is_set():
             raise InterruptedError("Hardware scan cancelled")
-        mem = psutil.virtual_memory()
-        ram["total_bytes"] = mem.total
-        ram["formatted_total"] = format_size(mem.total)
-        ram["available_bytes"] = mem.available
-        ram["used_bytes"] = mem.used
-        ram["percent_used"] = mem.percent
+        # TICK-901: wrap psutil with timeout
+        mem = _psutil_with_timeout(psutil.virtual_memory, default=None)
+        if mem is not None:
+            ram["total_bytes"] = mem.total
+            ram["formatted_total"] = format_size(mem.total)
+            ram["available_bytes"] = mem.available
+            ram["used_bytes"] = mem.used
+            ram["percent_used"] = mem.percent
+        if cancel_token is not None and cancel_token.is_set():
+            raise InterruptedError("Hardware scan cancelled")
 
-        swap = psutil.swap_memory()
-        ram["swap_total_bytes"] = swap.total
-        ram["swap_formatted_total"] = format_size(swap.total)
+        swap = _psutil_with_timeout(psutil.swap_memory, default=None)
+        if swap is not None:
+            ram["swap_total_bytes"] = swap.total
+            ram["swap_formatted_total"] = format_size(swap.total)
         if cancel_token is not None and cancel_token.is_set():
             raise InterruptedError("Hardware scan cancelled")
 
@@ -250,7 +293,11 @@ def _get_storage_details(cancel_token=None):
     storage = {"partitions": [], "devices": []}
 
     if HAS_PSUTIL:
-        for partition in psutil.disk_partitions(all=False):
+        # TICK-901: wrap disk_partitions with timeout
+        partitions = _psutil_with_timeout(psutil.disk_partitions, all=False, default=[])
+        if partitions is None:
+            partitions = []
+        for partition in partitions:
             if cancel_token is not None and cancel_token.is_set():
                 raise InterruptedError("Hardware scan cancelled")
             part_info = {
@@ -259,14 +306,15 @@ def _get_storage_details(cancel_token=None):
                 "fstype": partition.fstype,
             }
             try:
-                usage = psutil.disk_usage(partition.mountpoint)
-                part_info.update({
-                    "total_bytes": usage.total,
-                    "formatted_total": format_size(usage.total),
-                    "used_bytes": usage.used,
-                    "free_bytes": usage.free,
-                    "percent_used": usage.percent,
-                })
+                usage = _psutil_with_timeout(psutil.disk_usage, partition.mountpoint, default=None)
+                if usage is not None:
+                    part_info.update({
+                        "total_bytes": usage.total,
+                        "formatted_total": format_size(usage.total),
+                        "used_bytes": usage.used,
+                        "free_bytes": usage.free,
+                        "percent_used": usage.percent,
+                    })
             except (PermissionError, OSError):
                 pass
             storage["partitions"].append(part_info)
@@ -353,8 +401,13 @@ def _get_network_details(cancel_token=None):
     if HAS_PSUTIL:
         if cancel_token is not None and cancel_token.is_set():
             raise InterruptedError("Hardware scan cancelled")
-        addrs = psutil.net_if_addrs()
-        stats = psutil.net_if_stats()
+        # TICK-901: wrap network psutil with timeout
+        addrs = _psutil_with_timeout(psutil.net_if_addrs, default={})
+        if addrs is None:
+            addrs = {}
+        stats = _psutil_with_timeout(psutil.net_if_stats, default={})
+        if stats is None:
+            stats = {}
 
         for name, addr_list in addrs.items():
             if cancel_token is not None and cancel_token.is_set():
