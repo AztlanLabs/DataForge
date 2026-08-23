@@ -424,10 +424,14 @@ class EnhancedTreeview(QWidget):
     """
     Treeview wrapper using QTreeWidget with sorting, context menu, and compatibility methods.
     """
-    def __init__(self, master, columns, app=None, on_file_action=None, **kwargs):
+    def __init__(self, master, columns, app=None, on_file_action=None, view=None, **kwargs):
         super().__init__(master)
         self.app = app
         self._on_file_action = on_file_action
+        # TICK-805: owning view for per-window context menus. When provided,
+        # show_context_menu dispatches to view.get_context_actions(). When
+        # None, the view is resolved by walking the parent chain (find BaseView).
+        self._view = view
         # Optional resolver: a callable (item_id) -> "session-key" that the
         # owning view can map back to a full filesystem path. Trees whose
         # visible columns are not file paths (Forensics hash list, etc.)
@@ -759,32 +763,96 @@ class EnhancedTreeview(QWidget):
         self.clipboard_clear()
         self.clipboard_append(text)
 
-    # Internal Actions ----------------------
-    def sort_by(self, col, descending):
-        # Native QTreeWidget sorting
-        self.tree.sortItems(self.col_indices.get(col, 0), Qt.DescendingOrder if descending else Qt.AscendingOrder)
+    def _get_view(self):
+        """TICK-805: resolve owning BaseView for per-window menus."""
+        if getattr(self, "_view", None) is not None:
+            return self._view
+        # Walk parent chain looking for BaseView
+        parent = self.parent()
+        visited = set()
+        while parent is not None and id(parent) not in visited:
+            visited.add(id(parent))
+            try:
+                # Lazy import to avoid circular
+                from .views.base import BaseView
+                if isinstance(parent, BaseView):
+                    return parent
+            except Exception:
+                pass
+            # Also check attribute view_name as heuristic for BaseView subclass
+            if hasattr(parent, "get_context_actions") and hasattr(parent, "get_title"):
+                # Likely a BaseView; return it
+                try:
+                    from .views.base import BaseView
+                    if isinstance(parent, BaseView):
+                        return parent
+                except Exception:
+                    return parent
+            try:
+                parent = parent.parent() if hasattr(parent, "parent") else None
+            except Exception:
+                break
+        return None
 
-    def show_context_menu(self, pos):
-        # customContextMenuRequested emits viewport-relative coords, which is
-        # exactly what QTreeWidget.itemAt expects — so pos can be passed
-        # through directly. Mapping naively to widget coords here breaks
-        # the top rows because the QTreeWidget includes the header height
-        # in widget coords but not in viewport coords.
-        item = self.tree.itemAt(pos)
-        if not item:
-            return
+    def _populate_menu_from_descriptors(self, menu, descriptors, item, path):
+        """Populate *menu* from view-provided descriptors (TICK-805)."""
+        # descriptors is list; each may be QAction, tuple, dict, None/separator
+        for desc in descriptors:
+            if desc is None:
+                menu.addSeparator()
+                continue
+            if isinstance(desc, dict):
+                if desc.get("separator"):
+                    menu.addSeparator()
+                    continue
+                label = desc.get("label") or desc.get("text") or ""
+                if not label:
+                    continue
+                enabled = desc.get("enabled", True)
+                callback = desc.get("callback") or desc.get("slot") or desc.get("action")
+                act = menu.addAction(label)
+                act.setEnabled(bool(enabled))
+                if callable(callback):
+                    # capture callback correctly
+                    act.triggered.connect(lambda checked, cb=callback: cb())
+                continue
+            # QAction instance
+            if hasattr(desc, "triggered") and hasattr(desc, "setEnabled"):
+                # QAction
+                try:
+                    menu.addAction(desc)
+                    continue
+                except Exception:
+                    pass
+            if isinstance(desc, (list, tuple)):
+                if len(desc) == 0:
+                    continue
+                label = desc[0]
+                if label is None:
+                    menu.addSeparator()
+                    continue
+                if isinstance(label, str) and label.strip() == "---":
+                    menu.addSeparator()
+                    continue
+                # tuple forms: (label, callback) or (label, callback, enabled)
+                cb = desc[1] if len(desc) > 1 else None
+                enabled = desc[2] if len(desc) > 2 else True
+                act = menu.addAction(str(label))
+                act.setEnabled(bool(enabled))
+                if callable(cb):
+                    act.triggered.connect(lambda checked, c=cb: c())
+                continue
+            # fallback: string label
+            if isinstance(desc, str):
+                if desc.strip() == "---":
+                    menu.addSeparator()
+                else:
+                    menu.addAction(desc)
 
-        iid = item.data(0, Qt.UserRole)
-        # Preserve multi-selection when the right-clicked row is already
-        # part of it; otherwise fall back to selecting just that row.
-        if iid not in self.selection():
-            self.selection_set([iid])
-
+    def _show_generic_context_menu(self, pos, item, iid, path):
+        """Generic fallback menu (Open/Rename/Move/Copy/Delete/Exclude + Copy col)."""
         menu = QMenu(self)
-
-        path = self.get_selected_path()
         has_path = bool(path)
-
         if not self._no_file_actions:
             open_act = menu.addAction("Open File")
             open_act.setEnabled(has_path)
@@ -849,6 +917,72 @@ class EnhancedTreeview(QWidget):
             menu.addAction("(No file path on this row)").setEnabled(False)
 
         menu.exec_(self.tree.viewport().mapToGlobal(pos))
+
+    # Internal Actions ----------------------
+    def sort_by(self, col, descending):
+        # Native QTreeWidget sorting
+        self.tree.sortItems(self.col_indices.get(col, 0), Qt.DescendingOrder if descending else Qt.AscendingOrder)
+
+    def show_context_menu(self, pos):
+        # customContextMenuRequested emits viewport-relative coords, which is
+        # exactly what QTreeWidget.itemAt expects — so pos can be passed
+        # through directly. Mapping naively to widget coords here breaks
+        # the top rows because the QTreeWidget includes the header height
+        # in widget coords but not in viewport coords.
+        item = self.tree.itemAt(pos)
+        if not item:
+            return
+
+        iid = item.data(0, Qt.UserRole)
+        # Preserve multi-selection when the right-clicked row is already
+        # part of it; otherwise fall back to selecting just that row.
+        if iid not in self.selection():
+            self.selection_set([iid])
+
+        path = self.get_selected_path()
+
+        # TICK-805: per-window dispatch — if owning view overrides
+        # get_context_actions, use its menu instead of the generic one.
+        view = self._get_view()
+        if view is not None:
+            try:
+                from .views.base import BaseView
+                is_overridden = type(view).get_context_actions is not BaseView.get_context_actions
+            except Exception:
+                is_overridden = hasattr(view, "get_context_actions")
+            if is_overridden:
+                try:
+                    import inspect
+                    sig = inspect.signature(view.get_context_actions)
+                    params = list(sig.parameters.keys())
+                    # Dispatch with best matching signature
+                    if len(params) >= 4:
+                        actions = view.get_context_actions(self, pos, item, path)
+                    elif len(params) == 2:
+                        actions = view.get_context_actions(self, pos)
+                    elif len(params) == 1:
+                        actions = view.get_context_actions(pos)
+                    else:
+                        actions = view.get_context_actions(self, pos, item, path)
+                    if actions is not None:
+                        # View wants to control the menu (even if empty)
+                        menu = QMenu(self)
+                        if actions:
+                            self._populate_menu_from_descriptors(menu, actions, item, path)
+                        # If view returned empty list, show empty menu (separatorless) vs fallback
+                        # For forensics/etc that want fallback, they return None
+                        menu.exec_(self.tree.viewport().mapToGlobal(pos))
+                        return
+                except Exception as exc:
+                    try:
+                        from ..core.logger import logger
+                        logger.debug(f"get_context_actions dispatch failed: {exc}")
+                    except Exception:
+                        pass
+                    # fall through to generic on error
+
+        # Fallback generic
+        self._show_generic_context_menu(pos, item, iid, path)
 
     def on_double_click(self, item, column):
         self.open_file()

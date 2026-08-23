@@ -166,6 +166,31 @@ class BaseView(QWidget, metaclass=QWidgetABCMeta):
         """Called when view is hidden."""
         pass
 
+    def get_context_actions(self, treeview, pos, item=None, path=None):
+        """Per-window context menu hook (TICK-805).
+
+        Views override this to return view-specific actions. The default
+        returns ``None`` to signal ``EnhancedTreeview.show_context_menu`` to
+        use the generic fallback (Open/Rename/Move/Copy/Delete/Exclude +
+        Copy column).
+
+        Args:
+            treeview: the ``EnhancedTreeview`` (or ``QTableWidget``) that
+                received the right-click.
+            pos: viewport-relative ``QPoint`` of the click.
+            item: the ``QTreeWidgetItem`` under the cursor (or ``None``).
+            path: resolved filesystem path for the row (or ``None``).
+
+        Returns:
+            ``None`` to use the generic menu, or a list of descriptors.
+            Each descriptor may be:
+            * a ``QAction`` instance,
+            * a ``(label, slot, enabled)`` tuple,
+            * a ``{"label": str, "callback": callable, "enabled": bool}`` dict.
+            A separator is represented by ``None`` or ``{"separator": True}``.
+        """
+        return None
+
     def make_empty_state(self, icon="", title="", body="", action_label="",
                            action_callback=None):
         """Convenience for ``EmptyState`` so views do not need to

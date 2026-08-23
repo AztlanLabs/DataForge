@@ -45,6 +45,65 @@ Once files are found, use the 'Bulk Actions' card to:
 - Create Zip archives instantly.
 """
 
+    def get_context_actions(self, treeview, pos, item=None, path=None):
+        """TICK-805: per-window menu for Search — Copy Path + Reveal + Hash + Open."""
+        # Resolve path if not provided
+        if not path and treeview is not None and hasattr(treeview, "get_selected_path"):
+            try:
+                path = treeview.get_selected_path()
+            except Exception:
+                path = None
+        has_path = bool(path)
+        # Collect column values for Copy column actions (optional but useful)
+        # Build Search-specific actions — must contain Copy Path + Reveal, not Show Details
+        actions: list = []
+        # Open
+        actions.append(("Open", lambda: treeview.open_file() if hasattr(treeview, "open_file") else None, has_path))
+        actions.append(("Reveal in File Manager", lambda: treeview.open_location() if hasattr(treeview, "open_location") else None, has_path))
+        actions.append(("Copy Path", lambda: treeview.clipboard_copy(path) if has_path and hasattr(treeview, "clipboard_copy") else None, has_path))
+        actions.append(("Copy File Name", lambda: treeview.clipboard_copy(os.path.basename(path)) if has_path and hasattr(treeview, "clipboard_copy") else None, has_path))
+        # Hash action — simple info dialog or clipboard
+        def _hash_action(p=path):
+            # Compute hash via hasher if available, else just copy path
+            try:
+                from ...core.hasher import get_file_hash
+                if p and os.path.isfile(p):
+                    h = get_file_hash(p, algo="sha256")
+                    if h and hasattr(treeview, "clipboard_copy"):
+                        treeview.clipboard_copy(h)
+                        if hasattr(self, "app") and self.app:
+                            try:
+                                self.app.show_info_dialog("Hash (SHA-256)", f"{h}\n\nCopied to clipboard.")
+                            except Exception:
+                                pass
+                        return
+                # fallback: copy path
+                if hasattr(treeview, "clipboard_copy") and p:
+                    treeview.clipboard_copy(p or "")
+            except Exception:
+                pass
+        actions.append(("Hash", _hash_action, has_path))
+        # Separator
+        actions.append(None)
+        # Column copy helpers — keep parity with generic but under Search menu
+        try:
+            if item is not None and treeview is not None and hasattr(treeview, "tree"):
+                col_count = treeview.tree.columnCount()
+                idx_to_col = getattr(treeview, "col_indices", {})
+                inv = {v: k for k, v in idx_to_col.items()}
+                for col_idx in range(col_count):
+                    try:
+                        header = treeview.tree.headerItem().text(col_idx)
+                    except Exception:
+                        header = ""
+                    if not header:
+                        header = inv.get(col_idx, f"Col {col_idx}").title()
+                    val = item.text(col_idx) if item is not None else ""
+                    actions.append((f"Copy {header}", lambda text=val, tv=treeview: tv.clipboard_copy(text) if hasattr(tv, "clipboard_copy") else None, True))
+        except Exception:
+            pass
+        return actions
+
     def __init__(self, master, app=None):
         super().__init__(master, app)
         self.current_results = []
