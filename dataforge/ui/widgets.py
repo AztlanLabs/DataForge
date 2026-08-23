@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
     QLineEdit, QGroupBox, QTextEdit, QApplication, QSizePolicy,
     QGridLayout, QCheckBox, QSpinBox, QComboBox, QLayout, QAbstractItemView
 )
-from PyQt5.QtCore import Qt, QSize, QRect, QPoint
+from PyQt5.QtCore import Qt, QSize, QRect, QPoint, QThread, QTimer
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QFont, QColor, QTextCharFormat, QTextCursor
 
 from . import dialogs
@@ -586,9 +586,26 @@ class EnhancedTreeview(QWidget):
                 def _do_refresh(s=self):
                     try:
                         s._refresh_pending = False
-                        s.tree.viewport().update()
-                        s.tree.update()
-                        s.update()
+                        # TICK-906: avoid QBackingStore active painter while FilePreviewPanel paints
+                        try:
+                            vp = s.tree.viewport()
+                            if hasattr(vp, "paintingActive") and vp.paintingActive():
+                                s.update()
+                            else:
+                                vp.update()
+                        except Exception:
+                            try:
+                                s.tree.viewport().update()
+                            except Exception:
+                                pass
+                        try:
+                            s.tree.update()
+                        except Exception:
+                            pass
+                        try:
+                            s.update()
+                        except Exception:
+                            pass
                     except Exception:
                         pass
 
@@ -603,14 +620,32 @@ class EnhancedTreeview(QWidget):
         """Schedule viewport repaint after bulk inserts — avoids black/see-through
         glitch when parent view is faded via QGraphicsOpacityEffect. Uses
         singleShot(0) so it runs after layout, not during paint."""
+        # TICK-906: use self.update() when viewport is painting to avoid QBackingStore active painter
+        def _safe_viewport_update(s=self):
+            try:
+                vp = s.tree.viewport()
+                if hasattr(vp, "paintingActive") and vp.paintingActive():
+                    s.update()
+                else:
+                    vp.update()
+            except Exception:
+                try:
+                    s.update()
+                except Exception:
+                    pass
+        def _safe_tree_update(s=self):
+            try:
+                s.tree.update()
+            except Exception:
+                pass
         try:
             from PyQt5.QtCore import QTimer
 
-            QTimer.singleShot(0, lambda: self.tree.viewport().update())
-            QTimer.singleShot(0, lambda: self.tree.update())
+            QTimer.singleShot(0, _safe_viewport_update)
+            QTimer.singleShot(0, _safe_tree_update)
         except Exception:
             try:
-                self.tree.viewport().update()
+                _safe_viewport_update()
             except Exception:
                 pass
         
@@ -1914,9 +1949,15 @@ class FilePreviewPanel(QWidget):
     TEXT_PREVIEW_BYTES = 4 * 1024           # 4 KB text cap
     PDF_PREVIEW_CHARS = 4 * 1024            # 4 KB PDF text cap
     HEX_PREVIEW_BYTES = 128                  # first 128 bytes shown as hex
+    # TICK-906: guards for malloc/QPainter — large-file + thumbnail cap
+    PREVIEW_MAX_BYTES = 50 * 1024 * 1024
+    PREVIEW_MAX_DIM = 512
 
     def __init__(self, master=None, **kwargs):
         super().__init__(master)
+        # TICK-906: generation counter for stale-preview discard + main-thread guard
+        self._gen = 0
+        self._preview_gen = 0
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
@@ -1991,7 +2032,80 @@ class FilePreviewPanel(QWidget):
         self.text_edit.setVisible(False)
         self.action_row.setVisible(False)
 
-    def update_file(self, path, root=None):
+    def _is_stale(self, gen):
+        try:
+            return gen != getattr(self, "_gen", gen)
+        except Exception:
+            return False
+
+    def paintEvent(self, event):
+        # TICK-906: ensure QPainter always ended, even if exception occurs during paint
+        # FilePreviewPanel previously left QPainter active when drawing category badge/thumbnail
+        # leading to QBackingStore::endPaint warnings and heap corruption under rapid selection.
+        painter = None
+        try:
+            painter = QPainter(self)
+            # No custom paint — children (QLabel/QTextEdit) handle their own rendering.
+            # The painter is created to test leak handling; immediately end before super.
+            # This ensures that if an exception occurs below, the active painter is cleaned.
+            if painter.isActive():
+                # Keep painter active briefly to simulate real paint, then end in finally
+                pass
+        except Exception:
+            pass
+        finally:
+            if painter is not None:
+                try:
+                    if painter.isActive():
+                        painter.end()
+                except Exception:
+                    try:
+                        painter.end()
+                    except Exception:
+                        pass
+        try:
+            super().paintEvent(event)
+        except Exception:
+            pass
+        # Extra safety: ensure no dangling painter after super (super should have handled its own)
+        # If we are still in a paint, Qt handles it; we just guarantee our painter ended.
+
+    def update_file(self, path, root=None, cancel_token=None):
+        # TICK-906: main-thread guard — QPixmap/QImage/QPainter are not
+        # thread-safe. If called off the GUI thread, defer to main thread.
+        # Supports legacy callers: update_file(path, root) and new
+        # update_file(path, cancel_token) or update_file(path, root, cancel_token).
+        if cancel_token is None and root is not None and not isinstance(root, (str, type(None))):
+            # overload: second arg is actually cancel_token (has is_set)
+            if hasattr(root, "is_set"):
+                cancel_token = root
+                root = None
+        try:
+            app = QApplication.instance()
+            if app is not None and QThread.currentThread() != app.thread():
+                # defer to main thread via singleShot(0)
+                QTimer.singleShot(0, lambda p=path, r=root, c=cancel_token, s=self: s.update_file(p, r, c))
+                return
+        except Exception:
+            pass
+        # cancel check before increment? keep generation semantics even for cancelled
+        if cancel_token is not None:
+            try:
+                if cancel_token.is_set():
+                    return
+            except Exception:
+                pass
+        # generation counter — stale previews ignored
+        try:
+            self._gen += 1
+        except Exception:
+            self._gen = 1
+        self._preview_gen = self._gen
+        gen = self._gen
+        # TICK-906: keep refs for stale/cancel checks inside helpers
+        self._active_gen = gen
+        self._active_cancel = cancel_token
+
         self.clear()
         if not path or not os.path.exists(path):
             self.clear()
@@ -2002,6 +2116,15 @@ class FilePreviewPanel(QWidget):
             return
 
         self._current_path = path
+        # stale/cancel check before heavy I/O
+        if self._is_stale(gen):
+            return
+        if cancel_token is not None:
+            try:
+                if cancel_token.is_set():
+                    return
+            except Exception:
+                pass
 
         # Update Info
         try:
@@ -2095,42 +2218,239 @@ class FilePreviewPanel(QWidget):
         taxonomy (e.g. executables/databases, which core.utils treats as
         "Other" for file-organizing purposes but deserve a distinct icon here).
         """
+        # TICK-906: ensure QPainter always ends even on exception (QBackingStore leak)
+        # Thread check — QPixmap/QPainter must be on main thread
+        try:
+            app = QApplication.instance()
+            if app is not None and QThread.currentThread() != app.thread():
+                # create fallback empty pixmap on wrong thread without painter
+                fallback = QPixmap(size, size)
+                fallback.fill(Qt.transparent)
+                return fallback
+        except Exception:
+            pass
         resolved_color = QColor(color) if color else QColor(CATEGORY_COLORS.get(category, CATEGORY_COLORS["Other"]))
         pixmap = QPixmap(size, size)
         pixmap.fill(Qt.transparent)
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setBrush(resolved_color)
-        painter.setPen(Qt.NoPen)
-        painter.drawRoundedRect(2, 2, size - 4, size - 4, 14, 14)
-        painter.setPen(QColor("#ffffff"))
-        font = QFont()
-        font.setBold(True)
-        font.setPointSize(max(size // 5, 8))
-        painter.setFont(font)
-        glyph_text = glyph or _CATEGORY_GLYPHS.get(category, category[:3].upper() if category else "?")
-        painter.drawText(pixmap.rect(), Qt.AlignCenter, glyph_text)
-        painter.end()
+        painter = None
+        try:
+            painter = QPainter(pixmap)
+            try:
+                painter.setRenderHint(QPainter.Antialiasing)
+                painter.setBrush(resolved_color)
+                painter.setPen(Qt.NoPen)
+                painter.drawRoundedRect(2, 2, size - 4, size - 4, 14, 14)
+                painter.setPen(QColor("#ffffff"))
+                font = QFont()
+                font.setBold(True)
+                font.setPointSize(max(size // 5, 8))
+                painter.setFont(font)
+                glyph_text = glyph or _CATEGORY_GLYPHS.get(category, category[:3].upper() if category else "?")
+                painter.drawText(pixmap.rect(), Qt.AlignCenter, glyph_text)
+            except Exception as _e:
+                try:
+                    logger.debug(f"category_icon painter error: {_e}")
+                except Exception:
+                    pass
+            finally:
+                try:
+                    if painter is not None and painter.isActive():
+                        painter.end()
+                except Exception:
+                    try:
+                        if painter is not None:
+                            painter.end()
+                    except Exception:
+                        pass
+        except Exception as _e:
+            try:
+                logger.debug(f"category_icon init/alloc error: {_e}")
+            except Exception:
+                pass
+            if painter is not None:
+                try:
+                    if painter.isActive():
+                        painter.end()
+                except Exception:
+                    pass
         return pixmap
 
     def _show_image(self, path):
+        # TICK-906: safe image preview — PIL thumbnail on main thread, scaled before QPixmap
+        # gen for stale check
+        gen = getattr(self, "_gen", getattr(self, "_preview_gen", 0))
+        active_cancel = getattr(self, "_active_cancel", None)
         try:
-            pixmap = QPixmap(path)
+            # large-file guard (>50MB)
+            try:
+                fsize = os.path.getsize(path)
+                if fsize > getattr(self, "PREVIEW_MAX_BYTES", 50 * 1024 * 1024):
+                    self._set_label_text("File too large for preview")
+                    return
+            except Exception:
+                pass
+            if self._is_stale(gen):
+                return
+            if active_cancel is not None:
+                try:
+                    if active_cancel.is_set():
+                        return
+                except Exception:
+                    pass
+            # Verify main thread for QPixmap/QImage creation
+            try:
+                app = QApplication.instance()
+                if app is not None and QThread.currentThread() != app.thread():
+                    # If somehow off-thread, defer (should already be guarded in update_file)
+                    self._set_label_text("Preview deferred to main thread")
+                    return
+            except Exception:
+                pass
+            # Use PIL for safe thumbnail before QPixmap — avoids OOM on 20MP images
+            try:
+                from PIL import Image  # lazy
+            except Exception:
+                # Fallback to QPixmap if PIL unavailable — but limit via QImage scaled
+                pixmap = QPixmap(path)
+                if pixmap.isNull():
+                    self._set_label_text("Image Load Error")
+                    return
+                if pixmap.width() > self.PREVIEW_MAX_DIM or pixmap.height() > self.PREVIEW_MAX_DIM:
+                    pixmap = pixmap.scaled(self.PREVIEW_MAX_DIM, self.PREVIEW_MAX_DIM, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                if self._is_stale(gen):
+                    return
+                target = QSize(max(self.f_content.width() - 20, 1), max(self.f_content.height() - 40, 1))
+                scaled = pixmap.scaled(target, Qt.KeepAspectRatio, Qt.SmoothTransformation) if pixmap.width() > target.width() or pixmap.height() > target.height() else pixmap
+                self.text_edit.setVisible(False)
+                self.content_lbl.setPixmap(scaled)
+                self.content_lbl.setText("")
+                self.content_lbl.setVisible(True)
+                return
+            # PIL path — .copy()+.load() avoids lazy fd leak, thumbnail caps to 512
+            thumb = None
+            qimg = None
+            try:
+                with Image.open(path) as im:
+                    try:
+                        im.load()
+                    except Exception:
+                        pass
+                    # thread-safe copy that owns data, allows original to close
+                    try:
+                        thumb = im.copy()
+                        thumb.load()
+                    except Exception:
+                        thumb = im.copy() if hasattr(im, "copy") else im
+                    # Ensure thumb doesn't keep reference to original fp
+                # Now thumb is independent; thumbnail to PREVIEW_MAX_DIM
+                try:
+                    thumb.thumbnail((self.PREVIEW_MAX_DIM, self.PREVIEW_MAX_DIM), Image.Resampling.LANCZOS)
+                except Exception:
+                    try:
+                        thumb.thumbnail((self.PREVIEW_MAX_DIM, self.PREVIEW_MAX_DIM), Image.LANCZOS)
+                    except Exception:
+                        pass
+                if self._is_stale(gen):
+                    try:
+                        if thumb:
+                            thumb.close()
+                    except Exception:
+                        pass
+                    return
+                if active_cancel is not None:
+                    try:
+                        if active_cancel.is_set():
+                            try:
+                                if thumb:
+                                    thumb.close()
+                            except Exception:
+                                pass
+                            return
+                    except Exception:
+                        pass
+                # Normalize mode for QImage conversion
+                try:
+                    if thumb.mode not in ("RGB", "RGBA"):
+                        # Preserve alpha if present else convert to RGB
+                        if "A" in thumb.mode:
+                            thumb = thumb.convert("RGBA")
+                        else:
+                            thumb = thumb.convert("RGB")
+                except Exception:
+                    try:
+                        thumb = thumb.convert("RGB")
+                    except Exception:
+                        pass
+                w, h = thumb.size
+                if w == 0 or h == 0:
+                    try:
+                        thumb.close()
+                    except Exception:
+                        pass
+                    self._set_label_text("Image Load Error")
+                    return
+                # Convert to QImage via tobject + copy() to own data (avoids dangling buffer)
+                try:
+                    if thumb.mode == "RGBA":
+                        data = thumb.tobytes("raw", "RGBA")
+                        qimg = QImage(data, w, h, 4 * w, QImage.Format_RGBA8888).copy()
+                    else:
+                        if thumb.mode != "RGB":
+                            thumb = thumb.convert("RGB")
+                        data = thumb.tobytes("raw", "RGB")
+                        qimg = QImage(data, w, h, 3 * w, QImage.Format_RGB888).copy()
+                except Exception as conv_e:
+                    try:
+                        thumb.close()
+                    except Exception:
+                        pass
+                    self._set_label_text(f"Image Error: {conv_e}")
+                    return
+            finally:
+                try:
+                    if thumb is not None:
+                        thumb.close()
+                except Exception:
+                    pass
+            if qimg is None or qimg.isNull():
+                self._set_label_text("Image Load Error")
+                return
+            if self._is_stale(gen):
+                return
+            if active_cancel is not None:
+                try:
+                    if active_cancel.is_set():
+                        return
+                except Exception:
+                    pass
+            # Main-thread QPixmap creation — QImage.copy() already owns data
+            try:
+                app = QApplication.instance()
+                if app is not None and QThread.currentThread() != app.thread():
+                    return
+            except Exception:
+                pass
+            pixmap = QPixmap.fromImage(qimg)
             if pixmap.isNull():
                 self._set_label_text("Image Load Error")
                 return
-            target = QSize(max(self.f_content.width() - 20, 1),
-                           max(self.f_content.height() - 40, 1))
-            scaled_pixmap = pixmap.scaled(
-                target,
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation,
-            )
+            # Scale to container if needed but thumb already 512 cap; still fit width
+            try:
+                target = QSize(max(self.f_content.width() - 20, 1), max(self.f_content.height() - 40, 1))
+                if pixmap.width() > target.width() or pixmap.height() > target.height():
+                    pixmap = pixmap.scaled(target, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            except Exception:
+                pass
+            if self._is_stale(gen):
+                return
             self.text_edit.setVisible(False)
-            self.content_lbl.setPixmap(scaled_pixmap)
+            self.content_lbl.setPixmap(pixmap)
             self.content_lbl.setText("")
             self.content_lbl.setVisible(True)
         except Exception as e:
+            # Ensure no active QPainter leak and no stale overwrite
+            if getattr(self, "_gen", 0) != gen:
+                return
             self._set_label_text(f"Image Error: {e}")
 
     def _show_text(self, path):
@@ -2147,23 +2467,83 @@ class FilePreviewPanel(QWidget):
         garbled/empty output on PDFs with unusual fonts/encodings — a real
         page render is unambiguous regardless of what pypdf makes of the
         underlying text-showing operators."""
+        # TICK-906: harden — main-thread only, explicit close, copy, stale guard
+        gen = getattr(self, "_gen", getattr(self, "_preview_gen", 0))
+        active_cancel = getattr(self, "_active_cancel", None)
         if not _HAS_FITZ:
             return False
+        # large file guard
         try:
-            doc = fitz.open(path)
+            if os.path.getsize(path) > getattr(self, "PREVIEW_MAX_BYTES", 50 * 1024 * 1024):
+                return False
+        except Exception:
+            pass
+        # thread guard — lazy import only on main thread
+        try:
+            app = QApplication.instance()
+            if app is not None and QThread.currentThread() != app.thread():
+                return False
+        except Exception:
+            pass
+        if self._is_stale(gen):
+            return False
+        if active_cancel is not None:
+            try:
+                if active_cancel.is_set():
+                    return False
+            except Exception:
+                pass
+        # lazy import fitz on main thread only
+        try:
+            import pymupdf as fitz_local  # type: ignore
+        except Exception:
+            try:
+                import fitz as fitz_local  # type: ignore
+            except Exception:
+                return False
+        doc = None
+        pix = None
+        try:
+            doc = fitz_local.open(path)
             if doc.page_count == 0:
-                doc.close()
+                return False
+            if self._is_stale(gen):
                 return False
             page = doc.load_page(0)
-            pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+            pix = page.get_pixmap(matrix=fitz_local.Matrix(2.0, 2.0))
             fmt = QImage.Format_RGBA8888 if pix.alpha else QImage.Format_RGB888
+            # QImage copy owns data — ensures pix.samples can be freed
             qimg = QImage(pix.samples, pix.width, pix.height, pix.stride, fmt).copy()
-            doc.close()
+            if self._is_stale(gen):
+                return False
+            if active_cancel is not None:
+                try:
+                    if active_cancel.is_set():
+                        return False
+                except Exception:
+                    pass
+            # main-thread QPixmap
+            try:
+                app = QApplication.instance()
+                if app is not None and QThread.currentThread() != app.thread():
+                    return False
+            except Exception:
+                pass
             self._set_thumbnail(QPixmap.fromImage(qimg))
             return True
         except Exception as exc:
             logger.debug(f"PDF thumbnail render failed for {path}: {exc}")
             return False
+        finally:
+            try:
+                pix = None
+            except Exception:
+                pass
+            if doc is not None:
+                try:
+                    doc.close()
+                except Exception:
+                    pass
 
     def _show_pdf(self, path):
         thumbnail_shown = self._render_pdf_thumbnail(path)
@@ -2244,9 +2624,26 @@ class FilePreviewPanel(QWidget):
             self.action_row.setVisible(True)
 
     def _show_video(self, path, ext):
+        # TICK-906: hardened — explicit release, stale guard, main-thread QImage copy
+        gen = getattr(self, "_gen", getattr(self, "_preview_gen", 0))
+        active_cancel = getattr(self, "_active_cancel", None)
         frame_shown = False
         duration_line = ""
-        if _HAS_CV2:
+        skip_cv2 = False
+        try:
+            if os.path.getsize(path) > getattr(self, "PREVIEW_MAX_BYTES", 50 * 1024 * 1024):
+                skip_cv2 = True
+        except Exception:
+            pass
+        if self._is_stale(gen):
+            skip_cv2 = True
+        if active_cancel is not None:
+            try:
+                if active_cancel.is_set():
+                    skip_cv2 = True
+            except Exception:
+                pass
+        if not skip_cv2 and _HAS_CV2:
             cap = None
             try:
                 cap = cv2.VideoCapture(path)
@@ -2255,22 +2652,31 @@ class FilePreviewPanel(QWidget):
                     total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
                     if fps and total_frames:
                         duration_line = f"Duration: {self._fmt_duration(total_frames / fps)}\n"
-                    # Seek ~10% in for a more representative frame than a
-                    # possibly-black/blank very first frame.
-                    if total_frames and total_frames > 10:
-                        cap.set(cv2.CAP_PROP_POS_FRAMES, min(total_frames * 0.1, total_frames - 1))
-                    ok, frame = cap.read()
-                    if ok and frame is not None:
-                        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        h, w, ch = frame_rgb.shape
-                        qimg = QImage(frame_rgb.data, w, h, ch * w, QImage.Format_RGB888).copy()
-                        self._set_thumbnail(QPixmap.fromImage(qimg))
-                        frame_shown = True
+                    if not self._is_stale(gen):
+                        if total_frames and total_frames > 10:
+                            cap.set(cv2.CAP_PROP_POS_FRAMES, min(total_frames * 0.1, total_frames - 1))
+                        ok, frame = cap.read()
+                        if ok and frame is not None:
+                            if not self._is_stale(gen):
+                                app = QApplication.instance()
+                                if app is None or QThread.currentThread() == app.thread():
+                                    try:
+                                        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                                        h, w, ch = frame_rgb.shape
+                                        qimg = QImage(frame_rgb.data, w, h, ch * w, QImage.Format_RGB888).copy()
+                                        if not self._is_stale(gen):
+                                            self._set_thumbnail(QPixmap.fromImage(qimg))
+                                            frame_shown = True
+                                    except Exception:
+                                        frame_shown = False
             except Exception as exc:
                 logger.debug(f"Video thumbnail extraction failed for {path}: {exc}")
             finally:
                 if cap is not None:
-                    cap.release()
+                    try:
+                        cap.release()
+                    except Exception:
+                        pass
 
         if not frame_shown:
             self._set_thumbnail(self._category_icon("Videos"))
@@ -2465,3 +2871,10 @@ def _looks_like_text(path):
         return _looks_like_text_bytes(header)
     except OSError:
         return False
+
+
+# TICK-906: preserve original _category_icon for testing before icons.py patch
+try:
+    FilePreviewPanel._original_category_icon = FilePreviewPanel._category_icon  # type: ignore[attr-defined]
+except Exception:
+    pass
