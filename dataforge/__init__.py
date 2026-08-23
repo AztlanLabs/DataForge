@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 
 # Version is synced by scripts/bump_version.py — do not edit manually
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 _FALLBACK_VERSION = "0.1.0"
 _PYPROJECT_PATH = Path(__file__).resolve().parent.parent / "pyproject.toml"

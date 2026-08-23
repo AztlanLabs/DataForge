@@ -5,7 +5,7 @@
 name: dataforge
 arch: amd64
 platform: linux
-version: "0.1.0"
+version: "0.2.0"
 section: utils
 priority: optional
 maintainer: "DataForge Contributors <dev@dataforge.dev>"
@@ -79,6 +79,6 @@ rpm:
 # Deb-specific
 deb:
   breaks:
-    - dataforge (<< 0.1.0)
+    - dataforge (<< 0.2.0)
   replaces:
-    - dataforge (<< 0.1.0)
+    - dataforge (<< 0.2.0)

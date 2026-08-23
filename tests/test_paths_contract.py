@@ -86,7 +86,7 @@ def make_legacy(home: Path, config: dict | None = None) -> Path:
 
 def test_version_is_exposed_and_matches_pyproject():
     pyproject_version = dataforge._version_from_pyproject()
-    assert pyproject_version == "0.1.0"
+    assert pyproject_version == "0.2.0"
     assert dataforge.__version__ == pyproject_version
 
 
@@ -97,7 +97,7 @@ def test_version_falls_back_to_pyproject_without_install(monkeypatch):
         raise PackageNotFoundError(name)
 
     monkeypatch.setattr(importlib.metadata, "version", missing)
-    assert dataforge._resolve_version() == "0.1.0"
+    assert dataforge._resolve_version() == "0.2.0"
 
 
 def test_version_pyproject_missing_file_defaults_cleanly(tmp_path):
