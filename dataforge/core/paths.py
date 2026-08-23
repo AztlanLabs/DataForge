@@ -9,6 +9,7 @@ artifacts to the canonical locations and leaves a timestamped backup at
 non-empty value) to suppress the import-time migration.
 """
 
+import json
 import logging
 import os
 import shutil
@@ -88,6 +89,13 @@ log_file: Path = log_dir / "app.log"
 runtime_dir: Path = dirs.user_runtime_path
 exports_dir: Path = Path.home() / "Documents" / "DataForge"
 
+# TICK-807 — UI state helper for recent.json (recent searches / automations)
+# Stored in state_dir (not config) to keep config lean; config holds the
+# ui_* dicts/lists while recent.json holds ephemeral recent lists with caps.
+ui_state_file: Path = state_dir / "recent.json"
+# Alias for backwards compatibility
+recent_file: Path = ui_state_file
+
 
 def ensure_dirs(*extra: Path) -> None:
     """Create the canonical directory layout (best effort)."""
@@ -144,6 +152,64 @@ def _backup_target(legacy: Path) -> Path:
     return candidate
 
 
+# ---------------------------------------------------------------------------
+# TICK-807 — ui_state helpers for recent.json
+# ---------------------------------------------------------------------------
+def load_ui_state() -> dict:
+    """Load UI state from recent.json (returns {} on missing/corrupt)."""
+    try:
+        if not ui_state_file.exists():
+            return {}
+        text = ui_state_file.read_text(encoding="utf-8")
+        data = json.loads(text)
+        if isinstance(data, dict):
+            return data
+        return {}
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("Could not load ui_state %s: %s", ui_state_file, exc)
+        return {}
+
+
+def save_ui_state(state: dict) -> None:
+    """Persist UI state dict to recent.json (best effort)."""
+    try:
+        ui_state_file.parent.mkdir(parents=True, exist_ok=True)
+        # Cap recent lists to keep file lean (policy: recent searches/automations <=100)
+        for key in ("recent_searches", "recent_automations", "ui_recent_searches", "ui_recent_automations"):
+            if key in state and isinstance(state[key], list) and len(state[key]) > 100:
+                state[key] = state[key][:100]
+        ui_state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    except OSError as exc:
+        logger.warning("Could not save ui_state %s: %s", ui_state_file, exc)
+
+
+def append_recent_search(query: str, limit: int = 20) -> None:
+    """Append a recent search query to recent.json (dedup, cap). Not persisted in config."""
+    if not isinstance(query, str) or not query.strip():
+        return
+    state = load_ui_state()
+    recent = state.get("recent_searches", [])
+    if not isinstance(recent, list):
+        recent = []
+    q = query.strip()
+    # dedup: move to front
+    if q in recent:
+        recent.remove(q)
+    recent.insert(0, q)
+    # cap
+    recent = recent[:limit]
+    state["recent_searches"] = recent
+    save_ui_state(state)
+
+
+def get_recent_searches(limit: int = 20) -> list:
+    state = load_ui_state()
+    recent = state.get("recent_searches", [])
+    if not isinstance(recent, list):
+        return []
+    return [str(x) for x in recent[:limit] if isinstance(x, str)]
+
+
 if not os.environ.get(SKIP_MIGRATION_ENV):
     try:
         migrate_from_legacy()
@@ -168,4 +234,10 @@ __all__ = [
     "migrate_from_legacy",
     "runtime_dir",
     "state_dir",
+    "ui_state_file",
+    "recent_file",
+    "load_ui_state",
+    "save_ui_state",
+    "append_recent_search",
+    "get_recent_searches",
 ]

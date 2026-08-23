@@ -17,6 +17,7 @@ from ..theme_tokens import TYPE_SCALE
 
 from .base import BaseView
 from .. import dialogs
+from ...core.config import config
 from ..widgets import EnhancedTreeview, CollapsibleCard, attach_tooltips, FilePreviewPanel
 from ...core.utils import format_size
 from ...core.services import FileActionService
@@ -106,6 +107,12 @@ class SystemCleanupView(BaseView):
             cat_grid.addWidget(chk, i // 3, i % 3)
             self.category_checks[cat] = chk
         c_body_layout.addWidget(cat_group)
+
+        # TICK-807 — include browser checkbox (remembered via ui_checkbox_states)
+        self.chk_include_browser = QCheckBox("Include browser artifacts", c_body)
+        self.chk_include_browser.setChecked(False)
+        self.chk_include_browser.setToolTip("When checked, junk scan also includes browser cache/cookies (stored in ui_checkbox_states).")
+        c_body_layout.addWidget(self.chk_include_browser)
 
         # Scan button in header
         self.btn_scan = self.card_scan.add_widget_to_header(
@@ -248,6 +255,174 @@ class SystemCleanupView(BaseView):
         self.tabs.addTab(browser_tab, "🔒 Browser Privacy")
 
         self._init_tooltips()
+        # TICK-807 — restore UI memory after widgets exist
+        self._load_ui_memory()
+        self._connect_ui_memory_signals()
+
+    # ------------------------------------------------------------------
+    # TICK-807 — UI memory (persisted via config, not transient)
+    # ------------------------------------------------------------------
+    def mount(self):
+        super().mount()
+        self._load_ui_memory()
+
+    def _load_ui_memory(self):
+        """Restore checkbox/selection/tab/path state from config (persisted)."""
+        try:
+            # ui_last_paths: view -> path
+            last_paths = config.get("ui_last_paths", {}) or {}
+            if isinstance(last_paths, dict):
+                p = last_paths.get("system_cleanup") or last_paths.get("system_cleanup.extra_path") or ""
+                if isinstance(p, str) and p:
+                    # block signals to avoid saving during restore
+                    self.entry_path.blockSignals(True)
+                    self.entry_path.setText(p)
+                    self.entry_path.blockSignals(False)
+            # ui_filter_names: e.g., min_age
+            filter_names = config.get("ui_filter_names", {}) or {}
+            if isinstance(filter_names, dict):
+                v = filter_names.get("system_cleanup.min_age")
+                if isinstance(v, str) and v.isdigit():
+                    try:
+                        self.spin_age.blockSignals(True)
+                        self.spin_age.setValue(int(v))
+                        self.spin_age.blockSignals(False)
+                    except Exception:
+                        pass
+                # also handle int directly if stored as int
+                fv = filter_names.get("system_cleanup.min_age_int")
+                if isinstance(fv, int):
+                    try:
+                        self.spin_age.blockSignals(True)
+                        self.spin_age.setValue(fv)
+                        self.spin_age.blockSignals(False)
+                    except Exception:
+                        pass
+            # direct int storage for spin
+            checkbox_states = config.get("ui_checkbox_states", {}) or {}
+            if isinstance(checkbox_states, dict):
+                # include_browser
+                if "system_cleanup.include_browser" in checkbox_states:
+                    v = checkbox_states["system_cleanup.include_browser"]
+                    if isinstance(v, bool):
+                        self.chk_include_browser.blockSignals(True)
+                        self.chk_include_browser.setChecked(v)
+                        self.chk_include_browser.blockSignals(False)
+                # categories
+                for cat, chk in self.category_checks.items():
+                    key = f"system_cleanup.category.{cat}"
+                    if key in checkbox_states and isinstance(checkbox_states[key], bool):
+                        chk.blockSignals(True)
+                        chk.setChecked(checkbox_states[key])
+                        chk.blockSignals(False)
+                # tab index (stored as int in checkbox_states or window_geometry)
+                tab_key = "system_cleanup.tab_index"
+                if tab_key in checkbox_states and isinstance(checkbox_states[tab_key], int):
+                    idx = checkbox_states[tab_key]
+                    if 0 <= idx < self.tabs.count():
+                        self.tabs.blockSignals(True)
+                        self.tabs.setCurrentIndex(idx)
+                        self.tabs.blockSignals(False)
+            # window_geometry may also hold tab index
+            geom = config.get("window_geometry", {}) or {}
+            if isinstance(geom, dict) and "system_cleanup.tab_index" in geom:
+                idx = geom["system_cleanup.tab_index"]
+                if isinstance(idx, int) and 0 <= idx < self.tabs.count():
+                    self.tabs.blockSignals(True)
+                    self.tabs.setCurrentIndex(idx)
+                    self.tabs.blockSignals(False)
+            # spin_age also stored directly as int under ui_checkbox_states or window_geometry
+            if isinstance(checkbox_states, dict) and "system_cleanup.min_age" in checkbox_states:
+                v = checkbox_states["system_cleanup.min_age"]
+                if isinstance(v, int):
+                    self.spin_age.blockSignals(True)
+                    self.spin_age.setValue(v)
+                    self.spin_age.blockSignals(False)
+        except Exception:
+            pass
+
+    def _connect_ui_memory_signals(self):
+        """Connect widget changes to config persistence (transient progress not saved)."""
+        try:
+            self.entry_path.textChanged.connect(self._on_extra_path_changed)
+            self.spin_age.valueChanged.connect(self._on_min_age_changed)
+            self.chk_include_browser.stateChanged.connect(self._on_include_browser_changed)
+            for cat, chk in self.category_checks.items():
+                # capture cat
+                chk.stateChanged.connect(lambda _v, c=cat: self._on_category_changed(c))
+            self.tabs.currentChanged.connect(self._on_tab_changed)
+        except Exception:
+            pass
+
+    def _on_extra_path_changed(self, text):
+        try:
+            last = config.get("ui_last_paths", {}) or {}
+            if not isinstance(last, dict):
+                last = {}
+            last["system_cleanup"] = str(text or "")
+            # also store filter name for entry
+            filters = config.get("ui_filter_names", {}) or {}
+            if not isinstance(filters, dict):
+                filters = {}
+            filters["system_cleanup.extra_path"] = str(text or "")
+            config.set("ui_last_paths", last)
+            config.set("ui_filter_names", filters)
+        except Exception:
+            pass
+
+    def _on_min_age_changed(self, value):
+        try:
+            # store as filter and checkbox state (both are valid persisted locations)
+            filters = config.get("ui_filter_names", {}) or {}
+            if not isinstance(filters, dict):
+                filters = {}
+            filters["system_cleanup.min_age"] = str(value)
+            config.set("ui_filter_names", filters)
+            # also store int in checkbox_states for easy retrieval
+            cbs = config.get("ui_checkbox_states", {}) or {}
+            if not isinstance(cbs, dict):
+                cbs = {}
+            cbs["system_cleanup.min_age"] = int(value)
+            config.set("ui_checkbox_states", cbs)
+        except Exception:
+            pass
+
+    def _on_include_browser_changed(self, _state):
+        try:
+            cbs = config.get("ui_checkbox_states", {}) or {}
+            if not isinstance(cbs, dict):
+                cbs = {}
+            cbs["system_cleanup.include_browser"] = bool(self.chk_include_browser.isChecked())
+            config.set("ui_checkbox_states", cbs)
+        except Exception:
+            pass
+
+    def _on_category_changed(self, cat):
+        try:
+            cbs = config.get("ui_checkbox_states", {}) or {}
+            if not isinstance(cbs, dict):
+                cbs = {}
+            chk = self.category_checks.get(cat)
+            if chk is not None:
+                cbs[f"system_cleanup.category.{cat}"] = bool(chk.isChecked())
+                config.set("ui_checkbox_states", cbs)
+        except Exception:
+            pass
+
+    def _on_tab_changed(self, index):
+        try:
+            cbs = config.get("ui_checkbox_states", {}) or {}
+            if not isinstance(cbs, dict):
+                cbs = {}
+            cbs["system_cleanup.tab_index"] = int(index)
+            config.set("ui_checkbox_states", cbs)
+            geom = config.get("window_geometry", {}) or {}
+            if not isinstance(geom, dict):
+                geom = {}
+            geom["system_cleanup.tab_index"] = int(index)
+            config.set("window_geometry", geom)
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Junk scan
