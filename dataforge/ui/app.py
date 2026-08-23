@@ -654,10 +654,21 @@ class DataForgeApp(QMainWindow):
     def update_sidebar_experience(self):
         """Rebuild the sidebar and notify the current view of the new tier
         so its in-view complexity (e.g. advanced expanders) can update."""
-        self.build_navigation_sidebar()
-        if self.current_view and hasattr(self.current_view, "apply_tier"):
-            tier_name = config.get("settings_ui_tier", "Simple")
-            self.current_view.apply_tier(tier_name)
+        if getattr(self, "_in_sidebar_update", False):
+            return
+        self._in_sidebar_update = True
+        try:
+            self.build_navigation_sidebar()
+            if self.current_view and hasattr(self.current_view, "apply_tier"):
+                # Guard SettingsView re-entry: it already applied the tier and
+                # called us — notifying it again would recurse infinitely
+                # (app -> settings.apply_tier -> app -> ...).
+                if getattr(self.current_view, "_in_apply_tier", False):
+                    return
+                tier_name = config.get("settings_ui_tier", "Simple")
+                self.current_view.apply_tier(tier_name)
+        finally:
+            self._in_sidebar_update = False
 
     def switch_view(self, title):
         if self.current_view:

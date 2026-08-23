@@ -301,18 +301,27 @@ class SettingsView(BaseView):
         self._tiered_widgets.append((widget, min_tier))
 
     def apply_tier(self, tier_name):
-        rank = self.TIER_ORDER.index(tier_name)
-        for widget, min_tier in self._tiered_widgets:
-            widget.setVisible(self.TIER_ORDER.index(min_tier) <= rank)
-        if hasattr(self, "_excl_tab_index"):
-            self.nb.setTabVisible(self._excl_tab_index, rank >= self.TIER_ORDER.index("Standard"))
-        config.set("settings_ui_tier", tier_name)
-        # Tier now controls in-view complexity (advanced controls stay
-        # hidden behind tiered rows and the Exclusions tab), NOT the
-        # sidebar. The sidebar shows every group regardless of tier so
-        # users can always discover what DataForge can do.
-        if getattr(self, "app", None) and hasattr(self.app, "update_sidebar_experience"):
-            self.app.update_sidebar_experience()
+        if getattr(self, "_in_apply_tier", False):
+            return
+        self._in_apply_tier = True
+        try:
+            rank = self.TIER_ORDER.index(tier_name)
+            for widget, min_tier in self._tiered_widgets:
+                widget.setVisible(self.TIER_ORDER.index(min_tier) <= rank)
+            if hasattr(self, "_excl_tab_index"):
+                self.nb.setTabVisible(self._excl_tab_index, rank >= self.TIER_ORDER.index("Standard"))
+            config.set("settings_ui_tier", tier_name)
+            # Tier now controls in-view complexity (advanced controls stay
+            # hidden behind tiered rows and the Exclusions tab), NOT the
+            # sidebar. The sidebar shows every group regardless of tier so
+            # users can always discover what DataForge can do.
+            # NOTE: do NOT call app.update_sidebar_experience() here — that
+            # method rebuilds the sidebar and then callbacks into
+            # current_view.apply_tier, which would recurse infinitely
+            # (settings.apply_tier -> app.update_sidebar -> settings.apply_tier -> ...).
+            # Sidebar visibility is tier-independent now; no rebuild needed on tier change.
+        finally:
+            self._in_apply_tier = False
 
     def _sync_theme_label(self, _state=None):
         """Mirror the sidebar Dark Mode checkbox as a read-only label.
