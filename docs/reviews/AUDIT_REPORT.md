@@ -1,8 +1,8 @@
 # Audit Report — Bugs, Security, Doc Defects, and New Line-Level Findings
 
-**Date:** 2026-07-10 · **Updated:** 2026-08-22 · **Last verified:** 2026-08-22  
+**Date:** 2026-07-10 · **Updated:** 2026-08-23 06:30 UTC · **Last verified:** 2026-08-23 06:30 UTC  
 **Merges:** `AUDIT_REPORT.md` + `AUDIT_REPORT.md` + `drafts/FULL_APP_REVIEW.md` (R-CORE/R-OPS, §1–2). No finding removed — this is a consolidation. Originals are kept in git history.  
-**Scope:** Entire `dataforge/` HEAD at 2026-08-22.
+**Scope:** Entire `dataforge/` HEAD at `543675f` (2026-08-23, Wave 5+6 DONE, 1213 tests) + `dc44be4` UI fixes (dropdown, tier, STOP, artifacts).
 
 > See `FORENSIC_REVIEW.md` for the separate forensic backlog (F/U). See `ROADMAP.md` for sequencing.
 
@@ -75,29 +75,29 @@
 
 ---
 
-## Part 4 — New Line-Level Findings (R-CORE / R-OPS, from FULL_APP_REVIEW §1–2, still open)
+## Part 4 — New Line-Level Findings (R-CORE / R-OPS, from FULL_APP_REVIEW §1–2, updated 2026-08-23)
 
-> Fresh 2026-08-22 read. These are **not** covered by S/D/H/M. IDs `R-<section>-<n>`.
+> Fresh 2026-08-22 read. These are **not** covered by S/D/H/M. IDs `R-<section>-<n>`. Updated 2026-08-23 06:30 UTC after Wave 5+6.
 
 | ID | Severity | Title | Status |
 |---|---|---|---|
 | R-CORE-1 | 🟠 | Logger to `stdout` corrupts `fm … --format json` (`logger.py:23` `StreamHandler(sys.stdout)`) | ✅ Fixed (TICK-101) |
-| R-CORE-2 | 🟠 | Config `excluded_extensions`/`excluded_folders` validate `list` only, not items → `endswith`/set crash on every `scan_directory` | ⏳ Open |
-| R-CORE-3 | 🟡 | `collapsed_groups` dropped on reload (`config.py:77` iterates `DEFAULT_CONFIG` only) → sidebar state never persists | ⏳ Open |
-| R-CORE-4 | 🟡 | `cache.py:43` `conn=None` crash if init failed (`AttributeError` in worker) | ⏳ Open |
-| R-CORE-5 | 🟡 | Per-file `commit()` (fsync) in `cache.py:51` → large scans I/O-bound | ⏳ Open (proposal: `set_hash_many` batch in `proposals/PERFORMANCE_INVESTIGATION`) |
-| R-CORE-6 | 🟡 | `scanner.py:80` swallows `FileNotFoundError` → “no results” vs “no such path” indistinguishable | ⏳ Open |
-| R-CORE-7 | 🟡 | `logger.py:30` `makedirs("")` crash on bare filename | ⏳ Open |
-| R-CORE-8 | 🔵 | `hasher.py:32` `get_hashes()` no algo allow-list | Info — latent |
+| R-CORE-2 | 🟠 | Config `excluded_extensions`/`excluded_folders` validate `list` only, not items → `endswith`/set crash on every `scan_directory` | ⏳ Open — deferred to Wave 7+ (not yet ticketed; scanner now guards `isinstance(e, str)` but config still `isinstance(list)` only `config.py:223`) |
+| R-CORE-3 | 🟡 | `collapsed_groups` dropped on reload (`config.py:77` iterates `DEFAULT_CONFIG` only) → sidebar state never persists | ✅ Fixed (TICK-501 `fix/core: preserve config keys` `04d1be7` — `_merge_validated` preserves unknown keys) |
+| R-CORE-4 | 🟡 | `cache.py:43` `conn=None` crash if init failed (`AttributeError` in worker) | ✅ Fixed (TICK-501 `04d1be7` — `cache.py:110` `if self.conn is None: return None`) |
+| R-CORE-5 | 🟡 | Per-file `commit()` (fsync) in `cache.py:51` → large scans I/O-bound | ⏳ Open — deferred (proposal `set_hash_many` batch `PERFORMANCE_INVESTIGATION`; `cache.py:131` `set_hash_many` exists but per-file `set_hash` still used by some callers) |
+| R-CORE-6 | 🟡 | `scanner.py:80` swallows `FileNotFoundError` → “no results” vs “no such path” indistinguishable | ✅ Fixed (TICK-501 `04d1be7` — `scanner.py:78` `logger.warning` + `on_error` callback) |
+| R-CORE-7 | 🟡 | `logger.py:30` `makedirs("")` crash on bare filename | ⏳ Open — deferred to Wave 7+ (not yet ticketed; `logger.py:30` `if _dirname: os.makedirs` added in TICK-101? Actually TICK-101 fixed `StreamHandler` but not `makedirs`; still `makedirs("")` risk) |
+| R-CORE-8 | 🔵 | `hasher.py:32` `get_hashes()` no algo allow-list | Info — latent (deferred, `hasher.py:33` `SUPPORTED_ALGORITHMS` exists but no allow-list check in `get_hashes` loop) |
 | R-OPS-1 | 🟡 | `operations/files.py:39` `normalized_reserved_paths` rebuilt per item → O(N²) on large batches | ✅ Fixed (TICK-105) |
 | R-OPS-2 | 🟠 | `services/file_actions.py:357` single-mode zip: one bad file aborts whole batch, partial `.zip` left, remaining items no records, cancel leaves partial | ✅ Fixed (TICK-201) |
 | R-OPS-3 | 🟡 | `archive_items` truncates existing zip without collision check | ✅ Fixed (TICK-105) |
 | R-OPS-4 | 🟡 | `files.py:102` `makedirs` before first success → empty dest dirs on failure | ✅ Fixed (TICK-105) |
 
-**Not yet reviewed:** R-sections 3+ (modules, UI, packaging, tests) — see `drafts/FULL_APP_REVIEW.md`. Remaining forensic gaps F1–F21/U1–U11 are in `FORENSIC_REVIEW.md`.
+**Not yet reviewed:** R-sections 3+ (modules, UI, packaging, tests) — see `drafts/FULL_APP_REVIEW.md`. Remaining forensic gaps F1–F21/U1–U11 are in `FORENSIC_REVIEW.md` — updated below.
 
 ---
 
 ## Recommended order
 
-S1–S13 are **done**. R-CORE-1, R-OPS-1/2/3/4 are **done** (TICK-101, TICK-105, TICK-201). F1–F3/U2/F9 are **done** (TICK-304). Next tranche is WS-G (brand/release polish) and remaining forensic gaps F4/F21/F13 (WS-I/J) — sequenced in `ROADMAP.md`.
+S1–S13 are **done**. R-CORE-1, R-CORE-3, R-CORE-4, R-CORE-6, R-OPS-1/2/3/4 are **done** (TICK-101, TICK-105, TICK-201, TICK-501). F1–F5, F7, F8, F9, F11–F14, U3, U4, U10, U11 are **done** (TICK-304, TICK-501..512). Remaining R-CORE-2/5/7 + F6, F10, F15, F16, F20, U5–U9 deferred to Wave 7+ (WS-I/WS-J) — sequenced in `ROADMAP.md` and `PARALLEL_BACKLOG.md` Wave 6 Spec.

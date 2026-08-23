@@ -2,7 +2,7 @@
 
 *File System Management with Steroids and Superpowers*
 
-**Last verified:** 2026-08-23 06:00 UTC *(re-verified against `dataforge/ui/app.py` + `views/*` HEAD `b373e7e`; Wave 5+6 12/12 DONE — virtualised timeline, HexView, plugin isolation)*
+**Last verified:** 2026-08-23 06:30 UTC *(re-verified against `dataforge/ui/app.py` + `views/*` HEAD `b373e7e`; Wave 5+6 12/12 DONE — virtualised timeline, HexView, plugin isolation)*
 
 > **2026-07-12 update:** WS-E (Motion, Empty/Error, A11y) is now shipped. Sidebar group expand/collapse and view-switch transitions are animated via `QPropertyAnimation` (180ms / 160ms OutCubic — see [`ROADMAP.md` §WS-E](./reviews/ROADMAP.md#ws-e--motion-emptyerror-a11y-phase-2e--v020-alpha5--closed)); the Braille-character busy label is replaced by a native `QProgressBar` in indeterminate mode; **Settings → General → Appearance** now has a Reduce motion checkbox that gates both animations; every interactive widget draws a `focus_ring` border on `:focus`; Search and Duplicates now show a purposeful `EmptyState` (icon + body + action button) instead of a bare "No results" label; `friendly_error_message` translates the common Python exceptions; sidebar buttons, the status bar, and the destructive-preview Proceed button carry `accessibleName`/`accessibleDescription` plus a `⚠` colour-blind glyph; an 18-icon monochrome SVG set ships in `dataforge/ui/resources/icons.py` and is attached to every sidebar view, with the icon tone regenerated on every theme change.
 

@@ -2,7 +2,7 @@
 
 *File System Management with Steroids and Superpowers*
 
-**Last verified:** 2026-08-23 06:00 UTC *(re-verified against `pyproject.toml` / `build_exe.py` / `dataforge/` HEAD `b373e7e`; Wave 5+6 12/12 DONE, venv ext4 recommendation)*
+**Last verified:** 2026-08-23 06:30 UTC *(re-verified against `pyproject.toml` / `build_exe.py` / `dataforge/` HEAD `b373e7e`; Wave 5+6 12/12 DONE, venv ext4 recommendation)*
 
 ## Effective Project Root
 

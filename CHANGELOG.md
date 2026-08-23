@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Wave 5+6 (Audit & Forensic Gap Closure, 2026-08-23 06:30 UTC, 37/37 DONE, 1213 tests)
+- TICK-501: `core/config.py` now preserves unknown keys (e.g. `collapsed_groups`) on reload, `core/cache.py` guards `conn is None` (no `AttributeError` in worker), `core/scanner.py` logs `FileNotFound`/`Permission`/`OSError` with optional `on_error` callback (R-CORE-3/4/6)
+- TICK-502: `modules/sanitisation.py` [NEW] moves `secure_delete` out of `forensics.py` (F4) + hardlink-aware `st_nlink>1` warning (F21), `forensics.py` shim re-exports for backward compat
+- TICK-503: `core/services/file_actions.py` now `__init__(audit_log, case_context)` + `_record_operation` hash-chained `AuditLog.append` per `transfer`/`delete`/`rename`/`archive` (F1 remainder)
+- TICK-504: 6 files (`system_cleanup.py`, `search.py`, `recovery.py`, `integrity.py`, `performance.py`, `ui/views/search.py`) `datetime.now()` → `datetime.now(timezone.utc)` UTC (F9 remainder)
+- TICK-506: `ui/views/forensics_view.py` `EnhancedTreeview` → `QTreeView` + `TimelineModel(QAbstractTableModel)` virtualised, `events[:5000]` cap removed (U3)
+- TICK-507: `ui/widgets.py` `HexView(QWidget)` with hex/ASCII columns + `QTreeWidget` field inspector for MBR/PE/ELF (U4)
+- TICK-508: `core/image_io.py` [NEW] `open_image` + `RawImageReader` gated `pyewf`/`pyaff` fallback, `core/streams.py` [NEW] `list_alternate_streams` ADS/xattr/MotW, `modules/indicators.py` [NEW] `match_path` YARA/SSDEEP/NSRL `HAS_*` gated (F5/F7/F8)
+- TICK-509: `ui/plugin_loader.py` `isolation='subprocess'` `ProcessPoolExecutor` + `require_signed` `*.sig` + `AuditLog` `plugin_load*` (F12 remainder)
+- TICK-510: `core/logger.py` `ChainToAuditFilter` forwarding `>=INFO` to `AuditLog` when `chain_to_audit=True` + Evidence Mode (F11 remainder)
+- TICK-511: `engine/parsers.py` [NEW] `ParserPool` lazy `ProcessPoolExecutor` + `BrokenProcessPool` → `ParseResult(success=False)` (F13)
+- TICK-512: `docs/CLI_REFERENCE.md` + `README.md` + `docs/GUI_WORKFLOWS.md` + `ui/views/about.py` platform matrix `Linux ✓`/`macOS ✓`/`Windows ✗ TrashScanUnsupported` + tooltip (U10/U11)
+- TICK-505 (Wave 6): `modules/forensics.py` `ingest_disk_image` now `O(batch)` queue incremental consume via `_drain_batch` (F14)
+
+### Fixed — Wave 5+6 + UI (2026-08-23, dc44be4 + b78dff9 + 6d56c2c)
+- `b78dff9` NTFS/fuse hardening: `core/_metadata_patch.py` [NEW] + `run_ui.py:7` + `__init__.py:3` + `api/schema.py:5` tolerate `OSError 5` on corrupted `.dist-info/entry_points.txt` (`importlib.metadata` → `ImportWarning` + debug log, not crash); new ext4 venv `/home/crowne/.venvs/DataForge`
+- `6d56c2c` Settings tier infinite recursion: `views/settings.py:303` `apply_tier` / `ui/app.py:664` `update_sidebar_experience` now guarded `_in_apply_tier`/`_in_sidebar_update` (was `settings→app→settings` loop → `RecursionError` on `excluded_extensions` `json.dump`)
+- `dc44be4` Dropdown at top-right: `ui/app.py:404` `add_view` no permanent `QGraphicsOpacityEffect` (transient 0→1 then `setGraphicsEffect(None)`), `theme_tokens.py:393` `QComboBox QAbstractItemView` themed popup, `app.py:683` `switch_view` freezes `setUpdatesEnabled` to avoid blank/see-through composite
+- `dc44be4` Tier navbar: restored `GROUP_MIN_TIER` filtering (`Home:Simple`, `Clean & Optimize:Standard`, `Recover & Investigate:Everything`) in `build_navigation_sidebar` so tier hides/shows groups, guarded rebuild
+- `dc44be4` STOP button: `ui/job_manager.py:57` `ManagedWorker` now handles `**kwargs` `cancel_token`, chains `progress_callback`, normalizes `InterruptedError`→`cancelled` dict, `is_busy` checks QThreads, `_on_progress` forwards to `DataForgeApp.update_progress`; `recovery.py:575` `run_photorec` `Popen` polling, `hardware.py:45` per-step cancel, `media_ops.py:119` `convert_image` `cancel_token`, `search.py:377`/`duplicates.py:196` `return` on cancel (not `raise`), `views/base.py:77` `InterruptedError`→`Cancelled`, `app.py:827` `show_workflow_error` treats cancel as status not dialog, `app.py:396` `cancel_action` force-hides after 2s
+- `dc44be4` Visual artifacts: `performance.py:471` `get_live_resource_snapshot(blocking=False)` `interval=None` for timer ticks (was 400ms main-thread sleep), `performance_view.py:435` non-blocking + viewport updates, `storage_devices.py:89` `run_workflow` async + `viewport().update()`, `theme_tokens.py:444` `QProgressBar::chunk` `6px` + `QFrame StyledPanel` opaque, `app.py:683` `switch_view` transient effect + freeze
+
 ### Added
 - TICK-002: `FileProvider` ABC expanded to a seven-method, cancel/progress-aware contract (`list_files`, `list_files_parallel`, `stat`, `open`, `hash`, `hash_many`, `exists`) with `LocalProvider` as thin scanner/hasher shim and a `default_provider()` entry point
 - TICK-002: `FileEntry` OS-identity fields `st_ino`/`st_dev`/`st_blocks` (default 0) plus `hardlink_key` for hardlink grouping and sparse-file awareness

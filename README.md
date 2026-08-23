@@ -23,7 +23,7 @@ The GUI was migrated from Tkinter/ttkbootstrap to **PyQt5**, and new modules (ha
 | **🔍 Go deep into data** | Forensic file carving, GPS metadata stripping, disk SMART health, password strength analysis, trash recovery — extract what's hidden |
 | **⚡ Unified interface** | Terminal and desktop — shared core where applicable, with GUI-only features (Action Builder, media tools) called out — no tool switching |
 | **🧩 Extensible** | Action Builder pipeline for custom multi-step workflows; plugin system for custom views; scriptable CLI — build your own workflows |
-| **🛡️ Production-ready** | 1213 passing tests (+2 skipped, 1 NTFS caveat), thread-safe batch operations, dry-run previews, cancellation support, detailed logging — trust the tool |
+| **🛡️ Production-ready** | 1213 passing tests (+2 skipped, 1 NTFS caveat) + dc44be4 UI fixes, thread-safe batch operations, dry-run previews, cancellation support, detailed logging — trust the tool |
 | **🚀 Automation at scale** | Parallel hashing, batch operations on thousands of files, configurable worker threads, progress tracking, cancellation — process like a pro |
 | **🔐 Enterprise features** | Detail level (Simple/Standard/Everything), audit logging, integrity verification, forensic reports — audit-ready |
 
@@ -191,7 +191,7 @@ python build_exe.py debug
 | **`dataforge/ui/views/`** | Dashboard, Search, Duplicates, Media Tools, Metadata & EXIF, Automations (Action Builder + Tools), Clean Up Space, Storage & Devices, Performance, File Recovery, Forensics, Hardware Info, Settings, About & Help |
 | **`dataforge/ui/resources/icons.py`** | 18 stroke-only monochrome SVGs (sidebar icons, expand/collapse chevrons, sun/moon theme toggle) — 2e.7 |
 | **`dataforge/ui/plugins/`** | Plugin system; bundled example: Metadata Cleaner plugin |
-| **`tests/`** | 1213 passing tests (+2 skipped, 1 NTFS caveat): comprehensive, integration, contract, new-modules suites, token-regression guard |
+| **`tests/`** | 1213 passing tests (+2 skipped, 1 NTFS caveat) + dc44be4 UI fixes: comprehensive, integration, contract, new-modules suites, token-regression guard |
 | **`docs/`** | Architecture, CLI reference, GUI workflows, development guide, audit reviews |
 | **`build/`, `dist/`** | Generated build artifacts (output only, not maintained source) |
 

@@ -5,7 +5,7 @@
 **Toolchain:** `pytest` (`requirements-dev.txt:4`), `pytest-cov`, `ruff`, `mypy` — all `validation_command` are `pytest`-based.  
 **Principles enforced:** Contract-first (Wave 0) → disjoint writes per wave (no file appears twice in same wave) → sequential re-entries documented → consolidation isolates central touchpoints.
 
-> **Wave Status — Updated 2026-08-23 06:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1 DONE**
+> **Wave Status — Updated 2026-08-23 06:30 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1 DONE**
 > - **Wave 0 (Contracts): 5/5 DONE — 69 tests.** Unblocks Wave 1.
 > - **Wave 1 (Parallel Fixes): 9/9 DONE — 126 tests.** Unblocks Wave 2.
 > - **Wave 2 (Service & Mutations): 5/5 DONE — 98 tests, 5/5 `validation_command` green, file parity verified. Unblocks Wave 3.**
@@ -147,7 +147,7 @@
 
 ---
 
-## Wave 5 Review — Completed 2026-08-23 06:00 UTC (11/11 DONE)
+## Wave 5 Review — Completed 2026-08-23 06:30 UTC (11/11 DONE)
 
 > **Reviewer:** Principal Technical Auditor · **Method:** `Read` each `exclusive_write_files` + `Read` `tests/test_*` + `PYTHONPATH=. pytest` + `git log --oneline --grep=TICK-50` + `ls -l dataforge/...` + `grep -c "exclusive_write_files"` disjoint check. Wave 5 now has **11/11 merged tickets — 142 tests (+2 skipped, 1 NTFS caveat, 11/11 `validation_command` green, file parity clean, 11 disjoint files, no collision — TICK-505 moved to Wave 6).**
 
@@ -169,7 +169,7 @@
 
 ---
 
-## Wave 6 Review — Completed 2026-08-23 06:00 UTC (1/1 DONE)
+## Wave 6 Review — Completed 2026-08-23 06:30 UTC (1/1 DONE)
 
 > **Reviewer:** Principal Technical Auditor · **Method:** `Read` `dataforge/modules/forensics.py` + `Read` `tests/test_forensics_streaming.py` + `PYTHONPATH=. pytest` + `git log --oneline --grep=TICK-505` + `ls -l dataforge/...` file-time checks. Wave 6 now has **1/1 merged ticket — 13 tests, 1/1 `validation_command` green, file parity clean, sequential re-entry verified (sole Wave 6 writer to `forensics.py` after `TICK-502` Wave 5).**
 
