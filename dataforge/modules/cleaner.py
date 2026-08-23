@@ -72,10 +72,15 @@ class MetadataCleaner:
         return (False, 0, "")
 
     @staticmethod
-    def remove_metadata(path, dry_run=False):
+    def remove_metadata(path, fields=None, dry_run=False, cancel_token=None, progress_callback=None):
         """
         Removes metadata from file.
-        Delegates to MetadataEngine.remove_metadata.
+        Delegates to MetadataEngine.remove_metadata (thin shim, TICK-204).
         Returns dict with 'success' key (bool) and 'message' key (str).
+
+        Keeps shim delegation with cross-device safety via metadata helpers.
         """
-        return MetadataEngine.remove_metadata(path, dry_run=dry_run)
+        return MetadataEngine.remove_metadata(
+            path, fields=fields, dry_run=dry_run,
+            cancel_token=cancel_token, progress_callback=progress_callback,
+        )

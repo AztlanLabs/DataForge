@@ -623,22 +623,60 @@ class MetadataView(BaseView):
                 break
             if progress_callback:
                 progress_callback(idx, total, f"Stripping: {os.path.basename(path)}")
-            result = MetadataEngine.remove_metadata(path, fields=fields, dry_run=False)
+            result = MetadataEngine.remove_metadata(
+                path, fields=fields, dry_run=False,
+                cancel_token=cancel_token, progress_callback=progress_callback,
+            )
             result["path"] = path
             results.append(result)
         if progress_callback:
             progress_callback(total, total, "Strip complete")
+        # Preserve cancel semantics for JobManager
+        if cancel_token and cancel_token.is_set():
+            return {"cancelled": True, "results": results}
         return results
 
     def _on_strip_complete(self, results):
+        # Handle cancelled wrapper
+        if isinstance(results, dict) and results.get("cancelled"):
+            results = results.get("results", [])
+            self.lbl_action_status.setText(f"Cancelled: {len(results)} processed before cancel")
+            self.app.update_status(f"Metadata strip cancelled: {len(results)} processed.")
+            return
         success = sum(1 for r in results if r.get("success"))
         failed = len(results) - success
         self.lbl_action_status.setText(f"Stripped: {success} | Failed: {failed}")
         self.app.update_status(f"Metadata strip complete: {success} succeeded, {failed} failed.")
 
+        # Refresh preview for selected item if any succeeded
+        if success and hasattr(self, "file_tree"):
+            try:
+                self._on_file_select()
+            except Exception:
+                pass
+            # Update item_metadata_map by re-reading succeeded paths
+            for r in results:
+                if r.get("success") and r.get("path"):
+                    try:
+                        meta = MetadataEngine.read_metadata(r["path"])
+                        for iid, m in list(self.item_metadata_map.items()):
+                            if m.get("path") == r["path"]:
+                                self.item_metadata_map[iid] = meta
+                    except Exception:
+                        pass
+
         if failed:
-            errors = [r.get("message", "") for r in results if not r.get("success")][:5]
-            self.app.show_warning_dialog("Partial Success", f"Stripped {success}, failed {failed}:\n" + "\n".join(errors))
+            details = []
+            for r in results:
+                if not r.get("success"):
+                    msg = r.get("message", "Unknown error")
+                    p = os.path.basename(r.get("path", ""))
+                    details.append(f"{p}: {msg}" if p else msg)
+            details = details[:8]
+            self.app.show_warning_dialog(
+                "Partial Success",
+                f"Stripped {success}, failed {failed}:\n" + "\n".join(details),
+            )
         else:
             self.app.show_info_dialog("Strip Complete", f"Metadata stripped from {success} file(s).")
 
@@ -668,23 +706,82 @@ class MetadataView(BaseView):
             self._write_worker,
             self._on_write_complete,
             paths, {field_name: field_value},
+            progress=True,
             error_title="Metadata Write Failed",
         )
 
     def _write_worker(self, paths, fields, progress_callback=None, cancel_token=None):
         results = []
-        for path in paths:
+        total = len(paths)
+        for idx, path in enumerate(paths):
             if cancel_token and cancel_token.is_set():
                 break
-            result = MetadataEngine.write_metadata(path, fields, dry_run=False)
+            if progress_callback:
+                progress_callback(idx, total, f"Writing: {os.path.basename(path)}")
+            result = MetadataEngine.write_metadata(
+                path, fields, dry_run=False,
+                cancel_token=cancel_token, progress_callback=progress_callback,
+            )
             result["path"] = path
             results.append(result)
+        if progress_callback:
+            progress_callback(total, total, "Write complete")
+        if cancel_token and cancel_token.is_set():
+            return {"cancelled": True, "results": results}
         return results
 
     def _on_write_complete(self, results):
+        if isinstance(results, dict) and results.get("cancelled"):
+            results = results.get("results", [])
+            self.lbl_action_status.setText(f"Cancelled: {len(results)} written before cancel")
+            self.app.update_status(f"Metadata write cancelled: {len(results)} processed.")
+            return
         success = sum(1 for r in results if r.get("success"))
-        self.lbl_action_status.setText(f"Written: {success} / {len(results)}")
-        self.app.update_status(f"Metadata write complete: {success} succeeded.")
+        failed = len(results) - success
+        self.lbl_action_status.setText(f"Written: {success} / {len(results)} | Failed: {failed}")
+        if failed:
+            details = []
+            for r in results:
+                if not r.get("success"):
+                    msg = r.get("message", "Unknown error")
+                    p = os.path.basename(r.get("path", ""))
+                    details.append(f"{p}: {msg}" if p else msg)
+            details = details[:8]
+            self.app.update_status(f"Metadata write complete: {success} succeeded, {failed} failed.")
+            # Surface actionable message (e.g., Install exiftool) rather than silent 0
+            self.app.show_warning_dialog(
+                "Write Partial",
+                f"Metadata write completed {success} succeeded, {failed} failed:\n" + "\n".join(details),
+            )
+        else:
+            self.app.update_status(f"Metadata write complete: {success} succeeded.")
+            self.app.show_info_dialog("Write Complete", f"Metadata written to {success} file(s).")
+
+        # Refresh preview / item_metadata_map for succeeded paths
+        if success:
+            try:
+                self._on_file_select()
+            except Exception:
+                pass
+            for r in results:
+                if r.get("success") and r.get("path"):
+                    try:
+                        meta = MetadataEngine.read_metadata(r["path"])
+                        for iid, m in list(self.item_metadata_map.items()):
+                            if m.get("path") == r["path"]:
+                                self.item_metadata_map[iid] = meta
+                    except Exception:
+                        pass
+            # Also refresh overview display if single selection
+            try:
+                sel = self.file_tree.selection()
+                if sel:
+                    meta = self.item_metadata_map.get(sel[0])
+                    if meta:
+                        self._display_overview(meta)
+                        self._display_raw(meta)
+            except Exception:
+                pass
 
     def _export_metadata(self):
         if not self.scanned_metadata:
