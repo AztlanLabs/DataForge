@@ -14,7 +14,7 @@ import threading
 import configparser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..core.logger import logger
 from ..core.utils import format_size
@@ -668,7 +668,7 @@ def scan_recently_deleted(directory, max_age_hours=24, progress_callback=None, c
         list of recently modified directories (potential deletion sites).
     """
     results = []
-    cutoff = datetime.now().timestamp() - (max_age_hours * 3600)
+    cutoff = datetime.now(timezone.utc).timestamp() - (max_age_hours * 3600)
 
     count = 0
     for root, dirs, files in os.walk(directory):
@@ -685,7 +685,7 @@ def scan_recently_deleted(directory, max_age_hours=24, progress_callback=None, c
             if stat.st_mtime >= cutoff and not files:
                 results.append({
                     "path": root,
-                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
                     "note": "Empty directory — may indicate recent file deletion",
                 })
         except OSError:

@@ -233,7 +233,7 @@ class IntegrityMonitor:
 
         payload = {
             "algorithm": algo,
-            "created_at": datetime.datetime.now().isoformat(timespec="seconds"),
+            "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
             "files": snapshot,
         }
         try:

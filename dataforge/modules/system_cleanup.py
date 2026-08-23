@@ -7,7 +7,7 @@ redundant logs, and browser artifacts for storage reclamation.
 import os
 import platform
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from ..core.scanner import scan_directory
 from ..core.logger import logger
@@ -229,9 +229,9 @@ def scan_junk_files(
 
     cutoff_time = None
     if min_age_days > 0:
-        cutoff_time = (datetime.now() - timedelta(days=min_age_days)).timestamp()
+        cutoff_time = (datetime.now(timezone.utc) - timedelta(days=min_age_days)).timestamp()
 
-    now_ts = datetime.now().timestamp()
+    now_ts = datetime.now(timezone.utc).timestamp()
     one_day_ts = timedelta(days=1).total_seconds()
 
     # Build mapping: unique_dir -> list of (category, is_user_path, is_sys_temp)
