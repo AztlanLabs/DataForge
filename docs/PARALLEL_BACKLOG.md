@@ -5,7 +5,7 @@
 **Toolchain:** `pytest` (`requirements-dev.txt:4`), `pytest-cov`, `ruff`, `mypy` — all `validation_command` are `pytest`-based.  
 **Principles enforced:** Contract-first (Wave 0) → disjoint writes per wave (no file appears twice in same wave) → sequential re-entries documented → consolidation isolates central touchpoints.
 
-> **Wave Status — Updated 2026-08-23 10:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1, Wave 7 ✅ 8/8, Wave 8 ✅ 7/8 DONE — 1 remaining (TICK-804)**
+> **Wave Status — Updated 2026-08-23 11:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1, Wave 7 ✅ 8/8, Wave 8 ✅ 7/8 DONE (1 remaining TICK-804), Wave 9 🔜 0/8 READY, Wave 10 🔜 0/3 READY**
 > - **Wave 0 (Contracts): 5/5 DONE — 69 tests.** Unblocks Wave 1.
 > - **Wave 1 (Parallel Fixes): 9/9 DONE — 126 tests.** Unblocks Wave 2.
 > - **Wave 2 (Service & Mutations): 5/5 DONE — 98 tests, 5/5 `validation_command` green, file parity verified. Unblocks Wave 3.**
@@ -15,7 +15,9 @@
 > - **Wave 6 (Forensics Re-entry): 1/1 DONE — 13 tests, 1/1 `validation_command` green, `forensics.py` sequential re-entry after TICK-502 verified.** Reviewed below.
 > - **Wave 7 (Remaining Gaps + Engine Growth): 8/8 DONE — 128 tests (+1 skipped, 8/8 `validation_command` green, file parity verified, 8 disjoint files, no collision).** Reviewed below.
 > - **Wave 8 (Next Issues — Renamer, STOP, Icons, Cache, Menus, Automation, Memory, Hardware): 7/8 DONE — 65 tests (7/8 `validation_command` green, file parity verified, 7 disjoint files, 1 remaining `TICK-804` — `feat/TICK-804-cache-info` branch, not yet merged).** Reviewed below.
-> - **Overall: 52/53 tickets DONE (98%) — 1 remaining (TICK-804 `cache info`).** See `docs/prompts/tickets/README.md` for per-ticket prompts.
+> - **Wave 9 (Stability Hotfix — Hardware QPainter, Metadata cross-device, MediaTools rework, Duplicates SIGSEGV, Junk SIGSEGV, Preview malloc, Automations collapsible, Cursor pointers): 0/8 READY — 8 parallel disjoint files, depends on Wave 8 (needs TICK-804 merged for cache.py sequential? No, Wave 9 avoids cache.py, so can start now; Wave 10 depends on Wave 9).** See below.
+> - **Wave 10 (Quality — Global audit, Test consolidation, Dead code prune): 0/3 READY — 3 parallel disjoint files, depends on Wave 9.** See below.
+> - **Overall: 52/64 tickets DONE (81%) — 12 remaining (TICK-804 + 901-908 + 911-913).** See `docs/prompts/tickets/README.md` for per-ticket prompts.
 
 > Read `CONSOLIDATED_SPEC.md` §2–7 for canonical definitions before picking a ticket. All `path:line` below verified at 2026-08-22.
 
@@ -78,6 +80,17 @@
 | Wave 8 | `TICK-806` | UI / Automations | `dataforge/ui/views/automations.py`, `dataforge/ui/views/action_builder.py`, `dataforge/engine/daemon.py` | None | Automation store custom | ✅ DONE 2026-08-23 — `tests/test_automation_store.py` 10/10, JSON store + `9eed4b2` verified |
 | Wave 8 | `TICK-807` | Core / Persistence | `dataforge/core/config.py`, `dataforge/core/paths.py`, `dataforge/ui/views/system_cleanup.py` | None | Memory checkboxes | ✅ DONE 2026-08-23 — `tests/test_ui_memory.py` 7/7, `ui_last_paths` + `checkbox` + migration verified |
 | Wave 8 | `TICK-808` | UI / Hardware | `dataforge/ui/views/hardware_view.py`, `dataforge/modules/hardware.py`, `dataforge/ui/app.py` | None | Hardware SIGSEGV | ✅ DONE 2026-08-23 — `tests/test_hardware_crash.py` 9/9, `VSS` + `QPainter` + debounce verified |
+| **Wave 9 — Stability Hotfix (Hardware QPainter, Metadata, MediaTools, Duplicates, Junk, Preview, Automations, Cursors) 🔜 0/8 READY** | `TICK-901` | UI / Hardware | `dataforge/ui/views/hardware_view.py`, `dataforge/modules/hardware.py` | None | Hardware QPainter/SIGSEGV deep hardening (viewport fix + debounce + cancel) | 🔜 Ready — 2 files |
+| Wave 9 | `TICK-902` | Modules / Metadata | `dataforge/modules/metadata.py`, `dataforge/modules/cleaner.py`, `dataforge/ui/views/metadata_view.py` | None | Metadata EXIF cross-device & 0 succeeded (Pillow EXDEV + GPS strip) | 🔜 Ready — 3 files |
+| Wave 9 | `TICK-903` | Core / Media | `dataforge/core/media_ops.py`, `dataforge/ui/views/media.py` | None | MediaTools PDF/Image rework (merge/split/compress/convert + preview + malloc) | 🔜 Ready — 2 files |
+| Wave 9 | `TICK-904` | Modules / Duplicates | `dataforge/modules/duplicates.py`, `dataforge/core/hasher.py` | None | Duplicate finder SIGSEGV hashing 33 files (mmap + cache batch) | 🔜 Ready — 2 files |
+| Wave 9 | `TICK-905` | Modules / System Cleanup | `dataforge/modules/system_cleanup.py`, `dataforge/core/scanner.py`, `dataforge/ui/views/system_cleanup.py` | None | Junk scan SIGSEGV + permission QBackingStore (systemd-private + paint) | 🔜 Ready — 3 files |
+| Wave 9 | `TICK-906` | UI / Widgets | `dataforge/ui/widgets.py` | None | FilePreviewPanel malloc/QPainter isolation (main-thread guard + gen counter) | 🔜 Ready — 1 file |
+| Wave 9 | `TICK-907` | UI / Automations | `dataforge/ui/views/automations.py`, `dataforge/ui/views/action_builder.py` | None | Automations saved store collapsible top | 🔜 Ready — 2 files |
+| Wave 9 | `TICK-908` | UI / Shell | `dataforge/ui/app.py`, `dataforge/ui/views/base.py`, `dataforge/ui/theme_tokens.py` | None | Global cursor pointers + app QPainter hardening | 🔜 Ready — 3 files |
+| **Wave 10 — Quality (Global Audit, Test Consolidation, Dead Code) 🔜 0/3 READY** | `TICK-911` | Core / Engine | `dataforge/ui/job_manager.py`, `dataforge/engine/jobs.py`, `dataforge/engine/daemon.py` | Wave 9 | Global stability audit + job lifecycle hardening | 🔜 Ready — 3 files — depends on Wave 9 |
+| Wave 10 | `TICK-912` | Tests / Quality | `tests/test_comprehensive.py`, `tests/test_integration.py`, `tests/test_contract_regressions.py`, `tests/test_new_modules.py`, `tests/verify_scenarios.py`, `scripts/tests_consolidate.py [NEW FILE]` | Wave 9 | Test consolidation + deprecated prune | 🔜 Ready — 6 files |
+| Wave 10 | `TICK-913` | Core / Debt | `dataforge/modules/organizer.py`, `dataforge/modules/reporting.py`, `dataforge/modules/usage.py`, `dataforge/modules/password_tools.py`, `dataforge/modules/file_signatures.py`, `dataforge/modules/device_manager.py`, `dataforge/core/utils.py` | Wave 9 | Dead code prune + unused paths | 🔜 Ready — 7 files |
 
 **Disjoint guarantee (hardened):** No two tickets in the **same wave** list the same `exclusive_write_files` path. Central touchpoints (`dataforge/ui/app.py`, `pyproject.toml`, `dataforge/engine/daemon.py`, `dataforge/modules/forensics.py`, `dataforge/core/cache.py`) appear in **different waves** sequentially and are documented as re-entries. Wave 0 contracts land before any Wave 1 impl that imports them (`TICK-004` now depends on `TICK-001`).
 
@@ -269,7 +282,7 @@ git commit -m "feat(core): parallel BFS scanner with DirEntry.stat reuse"  # Con
 Execute waves in DAG order. A wave starts only after **all** `depends_on` tickets in earlier waves have merged to `develop`:
 
 ```
-Wave 0 (contracts) → Wave 1 (parallel fixes, 9 agents but still after W0) → Wave 2 → Wave 3 → Wave 4 → Wave 5 (11 parallel, 142 tests) → Wave 6 (1 sequential re-entry, 13 tests) → Wave 7 (8 parallel, 20 files) → Wave 8 (8 parallel, 24 files) → Wave 9+ (STOP full sweep)
+Wave 0 (contracts) → Wave 1 (parallel fixes, 9 agents but still after W0) → Wave 2 → Wave 3 → Wave 4 → Wave 5 (11 parallel, 142 tests) → Wave 6 (1 sequential re-entry, 13 tests) → Wave 7 (8 parallel, 20 files) → Wave 8 (8 parallel, 24 files) → Wave 9 (Stability Hotfix, 8 parallel) → Wave 10 (Quality, 3 parallel)
 ```
 
 Inside a wave with dependencies, respect the ticket’s `depends_on` list (e.g. `TICK-004` depends on `TICK-001` — land `TICK-001` first even though both are Wave 0).
@@ -1179,6 +1192,356 @@ requirements:
 verification:
   test_target: "tests/test_version_sync.py [NEW FILE]"
   validation_command: "python -m pytest tests/test_version_sync.py -q && python scripts/bump_version.py --check"
+```
+
+---
+
+### TICK-901 — Hardware QPainter/SIGSEGV deep hardening
+```yaml
+ticket_id: "TICK-901"
+title: "Hardware section QPainter/SIGSEGV deep hardening"
+type: "Bugfix"
+execution_wave: 9
+depends_on: []
+scope:
+  domain: "UI / Hardware"
+  exclusive_write_files:
+    - "dataforge/ui/views/hardware_view.py"
+    - "dataforge/modules/hardware.py"
+  read_only_references:
+    - "dataforge/ui/job_manager.py"
+    - "dataforge/engine/jobs.py"
+    - "dataforge/ui/widgets.py"
+    - "dataforge/ui/app.py"
+architectural_context:
+  existing_symbols_to_use:
+    - "hardware_view.py: HardwareView, mount, _run_scan"
+    - "hardware.py: get_hardware_report, _check_cancel"
+  breaking_changes: "None"
+requirements:
+  summary: "Fix EnhancedTreeview viewport AttributeError + QPainter active painter + SIGSEGV during crossfade with 4 concurrent jobs"
+  source_documents:
+    - "docs/GUI_WORKFLOWS.md"
+  acceptance_criteria:
+    - "GIVEN rapid Hardware switches THEN no SIGSEGV"
+    - "GIVEN viewport() line 319 THEN uses refresh_viewport() correctly"
+verification:
+  test_target: "tests/test_hardware_stability.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_hardware_stability.py -q"
+```
+
+### TICK-902 — Metadata EXIF cross-device strip & 0 succeeded
+```yaml
+ticket_id: "TICK-902"
+title: "Metadata EXIF write/strip cross-device & 0 succeeded"
+type: "Bugfix"
+execution_wave: 9
+depends_on: []
+scope:
+  domain: "Modules / Metadata"
+  exclusive_write_files:
+    - "dataforge/modules/metadata.py"
+    - "dataforge/modules/cleaner.py"
+    - "dataforge/ui/views/metadata_view.py"
+  read_only_references:
+    - "dataforge/core/logger.py"
+    - "dataforge/ui/job_manager.py"
+architectural_context:
+  existing_symbols_to_use:
+    - "metadata.py: MetadataEngine, _strip_pillow, _strip_exiftool"
+    - "cleaner.py: MetadataCleaner shim"
+  breaking_changes: "None"
+requirements:
+  summary: "Fix EXDEV Invalid cross-device link via same-dir temp + shutil copy fallback; fix write 0 succeeded GPS-only strip"
+  source_documents:
+    - "docs/GUI_WORKFLOWS.md"
+  acceptance_criteria:
+    - "GIVEN cross-device png THEN strip succeeds"
+    - "GIVEN GPS-only strip THEN preserves other EXIF"
+verification:
+  test_target: "tests/test_metadata_cross_device.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_metadata_cross_device.py -q"
+```
+
+### TICK-903 — MediaTools PDF/Image rework + preview + malloc
+```yaml
+ticket_id: "TICK-903"
+title: "MediaTools PDF/Image rework + preview + malloc fix"
+type: "Feature"
+execution_wave: 9
+depends_on: []
+scope:
+  domain: "Core / Media"
+  exclusive_write_files:
+    - "dataforge/core/media_ops.py"
+    - "dataforge/ui/views/media.py"
+  read_only_references:
+    - "dataforge/ui/widgets.py"
+    - "dataforge/ui/job_manager.py"
+architectural_context:
+  existing_symbols_to_use:
+    - "media_ops.py: merge_pdfs, split_pdf, convert_image"
+    - "media.py: MediaView, FilePreviewPanel"
+  breaking_changes: "None"
+requirements:
+  summary: "Rework PDF merge/split/compress/convert + image batch + preview pane + fix malloc double linked list"
+  source_documents:
+    - "docs/GUI_WORKFLOWS.md"
+  acceptance_criteria:
+    - "GIVEN PDF merge/split THEN no crash and preview works"
+verification:
+  test_target: "tests/test_media_tools.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_media_tools.py -q"
+```
+
+### TICK-904 — Duplicate finder SIGSEGV hashing
+```yaml
+ticket_id: "TICK-904"
+title: "Duplicate finder SIGSEGV hashing"
+type: "Bugfix"
+execution_wave: 9
+depends_on: []
+scope:
+  domain: "Modules / Duplicates"
+  exclusive_write_files:
+    - "dataforge/modules/duplicates.py"
+    - "dataforge/core/hasher.py"
+  read_only_references:
+    - "dataforge/core/cache.py"
+    - "dataforge/core/scanner.py"
+architectural_context:
+  existing_symbols_to_use:
+    - "duplicates.py: find_duplicates"
+    - "hasher.py: get_file_hash mmap"
+  breaking_changes: "None"
+requirements:
+  summary: "Fix SIGSEGV at Hashing 33 via mmap zero-size guard + deferred cache batch"
+  source_documents:
+    - "docs/GUI_WORKFLOWS.md"
+  acceptance_criteria:
+    - "GIVEN 500 files THEN no SIGSEGV"
+verification:
+  test_target: "tests/test_duplicates_stability.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_duplicates_stability.py -q"
+```
+
+### TICK-905 — Junk scan SIGSEGV + permission QBackingStore
+```yaml
+ticket_id: "TICK-905"
+title: "Junk scan SIGSEGV + permission QBackingStore"
+type: "Bugfix"
+execution_wave: 9
+depends_on: []
+scope:
+  domain: "Modules / System Cleanup"
+  exclusive_write_files:
+    - "dataforge/modules/system_cleanup.py"
+    - "dataforge/core/scanner.py"
+    - "dataforge/ui/views/system_cleanup.py"
+  read_only_references:
+    - "dataforge/ui/job_manager.py"
+    - "dataforge/ui/widgets.py"
+architectural_context:
+  existing_symbols_to_use:
+    - "system_cleanup.py: scan_junk_files"
+    - "scanner.py: scan_directory"
+  breaking_changes: "None"
+requirements:
+  summary: "Skip systemd-private 0700 dirs without warning flood + harden QBackingStore rebuild"
+  source_documents:
+    - "docs/GUI_WORKFLOWS.md"
+  acceptance_criteria:
+    - "GIVEN systemd-private dirs THEN skip without SIGSEGV"
+verification:
+  test_target: "tests/test_junk_scan_stability.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_junk_scan_stability.py -q"
+```
+
+### TICK-906 — FilePreviewPanel malloc/QPainter isolation
+```yaml
+ticket_id: "TICK-906"
+title: "FilePreviewPanel & widgets malloc/QPainter isolation"
+type: "Bugfix"
+execution_wave: 9
+depends_on: []
+scope:
+  domain: "UI / Widgets"
+  exclusive_write_files:
+    - "dataforge/ui/widgets.py"
+  read_only_references:
+    - "dataforge/ui/views/media.py"
+    - "dataforge/core/media_ops.py"
+architectural_context:
+  existing_symbols_to_use:
+    - "widgets.py: FilePreviewPanel, EnhancedTreeview"
+  breaking_changes: "None"
+requirements:
+  summary: "Fix malloc double linked list via main-thread QPixmap guard + generation counter + thumbnail"
+  source_documents:
+    - "docs/GUI_WORKFLOWS.md"
+  acceptance_criteria:
+    - "GIVEN preview off main thread THEN defers"
+verification:
+  test_target: "tests/test_widgets_preview.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_widgets_preview.py -q"
+```
+
+### TICK-907 — Automations collapsible store UX
+```yaml
+ticket_id: "TICK-907"
+title: "Automations saved store collapsible UX"
+type: "Feature"
+execution_wave: 9
+depends_on: []
+scope:
+  domain: "UI / Automations"
+  exclusive_write_files:
+    - "dataforge/ui/views/automations.py"
+    - "dataforge/ui/views/action_builder.py"
+  read_only_references:
+    - "dataforge/core/paths.py"
+    - "dataforge/ui/widgets.py"
+architectural_context:
+  existing_symbols_to_use:
+    - "automations.py: AutomationsView"
+  breaking_changes: "None"
+requirements:
+  summary: "Move Saved Automations to collapsible top near config, remove 250px side waste"
+  source_documents:
+    - "docs/GUI_WORKFLOWS.md"
+  acceptance_criteria:
+    - "GIVEN view opened THEN card collapsed by default"
+verification:
+  test_target: "tests/test_automations_layout.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_automations_layout.py -q"
+```
+
+### TICK-908 — Global cursor pointers + app QPainter hardening
+```yaml
+ticket_id: "TICK-908"
+title: "Global cursor pointers + app QPainter hardening"
+type: "Feature"
+execution_wave: 9
+depends_on: []
+scope:
+  domain: "UI / Shell"
+  exclusive_write_files:
+    - "dataforge/ui/app.py"
+    - "dataforge/ui/views/base.py"
+    - "dataforge/ui/theme_tokens.py"
+  read_only_references:
+    - "dataforge/ui/job_manager.py"
+    - "dataforge/ui/widgets.py"
+architectural_context:
+  existing_symbols_to_use:
+    - "app.py: DataForgeApp"
+  breaking_changes: "None"
+requirements:
+  summary: "Add semantic cursors (PointingHand/Wait/Forbidden/Split) + harden global crossfade paint"
+  source_documents:
+    - "docs/GUI_WORKFLOWS.md"
+  acceptance_criteria:
+    - "GIVEN hover button THEN PointingHandCursor"
+verification:
+  test_target: "tests/test_cursor_pointers.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_cursor_pointers.py -q"
+```
+
+### TICK-911 — Global app stability audit + job lifecycle hardening
+```yaml
+ticket_id: "TICK-911"
+title: "Global app stability audit + job lifecycle hardening"
+type: "Bugfix"
+execution_wave: 10
+depends_on: ["TICK-901", "TICK-902", "TICK-903", "TICK-904", "TICK-905", "TICK-906", "TICK-907", "TICK-908"]
+scope:
+  domain: "Core / Engine"
+  exclusive_write_files:
+    - "dataforge/ui/job_manager.py"
+    - "dataforge/engine/jobs.py"
+    - "dataforge/engine/daemon.py"
+  read_only_references:
+    - "dataforge/ui/app.py"
+architectural_context:
+  existing_symbols_to_use:
+    - "jobs.py: Job, JobQueue"
+  breaking_changes: "None"
+requirements:
+  summary: "Audit entire app for double-submit/progress flood/evidence bypass after Wave 9 hotfixes"
+  source_documents:
+    - "docs/CONSOLIDATED_SPEC.md"
+  acceptance_criteria:
+    - "GIVEN 20 jobs burst THEN no double exec"
+verification:
+  test_target: "tests/test_global_stability.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_global_stability.py -q"
+```
+
+### TICK-912 — Test suite consolidation + deprecated prune
+```yaml
+ticket_id: "TICK-912"
+title: "Test suite consolidation + deprecated prune"
+type: "Refactor"
+execution_wave: 10
+depends_on: ["TICK-901", "TICK-902", "TICK-903", "TICK-904", "TICK-905", "TICK-906", "TICK-907", "TICK-908"]
+scope:
+  domain: "Tests / Quality"
+  exclusive_write_files:
+    - "tests/test_comprehensive.py"
+    - "tests/test_integration.py"
+    - "tests/test_contract_regressions.py"
+    - "tests/test_new_modules.py"
+    - "tests/verify_scenarios.py"
+    - "scripts/tests_consolidate.py [NEW FILE]"
+  read_only_references:
+    - "tests/test_scanner_parallel.py"
+architectural_context:
+  existing_symbols_to_use:
+    - "tests/test_comprehensive.py"
+  breaking_changes: "None"
+requirements:
+  summary: "Reduce 1406→950 tests by merging deprecated 5 files into parametrized consolidated suite"
+  source_documents:
+    - "docs/CONTRIBUTING.md"
+  acceptance_criteria:
+    - "GIVEN audit THEN deprecated 5 files merged"
+verification:
+  test_target: "tests/test_consolidated_suite.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_consolidated_suite.py -q"
+```
+
+### TICK-913 — Dead code prune + unused paths
+```yaml
+ticket_id: "TICK-913"
+title: "Dead code prune + unused paths"
+type: "Refactor"
+execution_wave: 10
+depends_on: ["TICK-901", "TICK-902", "TICK-903", "TICK-904", "TICK-905", "TICK-906", "TICK-907", "TICK-908"]
+scope:
+  domain: "Core / Debt"
+  exclusive_write_files:
+    - "dataforge/modules/organizer.py"
+    - "dataforge/modules/reporting.py"
+    - "dataforge/modules/usage.py"
+    - "dataforge/modules/password_tools.py"
+    - "dataforge/modules/file_signatures.py"
+    - "dataforge/modules/device_manager.py"
+    - "dataforge/core/utils.py"
+  read_only_references:
+    - "dataforge/cli.py"
+architectural_context:
+  existing_symbols_to_use:
+    - "utils.py: format_size"
+  breaking_changes: "None"
+requirements:
+  summary: "Prune dead code via vulture/coverage in 7 files"
+  source_documents:
+    - "docs/ARCHITECTURE.md"
+  acceptance_criteria:
+    - "GIVEN vulture THEN 0 dead"
+verification:
+  test_target: "tests/test_dead_code_prune.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_dead_code_prune.py -q"
 ```
 
 ---
