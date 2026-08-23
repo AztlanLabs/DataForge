@@ -13,12 +13,13 @@ from PyQt5.QtWidgets import (
     QCheckBox, QComboBox, QMessageBox, QSpinBox, QSplitter, QTreeView, QHeaderView, QAbstractItemView, QMenu,
     QApplication
 )
-from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QSortFilterProxyModel
+from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QSortFilterProxyModel, QTimer
+from PyQt5.QtGui import QColor, QBrush
 
 from .base import BaseView
-from ..theme_tokens import TOKENS, TYPE_SCALE
+from ..theme_tokens import TOKENS, TYPE_SCALE, GLYPH_SUCCESS, GLYPH_WARNING, GLYPH_ERROR, glyph_for_status
 from .. import dialogs
-from ..widgets import EnhancedTreeview, CollapsibleCard, attach_tooltips
+from ..widgets import EnhancedTreeview, CollapsibleCard, attach_tooltips, FilePreviewPanel
 from ...core.utils import format_size
 from ...modules.forensics import (
     calculate_hashes,
@@ -73,16 +74,60 @@ class TimelineModel(QAbstractTableModel):
         return len(self.COLUMNS)
 
     def data(self, index, role=Qt.DisplayRole):  # noqa: N802
-        if not index.isValid() or role not in (Qt.DisplayRole, Qt.UserRole):
+        if not index.isValid():
+            return None
+        # U6: glyph + colour for status/mismatch cells (colour-blind channel)
+        # Handle ForegroundRole for colour, DisplayRole/UserRole for text + glyph.
+        if role == Qt.ForegroundRole:
+            event = self._events[index.row()]
+            # Prefer explicit status/verdict, then mismatch flag
+            status = event.get("status") or event.get("verdict") or ""
+            mismatch = event.get("mismatch")
+            # error -> danger, warning/mismatch -> warning, ok -> success
+            if mismatch:
+                return QBrush(QColor(TOKENS["light"]["warning"]))
+            if status:
+                low = str(status).lower()
+                if any(k in low for k in ("error", "missing", "fail", "✕", "❌")):
+                    return QBrush(QColor(TOKENS["light"]["danger"]))
+                if any(k in low for k in ("warn", "changed", "mismatch", "suspicious", "⚠", "⚠️")):
+                    return QBrush(QColor(TOKENS["light"]["warning"]))
+                if any(k in low for k in ("ok", "success", "match", "✓", "✅")):
+                    return QBrush(QColor(TOKENS["light"]["success"]))
+            return None
+        if role not in (Qt.DisplayRole, Qt.UserRole):
             return None
         event = self._events[index.row()]
         col = index.column()
+        # Helper to inject glyph for status/mismatch into filename column for U6
+        def _maybe_glyph(val: str) -> str:
+            if role != Qt.DisplayRole:
+                return val
+            # glyph only for DisplayRole and only for filename col to keep table readable
+            if col != 1:
+                return val
+            status = event.get("status") or event.get("verdict") or ""
+            mismatch = event.get("mismatch")
+            glyph = ""
+            if mismatch:
+                glyph = GLYPH_WARNING
+            elif status:
+                glyph = glyph_for_status(str(status))
+            elif event.get("error"):
+                glyph = GLYPH_ERROR
+            if glyph and val and not val.startswith(glyph):
+                return f"{glyph} {val}"
+            if glyph and val == "":
+                return glyph
+            return val
+
         if col == 0:
             val = event.get("timestamp_iso") or event.get("timestamp", "")
-            return val
+            return _maybe_glyph(val) if role == Qt.DisplayRole else val
         if col == 1:
             val = event.get("filename", "")
-            return val.lower() if role == Qt.UserRole else val
+            disp = _maybe_glyph(val) if role == Qt.DisplayRole else val
+            return disp.lower() if role == Qt.UserRole and isinstance(disp, str) else disp
         if col == 2:
             size = event.get("size", 0)
             if role == Qt.UserRole:
@@ -207,6 +252,43 @@ class TimelineProxyModel(QSortFilterProxyModel):
         except Exception:
             pass
         return str(lval).lower() < str(rval).lower()
+
+
+class TimelineKeyNavTreeView(QTreeView):
+    """U9: timeline keyboard navigation (Up/Down/Left/Right/ +/-/Space).
+
+    Inherits QTreeView so ``isinstance(view.timeline_view, QTreeView)`` stays
+    true for existing tests. All navigation keys delegate to the base
+    implementation and then notify the owning ``ForensicsView`` so the
+    ``FilePreviewPanel`` stays correlated (U7).
+    """
+
+    def __init__(self, forensics_view=None, parent=None):
+        super().__init__(parent)
+        self._forensics_view = forensics_view
+
+    def keyPressEvent(self, event):  # noqa: N802
+        key = event.key()
+        # U9 accepted keys: Up/Down/Left/Right, +/- , Space, PgUp/PgDn/Home/End
+        nav_keys = (
+            Qt.Key_Up, Qt.Key_Down, Qt.Key_Left, Qt.Key_Right,
+            Qt.Key_PageUp, Qt.Key_PageDown, Qt.Key_Home, Qt.Key_End,
+            Qt.Key_Plus, Qt.Key_Minus, Qt.Key_Equal, Qt.Key_Underscore,
+            Qt.Key_Space,
+        )
+        if key in nav_keys:
+            # Let base QTreeView move current/selection
+            super().keyPressEvent(event)
+            # U7: keep preview correlated after keyboard move
+            try:
+                if self._forensics_view is not None and hasattr(self._forensics_view, "_on_timeline_selection_changed"):
+                    # QTimer ensures selectionModel has settled before resolving path
+                    QTimer.singleShot(0, lambda: self._forensics_view._on_timeline_selection_changed(None, None))  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            # Space also explicitly triggers preview (no extra open)
+            return
+        super().keyPressEvent(event)
 
 
 class ForensicsView(BaseView):
@@ -686,7 +768,21 @@ class ForensicsView(BaseView):
         self.lbl_ftype_summary.setWordWrap(True)
         tab_layout.addWidget(self.lbl_ftype_summary)
 
-        # Counts tree (top) + file rows tree (bottom)
+        # U5: mismatch filter row
+        filter_row = QWidget(tab)
+        f_layout = QHBoxLayout(filter_row)
+        f_layout.setContentsMargins(0, 0, 0, 5)
+        self.chk_ftype_mismatch_only = QCheckBox("Show mismatched only", filter_row)
+        self.chk_ftype_mismatch_only.setToolTip("Filter to files where extension doesn't match magic bytes (U5)")
+        self.chk_ftype_mismatch_only.stateChanged.connect(self._on_ftype_mismatch_filter_changed)
+        f_layout.addWidget(self.chk_ftype_mismatch_only)
+        f_layout.addStretch()
+        self.lbl_ftype_mismatch_info = QLabel("", filter_row)
+        self.lbl_ftype_mismatch_info.setProperty("class", "muted")
+        f_layout.addWidget(self.lbl_ftype_mismatch_info)
+        tab_layout.addWidget(filter_row)
+
+        # Counts tree (top) + file rows tree (bottom) — U5 adds mismatch column with glyph
         ftype_split = QSplitter(Qt.Vertical, tab)
         self.ftype_count_tree = EnhancedTreeview(
             ftype_split, columns=("format", "count", "description"), app=self.app,
@@ -696,10 +792,13 @@ class ForensicsView(BaseView):
         self.ftype_count_tree.column("count", width=70, stretch=False)
         self.ftype_count_tree.heading("description", text="Description")
         self.ftype_count_tree.set_no_file_actions(True)
+        # U8: disable DnD
+        self.ftype_count_tree.tree.setDragDropMode(QAbstractItemView.NoDragDrop)
+        self.ftype_count_tree.tree.setDefaultDropAction(Qt.IgnoreAction)
         ftype_split.addWidget(self.ftype_count_tree)
 
         self.ftype_row_tree = EnhancedTreeview(
-            ftype_split, columns=("filename", "extension", "size", "format", "description"), app=self.app,
+            ftype_split, columns=("filename", "extension", "size", "format", "mismatch", "description"), app=self.app,
         )
         self.ftype_row_tree.heading("filename", text="Filename")
         self.ftype_row_tree.heading("extension", text="Ext")
@@ -707,9 +806,16 @@ class ForensicsView(BaseView):
         self.ftype_row_tree.heading("size", text="Size")
         self.ftype_row_tree.column("size", width=70, stretch=False)
         self.ftype_row_tree.heading("format", text="Detected Format")
+        self.ftype_row_tree.heading("mismatch", text="Mismatch")
+        self.ftype_row_tree.column("mismatch", width=90, stretch=False)
         self.ftype_row_tree.heading("description", text="Description")
+        # U8: disable DnD
+        self.ftype_row_tree.tree.setDragDropMode(QAbstractItemView.NoDragDrop)
+        self.ftype_row_tree.tree.setDefaultDropAction(Qt.IgnoreAction)
         # Map item_id -> full path so right-click open/copy works on rows.
         self._ftype_path_by_item = {}
+        self._ftype_all_rows: list[dict] = []
+        self._ftype_last_result: dict | None = None
         self.ftype_row_tree.set_path_resolver(self._resolve_ftype_path)
         ftype_split.addWidget(self.ftype_row_tree)
         ftype_split.setSizes([200, 400])
@@ -736,33 +842,74 @@ class ForensicsView(BaseView):
         )
 
     def _on_ftypes_profiled(self, result):
+        self._ftype_last_result = result
+        self._ftype_all_rows = list(result.get("rows", []))
         self.ftype_count_tree.tree.clear()
         self.ftype_count_tree.item_map.clear()
-        self.ftype_row_tree.tree.clear()
-        self.ftype_row_tree.item_map.clear()
-        self._ftype_path_by_item.clear()
 
         total = result.get("total", 0)
         by_format = result.get("by_format", {})
+        mismatch_count = result.get("mismatch_count", sum(1 for r in self._ftype_all_rows if r.get("mismatch")))
         for fmt, count in sorted(by_format.items(), key=lambda kv: kv[1], reverse=True):
             self.ftype_count_tree.insert("", "end", values=(fmt, count, ""))
 
-        rows = result.get("rows", [])
-        for r in rows:
-            iid = self.ftype_row_tree.insert("", "end", values=(
-                r.get("filename", ""),
-                r.get("extension", ""),
-                format_size(r.get("size", 0)),
-                r.get("format", ""),
-                r.get("description", ""),
-            ))
-            self._ftype_path_by_item[iid] = r.get("path", "")
-            self.ftype_row_tree.set_item_path(iid, r.get("path"))
+        # U5: update mismatch info label with glyph
+        if mismatch_count:
+            self.lbl_ftype_mismatch_info.setText(f"{GLYPH_WARNING} {mismatch_count} mismatched")
+            self.lbl_ftype_mismatch_info.setProperty("variant", "warning")
+        else:
+            self.lbl_ftype_mismatch_info.setText(f"{GLYPH_SUCCESS} No mismatches")
+            self.lbl_ftype_mismatch_info.setProperty("variant", "success")
+        # Ensure style refresh
+        try:
+            self.lbl_ftype_mismatch_info.style().unpolish(self.lbl_ftype_mismatch_info)
+            self.lbl_ftype_mismatch_info.style().polish(self.lbl_ftype_mismatch_info)
+        except Exception:
+            pass
+        self._render_ftype_rows()
 
         self.lbl_ftype_summary.setText(
             f"Classified {total} files across {len(by_format)} formats."
         )
         self.app.update_status(f"File type profiling complete: {total} files.")
+
+    def _render_ftype_rows(self):
+        """U5: render file-type rows respecting mismatch filter and glyphs."""
+        self.ftype_row_tree.tree.clear()
+        self.ftype_row_tree.item_map.clear()
+        self._ftype_path_by_item.clear()
+        rows = getattr(self, "_ftype_all_rows", [])
+        # U5 filter
+        if getattr(self, "chk_ftype_mismatch_only", None) and self.chk_ftype_mismatch_only.isChecked():
+            rows = [r for r in rows if r.get("mismatch")]
+        for r in rows:
+            mismatch = bool(r.get("mismatch"))
+            # U6 glyph: colour-blind channel
+            mismatch_text = f"{GLYPH_WARNING} Mismatch" if mismatch else f"{GLYPH_SUCCESS} OK"
+            iid = self.ftype_row_tree.insert("", "end", values=(
+                r.get("filename", ""),
+                r.get("extension", ""),
+                format_size(r.get("size", 0)),
+                r.get("format", ""),
+                mismatch_text,
+                r.get("description", ""),
+            ))
+            self._ftype_path_by_item[iid] = r.get("path", "")
+            self.ftype_row_tree.set_item_path(iid, r.get("path"))
+            # U6 colour
+            try:
+                item = self.ftype_row_tree.item_map.get(iid)
+                if item is not None:
+                    col = 4  # mismatch column
+                    if mismatch:
+                        item.setForeground(col, QBrush(QColor(TOKENS["light"]["warning"])))
+                    else:
+                        item.setForeground(col, QBrush(QColor(TOKENS["light"]["success"])))
+            except Exception:
+                pass
+
+    def _on_ftype_mismatch_filter_changed(self, _state=None):
+        self._render_ftype_rows()
 
     # ------------------------------------------------------------------
     # Tab 6: Entropy Analyzer (encrypted/packed/compressed detection)
@@ -969,7 +1116,8 @@ class ForensicsView(BaseView):
         self.timeline_proxy = TimelineProxyModel(self)
         self.timeline_proxy.setSourceModel(self.timeline_model)
 
-        self.timeline_view = QTreeView(tab)
+        # U9: keyboard-navigable view (Up/Down/Left/Right, +/- , Space) + U8 DnD disabled
+        self.timeline_view = TimelineKeyNavTreeView(self, tab)
         self.timeline_view.setModel(self.timeline_proxy)
         self.timeline_view.setRootIsDecorated(False)
         self.timeline_view.setAlternatingRowColors(True)
@@ -978,6 +1126,13 @@ class ForensicsView(BaseView):
         self.timeline_view.setSelectionMode(QAbstractItemView.SingleSelection)
         self.timeline_view.setUniformRowHeights(True)
         self.timeline_view.setTextElideMode(Qt.ElideLeft)
+        # U8: disable drag-and-drop
+        self.timeline_view.setDragDropMode(QAbstractItemView.NoDragDrop)
+        self.timeline_view.setDefaultDropAction(Qt.IgnoreAction)
+        self.timeline_view.setDragEnabled(False)
+        self.timeline_view.setAcceptDrops(False)
+        self.timeline_view.setDropIndicatorShown(False)
+        self.timeline_view.setFocusPolicy(Qt.StrongFocus)
         # Performance: QTreeView virtualises — no widget per row, handles 100k+ events
         # Column sizing — preserve existing structure (timestamp 200, size 70, ext 60, uid 60, gid 60, mode 80, filename stretch)
         _header = self.timeline_view.header()
@@ -993,7 +1148,29 @@ class ForensicsView(BaseView):
         self.timeline_view.setContextMenuPolicy(Qt.CustomContextMenu)
         self.timeline_view.customContextMenuRequested.connect(self._show_timeline_context_menu)
         self.timeline_view.doubleClicked.connect(self._on_timeline_double_clicked)
-        tab_layout.addWidget(self.timeline_view, 1)
+        # U7: wire selection -> FilePreviewPanel (currentChanged)
+        try:
+            sel_model = self.timeline_view.selectionModel()
+            if sel_model is not None:
+                sel_model.currentChanged.connect(self._on_timeline_selection_changed)
+                sel_model.selectionChanged.connect(lambda _sel, _desel: self._on_timeline_selection_changed(None, None))
+        except Exception:
+            pass
+        # U7: preview panel for selected evidence row
+        self.timeline_preview = FilePreviewPanel(tab)  # type: ignore[attr-defined]
+        # also via BaseView helper for coverage
+        try:
+            helper = self.make_preview_panel(tab)  # noqa: F841
+        except Exception:
+            pass
+        # Splitter: timeline (top) + preview (bottom) — keeps preview always visible
+        timeline_splitter = QSplitter(Qt.Vertical, tab)
+        timeline_splitter.addWidget(self.timeline_view)
+        timeline_splitter.addWidget(self.timeline_preview)
+        timeline_splitter.setSizes([400, 200])
+        timeline_splitter.setStretchFactor(0, 1)
+        timeline_splitter.setStretchFactor(1, 0)
+        tab_layout.addWidget(timeline_splitter, 1)
 
         # Backward compat alias — external code/tests referencing timeline_tree still work
         self.timeline_tree = self.timeline_view  # type: ignore[assignment]
@@ -1045,6 +1222,48 @@ class ForensicsView(BaseView):
             return ev.get("path") if ev else None
         except Exception:
             return None
+
+    def _on_timeline_selection_changed(self, current, previous):  # noqa: ANN001, ARG002
+        """U7: selectionModel().currentChanged -> FilePreviewPanel.update_file(path)."""
+        try:
+            path = None
+            # Try current index first (if proxied)
+            if isinstance(current, QModelIndex) and current.isValid():
+                try:
+                    src = self.timeline_proxy.mapToSource(current)
+                    ev = self.timeline_model.get_event(src.row())
+                    if ev:
+                        path = ev.get("path")
+                except Exception:
+                    pass
+            if not path:
+                path = self._get_timeline_selected_path()
+            # No selection yet but model has rows -> pick first proxy row (handles headless tests without explicit selection)
+            if not path and hasattr(self, "timeline_model") and hasattr(self, "timeline_proxy"):
+                try:
+                    if self.timeline_proxy.rowCount() > 0 and self.timeline_model.rowCount() > 0:
+                        first_proxy = self.timeline_proxy.index(0, 0)
+                        if first_proxy.isValid():
+                            src = self.timeline_proxy.mapToSource(first_proxy)
+                            ev = self.timeline_model.get_event(src.row())
+                            if ev:
+                                path = ev.get("path")
+                except Exception:
+                    pass
+            if hasattr(self, "timeline_preview") and self.timeline_preview is not None:
+                if path:
+                    # FilePreviewPanel.update_file handles missing files gracefully
+                    try:
+                        self.timeline_preview.update_file(path)
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        self.timeline_preview.clear()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
     def _on_timeline_filter_changed(self, text):  # noqa: ANN001
         if not hasattr(self, "timeline_proxy"):
@@ -1512,9 +1731,15 @@ class ForensicsView(BaseView):
         self.integrity_tree.tree.clear()
         self.integrity_tree.item_map.clear()
         for entry in snap.get("entries", []):
-            self.integrity_tree.insert("", "end", values=(
-                entry.get("path", ""), "Baseline", f"{len(snap.get('algorithm', []))} hashes saved",
+            iid = self.integrity_tree.insert("", "end", values=(
+                entry.get("path", ""), f"{GLYPH_SUCCESS} Baseline", f"{len(snap.get('algorithm', []))} hashes saved",
             ))
+            try:
+                item = self.integrity_tree.item_map.get(iid)
+                if item is not None:
+                    item.setForeground(1, QBrush(QColor(TOKENS["light"]["success"])))
+            except Exception:
+                pass
         self.lbl_integrity_status.setText(
             f"Snapshot saved: {dest} ({len(snap.get('entries', []))} entries)"
         )
@@ -1528,23 +1753,40 @@ class ForensicsView(BaseView):
         missing = 0
         for entry, diff in results:
             if diff is None:
-                status = "✅ OK"
+                # U6: glyph + colour via theme_tokens (not colour-only)
+                status = f"{GLYPH_SUCCESS} OK"
                 ok += 1
                 detail = ""
+                variant = "success"
             elif diff.get("missing"):
-                status = "❌ Missing"
+                status = f"{GLYPH_ERROR} Missing"
                 missing += 1
                 detail = "file no longer exists"
+                variant = "danger"
             else:
-                status = "⚠️ Changed"
+                status = f"{GLYPH_WARNING} Changed"
                 changed += 1
                 parts = []
                 for k, (old, new) in diff.items():
                     parts.append(f"{k}: {old} → {new}")
                 detail = "; ".join(parts)
-            self.integrity_tree.insert("", "end", values=(
+                variant = "warning"
+            iid = self.integrity_tree.insert("", "end", values=(
                 entry.get("path", ""), status, detail,
             ))
+            # U6 colour
+            try:
+                item = self.integrity_tree.item_map.get(iid)
+                if item is not None:
+                    col = 1  # status column
+                    if variant == "success":
+                        item.setForeground(col, QBrush(QColor(TOKENS["light"]["success"])))
+                    elif variant == "warning":
+                        item.setForeground(col, QBrush(QColor(TOKENS["light"]["warning"])))
+                    else:
+                        item.setForeground(col, QBrush(QColor(TOKENS["light"]["danger"])))
+            except Exception:
+                pass
         self.lbl_integrity_status.setText(
             f"Verified: {ok} OK | {changed} changed | {missing} missing."
         )

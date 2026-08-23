@@ -34,6 +34,10 @@ __all__ = [
     "generate_qss",
     "generate_palette",
     "FOCUS_RING_TOKEN",
+    "STATUS_GLYPHS",
+    "GLYPH_SUCCESS",
+    "GLYPH_WARNING",
+    "GLYPH_ERROR",
 ]
 
 # ---------------------------------------------------------------------------
@@ -204,6 +208,50 @@ SEMANTIC_TOKEN_NAMES = frozenset({
 # name as a constant lets tests and the settings help text reference
 # the token without hard-coding the colour.
 FOCUS_RING_TOKEN = "focus_ring"
+
+# U6 — colour-blind glyph channel for status cells. Mirrors the
+# destructive-preview ``⚠`` pattern (2e.6): every colour-coded state
+# also carries a glyph so colour-blind users get the same signal.
+# Used by ``TimelineModel`` and ``ForensicsView`` mismatch/status cells.
+STATUS_GLYPHS: dict[str, str] = {
+    "success": "\u2713",  # ✓
+    "warning": "\u26A0",  # ⚠
+    "error": "\u2715",    # ✕
+    # aliases for forensic-specific states
+    "ok": "\u2713",
+    "changed": "\u26A0",
+    "missing": "\u2715",
+    "mismatch": "\u26A0",
+    "match": "\u2713",
+}
+GLYPH_SUCCESS = STATUS_GLYPHS["success"]
+GLYPH_WARNING = STATUS_GLYPHS["warning"]
+GLYPH_ERROR = STATUS_GLYPHS["error"]
+
+
+def glyph_for_status(status: str) -> str:
+    """Return the glyph for a status string (case-insensitive).
+
+    Normalises ``status`` by lower-casing and stripping glyphs so
+    callers can pass values like ``"⚠️ Changed"`` or ``"error"``.
+    Falls back to ``""`` when the status is unknown.
+    """
+    key = (status or "").lower()
+    # strip existing glyphs / emoji prefixes so "⚠ Changed" → "changed"
+    for g in (STATUS_GLYPHS["success"], STATUS_GLYPHS["warning"], STATUS_GLYPHS["error"], "✅", "❌", "🚩"):
+        key = key.replace(g.lower(), "")
+    key = key.strip(" :-\t")
+    # direct hit
+    if key in STATUS_GLYPHS:
+        return STATUS_GLYPHS[key]
+    # fuzzy: contains keyword
+    if "mismatch" in key or "changed" in key or "warn" in key or "suspicious" in key:
+        return STATUS_GLYPHS["warning"]
+    if "missing" in key or "error" in key or "fail" in key or "mismatch" in key:
+        return STATUS_GLYPHS["error"] if "missing" in key or "error" in key else STATUS_GLYPHS["warning"]
+    if "ok" in key or "success" in key or "match" in key or "clean" in key:
+        return STATUS_GLYPHS["success"]
+    return ""
 
 # ---------------------------------------------------------------------------
 # Typography
