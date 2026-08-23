@@ -1,8 +1,9 @@
 import sqlite3
 import os
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List, Optional
 
 from .logger import logger
 
@@ -38,6 +39,9 @@ class CacheManager:
         self._batch_size_val: int = 1000
         self._user_version: int = 0
         self._pending_migrations: List[Path] = []
+        self._hits: int = 0
+        self._misses: int = 0
+        self._last_vacuum: Optional[str] = None
         self._init_db()
         # initialise batch size from config (if available)
         try:
@@ -182,6 +186,10 @@ class CacheManager:
             # Check buffered writes first (most recent wins)
             for b_path, b_size, b_mtime, b_hash, b_algo in reversed(self._batch_buffer):
                 if b_path == path and b_size == size and b_mtime == mtime and b_algo == algo:
+                    try:
+                        self._hits += 1
+                    except Exception:
+                        pass
                     return b_hash
             cursor = self.conn.cursor()
             cursor.execute(
@@ -189,7 +197,15 @@ class CacheManager:
                 (path, size, mtime, algo)
             )
             row = cursor.fetchone()
-            return row[0] if row else None
+            result = row[0] if row else None
+            try:
+                if result is not None:
+                    self._hits += 1
+                else:
+                    self._misses += 1
+            except Exception:
+                pass
+            return result
 
     def set_hash(self, path, size, mtime, hash_val, algo='md5'):
         if self.conn is None:
@@ -253,9 +269,125 @@ class CacheManager:
                     self.conn.execute("VACUUM")
                 finally:
                     self.conn.isolation_level = old_iso
+                try:
+                    self._last_vacuum = datetime.now(timezone.utc).isoformat()
+                except Exception:
+                    pass
             logger.info("Cache cleared successfully.")
         except sqlite3.Error as e:
             logger.error(f"Failed to clear cache: {e}")
+
+    def _format_size(self, size_bytes: int) -> str:
+        """Return human-readable size string, preferring utils.format_size."""
+        try:
+            from .utils import format_size as _fmt
+
+            return _fmt(size_bytes)
+        except Exception:
+            pass
+        try:
+            if size_bytes < 1024:
+                return f"{size_bytes} B"
+            if size_bytes < 1024 * 1024:
+                return f"{size_bytes / 1024:.1f} KB"
+            if size_bytes < 1024 * 1024 * 1024:
+                return f"{size_bytes / (1024 * 1024):.1f} MB"
+            return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+        except Exception:
+            return f"{size_bytes} B"
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Return cache statistics for Settings Performance DB Cache info.
+
+        Keys:
+            path, size_bytes, formatted_size, entry_count,
+            page_count, freelist_count, page_size,
+            last_modified (ISO or None), last_vacuum (ISO or None),
+            hit_rate (float 0-1 or None), hits, misses
+        Never raises; returns zeroed defaults on error / missing file.
+        """
+        stats: Dict[str, Any] = {
+            "path": str(self.db_path),
+            "size_bytes": 0,
+            "formatted_size": "0 B",
+            "entry_count": 0,
+            "page_count": 0,
+            "freelist_count": 0,
+            "page_size": 0,
+            "last_modified": None,
+            "last_vacuum": getattr(self, "_last_vacuum", None),
+            "hit_rate": None,
+            "hits": getattr(self, "_hits", 0),
+            "misses": getattr(self, "_misses", 0),
+        }
+        # size / formatted / last_modified from filesystem
+        try:
+            if self.db_path and os.path.exists(self.db_path):
+                try:
+                    sz = os.path.getsize(self.db_path)
+                    stats["size_bytes"] = int(sz)
+                    stats["formatted_size"] = self._format_size(int(sz))
+                except Exception:
+                    stats["size_bytes"] = 0
+                    stats["formatted_size"] = "0 B"
+                try:
+                    mtime = os.path.getmtime(self.db_path)
+                    stats["last_modified"] = datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
+                except Exception:
+                    stats["last_modified"] = None
+            else:
+                stats["size_bytes"] = 0
+                stats["formatted_size"] = "0 B"
+                stats["last_modified"] = None
+        except Exception:
+            pass
+        # db stats via PRAGMA / COUNT
+        if self.conn is not None:
+            try:
+                with self._lock:
+                    try:
+                        # Ensure buffered writes are visible for count
+                        self._flush_batch_locked()
+                    except Exception:
+                        pass
+                    try:
+                        cur = self.conn.execute("SELECT count(*) FROM file_hashes")
+                        row = cur.fetchone()
+                        stats["entry_count"] = int(row[0]) if row and row[0] is not None else 0
+                    except (sqlite3.Error, ValueError, TypeError):
+                        stats["entry_count"] = 0
+                    try:
+                        cur = self.conn.execute("PRAGMA page_count")
+                        row = cur.fetchone()
+                        stats["page_count"] = int(row[0]) if row and row[0] is not None else 0
+                    except Exception:
+                        pass
+                    try:
+                        cur = self.conn.execute("PRAGMA freelist_count")
+                        row = cur.fetchone()
+                        stats["freelist_count"] = int(row[0]) if row and row[0] is not None else 0
+                    except Exception:
+                        pass
+                    try:
+                        cur = self.conn.execute("PRAGMA page_size")
+                        row = cur.fetchone()
+                        stats["page_size"] = int(row[0]) if row and row[0] is not None else 0
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+        # hit_rate
+        try:
+            hits = int(getattr(self, "_hits", 0))
+            misses = int(getattr(self, "_misses", 0))
+            total = hits + misses
+            stats["hits"] = hits
+            stats["misses"] = misses
+            stats["hit_rate"] = (hits / total) if total > 0 else None
+            stats["last_vacuum"] = getattr(self, "_last_vacuum", None)
+        except Exception:
+            pass
+        return stats
 
     def close(self):
         with self._lock:
@@ -271,3 +403,6 @@ class CacheManager:
                 self.conn = None
 
 file_cache = CacheManager()
+
+# Backwards-compat alias used by Work Package spec (cache.py: FileHashCache)
+FileHashCache = CacheManager

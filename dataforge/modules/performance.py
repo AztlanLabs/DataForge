@@ -491,7 +491,7 @@ def get_live_resource_snapshot(blocking: bool = True):
         cpu_pct = psutil.cpu_percent(interval=None)
         cpu_per_core = psutil.cpu_percent(interval=None, percpu=True)
 
-    return {
+    result: dict = {
         "cpu_percent": cpu_pct,
         "cpu_per_core": cpu_per_core,
         "memory": {
@@ -506,3 +506,20 @@ def get_live_resource_snapshot(blocking: bool = True):
         },
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+    # Include cache stats for Performance view (TICK-804 additive, optional)
+    try:
+        from dataforge.core.cache import file_cache as _fc
+
+        stats = _fc.get_stats()
+        # Ensure stats is a dict; guard against unexpected return
+        if isinstance(stats, dict):
+            result["cache"] = stats
+        else:
+            result["cache"] = {"error": "invalid cache stats"}
+    except Exception as exc:
+        # Never fail the snapshot due to cache issues
+        try:
+            result["cache"] = {"error": str(exc)}
+        except Exception:
+            pass
+    return result
