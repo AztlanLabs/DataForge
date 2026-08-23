@@ -1,3 +1,4 @@
+import errno
 import hashlib
 import mmap
 import os
@@ -51,6 +52,190 @@ def _madvise_willneed(mm: mmap.mmap) -> None:
         pass
 
 
+def _is_sparse_file(filepath: str, file_size: int | None = None) -> bool:
+    """F16: sparse detection via st_blocks*512 < st_size."""
+    try:
+        st = os.stat(filepath)
+        size = file_size if file_size is not None else st.st_size
+        if size <= 0:
+            return False
+        blocks = getattr(st, "st_blocks", 0)
+        return (blocks * 512) < size
+    except OSError:
+        return False
+    except Exception:
+        return False
+
+
+def _hash_sparse_hole_aware_single(filepath: str, algo: str, file_size: int, block_size: int, cancel_token=None) -> str | None:
+    """F16: Try SEEK_HOLE/SEEK_DATA hole-aware hashing. Returns hexdigest or None to fallback.
+
+    Hashes zeros for holes so result is identical to normal read (holes are zero-filled).
+    Skips seeking through holes without reading them, which is efficient for large sparse files.
+    """
+    if not hasattr(os, "SEEK_HOLE") or not hasattr(os, "SEEK_DATA"):
+        return None
+    try:
+        hasher = getattr(hashlib, algo)()
+        zeros_block = b"\x00" * block_size
+        with open(filepath, 'rb') as f:
+            fd = f.fileno()
+            _advise_willneed(fd)
+            offset = 0
+            while offset < file_size:
+                if cancel_token and cancel_token.is_set():
+                    return ""
+                # Find next data offset at or after current offset
+                try:
+                    data_off = os.lseek(fd, offset, os.SEEK_DATA)
+                except OSError as e:
+                    # ENXIO (errno 6) means no data until EOF → remaining is hole
+                    if e.errno == errno.ENXIO:
+                        remaining = file_size - offset
+                        while remaining > 0:
+                            if cancel_token and cancel_token.is_set():
+                                return ""
+                            chunk = zeros_block[: min(block_size, remaining)]
+                            hasher.update(chunk)
+                            remaining -= len(chunk)
+                        break
+                    else:
+                        return None
+                # data_off may be beyond file_size if no data
+                if data_off >= file_size:
+                    # Hole to EOF
+                    remaining = file_size - offset
+                    while remaining > 0:
+                        if cancel_token and cancel_token.is_set():
+                            return ""
+                        chunk = zeros_block[: min(block_size, remaining)]
+                        hasher.update(chunk)
+                        remaining -= len(chunk)
+                    break
+                if data_off > offset:
+                    hole_len = data_off - offset
+                    remaining = hole_len
+                    while remaining > 0:
+                        if cancel_token and cancel_token.is_set():
+                            return ""
+                        chunk = zeros_block[: min(block_size, remaining)]
+                        hasher.update(chunk)
+                        remaining -= len(chunk)
+                # Now data region from data_off to next hole
+                try:
+                    hole_off = os.lseek(fd, data_off, os.SEEK_HOLE)
+                except OSError:
+                    return None
+                if hole_off < 0 or hole_off > file_size:
+                    hole_off = file_size
+                # Clamp to file_size
+                if hole_off > file_size:
+                    hole_off = file_size
+                to_read = hole_off - data_off
+                if to_read <= 0:
+                    offset = hole_off
+                    continue
+                f.seek(data_off)
+                while to_read > 0:
+                    if cancel_token and cancel_token.is_set():
+                        return ""
+                    chunk_size = min(block_size, to_read)
+                    data = f.read(chunk_size)
+                    if not data:
+                        break
+                    hasher.update(data)
+                    to_read -= len(data)
+                    # If read less than expected (e.g., truncated), break
+                    if len(data) == 0:
+                        break
+                offset = hole_off
+            return hasher.hexdigest()
+    except Exception:
+        return None
+    return None
+
+
+def _hash_sparse_hole_aware_multi(filepath: str, algos: list[str], file_size: int, block_size: int, cancel_token=None) -> dict[str, str] | None:
+    """F16 hole-aware for multiple algos. Returns dict or None to fallback."""
+    if not hasattr(os, "SEEK_HOLE") or not hasattr(os, "SEEK_DATA"):
+        return None
+    try:
+        hashers = {algo: getattr(hashlib, algo)() for algo in algos}
+        zeros_block = b"\x00" * block_size
+        with open(filepath, 'rb') as f:
+            fd = f.fileno()
+            _advise_willneed(fd)
+            offset = 0
+            while offset < file_size:
+                if cancel_token and cancel_token.is_set():
+                    return {algo: "" for algo in algos}
+                try:
+                    data_off = os.lseek(fd, offset, os.SEEK_DATA)
+                except OSError as e:
+                    if e.errno == errno.ENXIO:
+                        remaining = file_size - offset
+                        while remaining > 0:
+                            if cancel_token and cancel_token.is_set():
+                                return {algo: "" for algo in algos}
+                            chunk = zeros_block[: min(block_size, remaining)]
+                            for h in hashers.values():
+                                h.update(chunk)
+                            remaining -= len(chunk)
+                        break
+                    else:
+                        return None
+                if data_off >= file_size:
+                    remaining = file_size - offset
+                    while remaining > 0:
+                        if cancel_token and cancel_token.is_set():
+                            return {algo: "" for algo in algos}
+                        chunk = zeros_block[: min(block_size, remaining)]
+                        for h in hashers.values():
+                            h.update(chunk)
+                        remaining -= len(chunk)
+                    break
+                if data_off > offset:
+                    hole_len = data_off - offset
+                    remaining = hole_len
+                    while remaining > 0:
+                        if cancel_token and cancel_token.is_set():
+                            return {algo: "" for algo in algos}
+                        chunk = zeros_block[: min(block_size, remaining)]
+                        for h in hashers.values():
+                            h.update(chunk)
+                        remaining -= len(chunk)
+                try:
+                    hole_off = os.lseek(fd, data_off, os.SEEK_HOLE)
+                except OSError:
+                    return None
+                if hole_off < 0 or hole_off > file_size:
+                    hole_off = file_size
+                if hole_off > file_size:
+                    hole_off = file_size
+                to_read = hole_off - data_off
+                if to_read <= 0:
+                    offset = hole_off
+                    continue
+                f.seek(data_off)
+                while to_read > 0:
+                    if cancel_token and cancel_token.is_set():
+                        return {algo: "" for algo in algos}
+                    chunk_size = min(block_size, to_read)
+                    data = f.read(chunk_size)
+                    if not data:
+                        break
+                    for h in hashers.values():
+                        h.update(data)
+                    to_read -= len(data)
+                    if len(data) == 0:
+                        break
+                offset = hole_off
+            return {algo: h.hexdigest() for algo, h in hashers.items()}
+    except Exception:
+        return None
+    return None
+
+
 def get_file_hash(filepath: str, algo: str = 'md5', cancel_token=None) -> str:
     """
     Calculate the hash of a file using the specified algorithm.
@@ -59,6 +244,10 @@ def get_file_hash(filepath: str, algo: str = 'md5', cancel_token=None) -> str:
     Uses 1 MiB blocks (config-driven via hash_block_size) and mmap for files
     >16 MiB with posix_fadvise/madvise WILLNEED hints. Checks cancel_token
     per chunk and returns "" if cancelled or on I/O error.
+
+    F16: Detects sparse files via st_blocks*512 < st_size and uses SEEK_HOLE
+    hole-aware hashing to avoid reading 1G holes byte-for-byte while still
+    hashing zeros correctly.
     """
     if algo not in SUPPORTED_ALGORITHMS:
         raise ValueError(f"Unsupported hash algorithm: {algo}")
@@ -76,6 +265,13 @@ def get_file_hash(filepath: str, algo: str = 'md5', cancel_token=None) -> str:
         if cancel_token and cancel_token.is_set():
             return ""
         return hasher.hexdigest()
+
+    # F16 sparse hole-aware path (tries SEEK_HOLE/SEEK_DATA)
+    if _is_sparse_file(filepath, file_size):
+        hole_result = _hash_sparse_hole_aware_single(filepath, algo, file_size, block_size, cancel_token)
+        if hole_result is not None:
+            return hole_result
+        # Fallback to normal path if hole-aware not supported or failed
 
     # Large-file mmap path — zero-copy, fewer Python iterations
     if file_size > MMAP_THRESHOLD:
@@ -112,7 +308,7 @@ def get_file_hash(filepath: str, algo: str = 'md5', cancel_token=None) -> str:
 
 
 def get_hashes(filepath: str, algos: list[str], cancel_token=None) -> dict[str, str]:
-    """Calculate multiple hashes in one pass (single read, many digests)."""
+    """Calculate multiple hashes in one pass (single read, many digests). F16 sparse-aware."""
     for algo in algos:
         if algo not in SUPPORTED_ALGORITHMS:
             raise ValueError(f"Unsupported hash algorithm: {algo}")
@@ -132,6 +328,12 @@ def get_hashes(filepath: str, algos: list[str], cancel_token=None) -> dict[str, 
         if cancel_token and cancel_token.is_set():
             return {algo: "" for algo in algos}
         return {algo: h.hexdigest() for algo, h in hashers.items()}
+
+    # F16 sparse hole-aware multi
+    if _is_sparse_file(filepath, file_size):
+        hole_result = _hash_sparse_hole_aware_multi(filepath, algos, file_size, block_size, cancel_token)
+        if hole_result is not None:
+            return hole_result
 
     if file_size > MMAP_THRESHOLD:
         try:
