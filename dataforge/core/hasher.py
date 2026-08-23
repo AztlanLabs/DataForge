@@ -2,6 +2,9 @@ import errno
 import hashlib
 import mmap
 import os
+import stat
+
+from .logger import logger
 
 # Block size is config-driven (1 MiB) — TICK-004 adds hash_block_size to config.
 # Fallback to 1<<20 if config not yet loaded or import fails (e.g., during tests
@@ -243,27 +246,36 @@ def get_file_hash(filepath: str, algo: str = 'md5', cancel_token=None) -> str:
 
     Uses 1 MiB blocks (config-driven via hash_block_size) and mmap for files
     >16 MiB with posix_fadvise/madvise WILLNEED hints. Checks cancel_token
-    per chunk and returns "" if cancelled or on I/O error.
+    per chunk and returns "" if cancelled or on I/O error. Hardened against
+    SIGSEGV: validates S_ISREG, zero-length, truncation race and ensures mmap
+    is closed on cancel (WITH context).
 
     F16: Detects sparse files via st_blocks*512 < st_size and uses SEEK_HOLE
     hole-aware hashing to avoid reading 1G holes byte-for-byte while still
     hashing zeros correctly.
     """
+    if cancel_token and cancel_token.is_set():
+        return ""
     if algo not in SUPPORTED_ALGORITHMS:
         raise ValueError(f"Unsupported hash algorithm: {algo}")
 
     hasher = getattr(hashlib, algo)()
     block_size = _get_block_size()
 
-    # Fast stat for size / empty-file handling
+    # Harden: stat + S_ISREG + re-stat before mmap to handle truncation/deletion race
     try:
-        file_size = os.path.getsize(filepath)
-    except OSError:
+        st = os.stat(filepath)
+        if not stat.S_ISREG(st.st_mode):
+            logger.debug(f"hash non-regular file {filepath}")
+            return ""
+        file_size = st.st_size
+    except OSError as e:
+        logger.debug(f"hash OSError stat {filepath}: {e}")
         return ""
 
+    if cancel_token and cancel_token.is_set():
+        return ""
     if file_size == 0:
-        if cancel_token and cancel_token.is_set():
-            return ""
         return hasher.hexdigest()
 
     # F16 sparse hole-aware path (tries SEEK_HOLE/SEEK_DATA)
@@ -275,22 +287,44 @@ def get_file_hash(filepath: str, algo: str = 'md5', cancel_token=None) -> str:
 
     # Large-file mmap path — zero-copy, fewer Python iterations
     if file_size > MMAP_THRESHOLD:
+        if cancel_token and cancel_token.is_set():
+            return ""
         try:
             with open(filepath, 'rb') as f:
+                # Re-stat after open to catch truncation/deletion between stat and open
+                try:
+                    fst = os.fstat(f.fileno())
+                    if not stat.S_ISREG(fst.st_mode):
+                        logger.debug(f"hash non-regular fd {filepath}")
+                        return ""
+                    fresh_size = fst.st_size
+                    if fresh_size != file_size:
+                        file_size = fresh_size
+                        if file_size == 0:
+                            return hasher.hexdigest()
+                except OSError as e:
+                    logger.debug(f"hash fstat fallback {filepath}: {e}")
+                    pass
                 _advise_willneed(f.fileno())
-                with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
-                    _madvise_willneed(mm)
-                    for offset in range(0, file_size, block_size):
-                        if cancel_token and cancel_token.is_set():
-                            return ""
-                        end = offset + block_size
-                        if end > file_size:
-                            end = file_size
-                        hasher.update(mm[offset:end])
-                    return hasher.hexdigest()
-        except (OSError, ValueError):
-            # mmap can fail on special files / empty / no support — fall back
-            pass
+                try:
+                    with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                        _madvise_willneed(mm)
+                        mmap_size = len(mm)
+                        effective_size = min(file_size, mmap_size) if mmap_size else file_size
+                        for offset in range(0, effective_size, block_size):
+                            if cancel_token and cancel_token.is_set():
+                                return ""
+                            end = offset + block_size
+                            if end > effective_size:
+                                end = effective_size
+                            hasher.update(mm[offset:end])
+                        return hasher.hexdigest()
+                except (OSError, ValueError) as e:
+                    logger.debug(f"mmap fallback {filepath}: {e}")
+                    pass
+        except OSError as e:
+            logger.debug(f"hash OSError open {filepath}: {e}")
+            return ""
 
     try:
         with open(filepath, 'rb') as f:
@@ -303,12 +337,15 @@ def get_file_hash(filepath: str, algo: str = 'md5', cancel_token=None) -> str:
                     break
                 hasher.update(data)
         return hasher.hexdigest()
-    except OSError:
+    except OSError as e:
+        logger.debug(f"hash OSError read {filepath}: {e}")
         return ""
 
 
 def get_hashes(filepath: str, algos: list[str], cancel_token=None) -> dict[str, str]:
-    """Calculate multiple hashes in one pass (single read, many digests). F16 sparse-aware."""
+    """Calculate multiple hashes in one pass (single read, many digests). F16 sparse-aware. Hardened."""
+    if cancel_token and cancel_token.is_set():
+        return {algo: "" for algo in algos} if algos else {}
     for algo in algos:
         if algo not in SUPPORTED_ALGORITHMS:
             raise ValueError(f"Unsupported hash algorithm: {algo}")
@@ -320,13 +357,18 @@ def get_hashes(filepath: str, algos: list[str], cancel_token=None) -> dict[str, 
     block_size = _get_block_size()
 
     try:
-        file_size = os.path.getsize(filepath)
-    except OSError:
+        st = os.stat(filepath)
+        if not stat.S_ISREG(st.st_mode):
+            logger.debug(f"hashes non-regular file {filepath}")
+            return {algo: "" for algo in algos}
+        file_size = st.st_size
+    except OSError as e:
+        logger.debug(f"hashes OSError stat {filepath}: {e}")
         return {algo: "" for algo in algos}
 
+    if cancel_token and cancel_token.is_set():
+        return {algo: "" for algo in algos}
     if file_size == 0:
-        if cancel_token and cancel_token.is_set():
-            return {algo: "" for algo in algos}
         return {algo: h.hexdigest() for algo, h in hashers.items()}
 
     # F16 sparse hole-aware multi
@@ -336,23 +378,45 @@ def get_hashes(filepath: str, algos: list[str], cancel_token=None) -> dict[str, 
             return hole_result
 
     if file_size > MMAP_THRESHOLD:
+        if cancel_token and cancel_token.is_set():
+            return {algo: "" for algo in algos}
         try:
             with open(filepath, 'rb') as f:
+                try:
+                    fst = os.fstat(f.fileno())
+                    if not stat.S_ISREG(fst.st_mode):
+                        logger.debug(f"hashes non-regular fd {filepath}")
+                        return {algo: "" for algo in algos}
+                    fresh_size = fst.st_size
+                    if fresh_size != file_size:
+                        file_size = fresh_size
+                        if file_size == 0:
+                            return {algo: h.hexdigest() for algo, h in hashers.items()}
+                except OSError as e:
+                    logger.debug(f"hashes fstat fallback {filepath}: {e}")
+                    pass
                 _advise_willneed(f.fileno())
-                with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
-                    _madvise_willneed(mm)
-                    for offset in range(0, file_size, block_size):
-                        if cancel_token and cancel_token.is_set():
-                            return {algo: "" for algo in algos}
-                        end = offset + block_size
-                        if end > file_size:
-                            end = file_size
-                        chunk = mm[offset:end]
-                        for h in hashers.values():
-                            h.update(chunk)
-                    return {algo: h.hexdigest() for algo, h in hashers.items()}
-        except (OSError, ValueError):
-            pass
+                try:
+                    with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                        _madvise_willneed(mm)
+                        mmap_size = len(mm)
+                        effective_size = min(file_size, mmap_size) if mmap_size else file_size
+                        for offset in range(0, effective_size, block_size):
+                            if cancel_token and cancel_token.is_set():
+                                return {algo: "" for algo in algos}
+                            end = offset + block_size
+                            if end > effective_size:
+                                end = effective_size
+                            chunk = mm[offset:end]
+                            for h in hashers.values():
+                                h.update(chunk)
+                        return {algo: h.hexdigest() for algo, h in hashers.items()}
+                except (OSError, ValueError) as e:
+                    logger.debug(f"hashes mmap fallback {filepath}: {e}")
+                    pass
+        except OSError as e:
+            logger.debug(f"hashes OSError open {filepath}: {e}")
+            return {algo: "" for algo in algos}
 
     try:
         with open(filepath, 'rb') as f:
@@ -366,5 +430,6 @@ def get_hashes(filepath: str, algos: list[str], cancel_token=None) -> dict[str, 
                 for h in hashers.values():
                     h.update(data)
         return {algo: h.hexdigest() for algo, h in hashers.items()}
-    except OSError:
+    except OSError as e:
+        logger.debug(f"hashes OSError read {filepath}: {e}")
         return {algo: "" for algo in algos}
