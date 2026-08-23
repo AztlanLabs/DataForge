@@ -1096,67 +1096,29 @@ def detect_steganography(path, threshold_ratio=0.05):
 
 
 # ---------------------------------------------------------------------------
-# Secure delete (overwrite + delete)
+# Secure delete — moved to sanitisation.py (F4)
+# Re-exported here for backward compatibility
 # ---------------------------------------------------------------------------
+from .sanitisation import secure_delete  # noqa: F401,E402 — backward compat
 
-def secure_delete(path, passes=3, cancel_token=None):
-    """Best-effort overwrite a file with random data ``passes`` times and then
-    unlink it.
+# Ensure `patch('dataforge.modules.sanitisation.secure_delete')` also affects
+# `forensics.secure_delete` (static import would otherwise hold stale reference).
+import sys  # noqa: E402
 
-    .. warning::
-       On SSDs, flash media, copy-on-write filesystems (btrfs, ZFS), and
-       journaled filesystems the overwrite may not reach the physical media.
-       This function does **not** guarantee data destruction on those
-       platforms.
 
-    F3/U2 gate: blocked when CaseContext.evidence_mode is True.
-    """
-    # F3/U2: Evidence Mode gate — refuse destructive operations
-    from ..core.case import is_evidence_mode
-    if is_evidence_mode():
-        return {
-            "success": False,
-            "path": path,
-            "message": "Evidence Mode is active — destructive operations are blocked (ACPO §1)",
-        }
+class _ForensicsModule(sys.modules[__name__].__class__):  # type: ignore[attr-defined]
+    def __getattribute__(self, name):
+        if name == "secure_delete":
+            from .sanitisation import secure_delete as _sd
 
-    if not os.path.isfile(path):
-        return {"success": False, "message": "not a regular file"}
-    size = os.path.getsize(path)
-    try:
-        with open(path, "r+b", buffering=0) as f:
-            for _ in range(passes):
-                if cancel_token and cancel_token.is_set():
-                    return {"success": False, "message": "cancelled", "path": path}
-                f.seek(0)
-                remaining = size
-                while remaining > 0:
-                    chunk = os.urandom(min(1024 * 1024, remaining))
-                    f.write(chunk)
-                    remaining -= len(chunk)
-                f.flush()
-                try:
-                    os.fsync(f.fileno())
-                except OSError:
-                    pass
-    except OSError as exc:
-        return {"success": False, "message": str(exc), "path": path}
-    try:
-        os.unlink(path)
-    except OSError as exc:
-        return {
-            "success": False,
-            "message": f"overwrite complete but unlink failed: {exc}",
-            "path": path,
-        }
-    return {
-        "success": True,
-        "path": path,
-        "message": (
-            f"best-effort overwrite complete ({passes} passes, {size} bytes). "
-            "Note: on SSDs/flash/CoW filesystems physical data may persist."
-        ),
-    }
+            return _sd
+        return super().__getattribute__(name)
+
+
+try:
+    sys.modules[__name__].__class__ = _ForensicsModule
+except Exception:
+    pass
 
 
 # ---------------------------------------------------------------------------
