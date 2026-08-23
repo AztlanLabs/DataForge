@@ -116,11 +116,18 @@ def split_pdf(path, output_dir, dry_run=False, progress_callback=None, cancel_to
             
     return _split_report(path, output_dir, total_pages, generated, dry_run=dry_run)
 
-def convert_image(path, target_format, resize_pct=100, dry_run=False):
+def convert_image(path, target_format, resize_pct=100, dry_run=False, progress_callback=None, cancel_token=None):
     """
     Convert image format and optionally resize.
     target_format: 'PNG', 'JPEG', 'WEBP'
     """
+    if cancel_token is not None and cancel_token.is_set():
+        return {"cancelled": True, "path": path, "message": "cancelled"}
+    if progress_callback:
+        try:
+            progress_callback(0, 1, f"Converting {os.path.basename(path)}...")
+        except Exception:
+            pass
     try:
         with Image.open(path) as img:
             # Handle RGBA to RGB for JPEG
@@ -137,19 +144,33 @@ def convert_image(path, target_format, resize_pct=100, dry_run=False):
                 img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
             
             # Save
+            if cancel_token is not None and cancel_token.is_set():
+                return {"cancelled": True, "path": path, "message": "cancelled"}
             head, tail = os.path.split(path)
             name = os.path.splitext(tail)[0]
             out_name = f"{name}.{target_format.lower()}"
             out_path = os.path.join(head, out_name)
 
             if dry_run:
+                if progress_callback:
+                    try:
+                        progress_callback(1, 1, "Converted")
+                    except Exception:
+                        pass
                 return _convert_report(path, out_path, target_format, resize_pct, dry_run=True)
             
             save_kwargs = {}
             if target_format.upper() == 'JPEG':
                 save_kwargs['quality'] = 90
             
+            if cancel_token is not None and cancel_token.is_set():
+                return {"cancelled": True, "path": path, "message": "cancelled"}
             img.save(out_path, format=target_format, **save_kwargs)
+            if progress_callback:
+                try:
+                    progress_callback(1, 1, "Converted")
+                except Exception:
+                    pass
             return _convert_report(path, out_path, target_format, resize_pct, dry_run=False)
     except (OSError, ValueError) as e:
         logger.error(f"Error converting {path}: {e}")

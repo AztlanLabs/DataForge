@@ -86,18 +86,41 @@ class ManagedWorker(QThread):
     def run(self) -> None:
         try:
             sig = inspect.signature(self._target)
+            params = sig.parameters
+            has_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values())
             kwargs_copy = dict(self._kwargs)
 
-            if "cancel_token" in sig.parameters and self._cancel_token:
+            if ("cancel_token" in params or has_var_kw) and self._cancel_token is not None:
                 kwargs_copy["cancel_token"] = self._cancel_token
 
-            if "progress_callback" in sig.parameters:
+            if "progress_callback" in params or has_var_kw:
+                # Preserve caller's progress_callback if provided, chain to signal
+                orig_cb = kwargs_copy.get("progress_callback")
+
                 def progress_callback(current: int, total: int, step_name: str = "") -> None:
+                    try:
+                        if orig_cb:
+                            orig_cb(current, total, step_name)
+                    except Exception:
+                        pass
                     self.progress_signal.emit(current, total, step_name)
+
                 kwargs_copy["progress_callback"] = progress_callback
 
             result = self._target(*self._args, **kwargs_copy)
+            # If cancelled during execution, normalize to cancelled dict for UI
+            if self._cancel_token is not None and self._cancel_token.is_set():
+                if isinstance(result, dict) and "cancelled" not in result:
+                    # Some targets return {"cancelled": True} already; others return normal result
+                    # Leave as-is but let app treat is_set as cancelled
+                    pass
             self.result_signal.emit(result)
+        except InterruptedError as e:
+            # Normalize cancellation exception to cancelled result (not error dialog)
+            try:
+                self.result_signal.emit({"cancelled": True, "message": str(e)})
+            except Exception:
+                self.error_signal.emit(e)
         except Exception as e:
             self.error_signal.emit(e)
         finally:
@@ -153,16 +176,35 @@ class JobManager(QObject):
 
     @property
     def is_busy(self) -> bool:
-        """True if any job is currently RUNNING."""
+        """True if any job is currently RUNNING (queue or QThread)."""
+        # Check JobQueue status
         for job in self._queue.list_jobs():
             if job.status == JobStatus.RUNNING:
                 return True
+        # Also check live QThreads (ManagedWorker) — they may still be
+        # running after queue marks DONE/CANCELLED, or queue may be
+        # RUNNING while worker finished first. Both need checking.
+        with self._lock:
+            for w in self._workers.values():
+                try:
+                    if w.isRunning():
+                        return True
+                except RuntimeError:
+                    pass
         return False
 
     @property
     def active_job_count(self) -> int:
         """Number of jobs currently RUNNING."""
-        return sum(1 for j in self._queue.list_jobs() if j.status == JobStatus.RUNNING)
+        c = sum(1 for j in self._queue.list_jobs() if j.status == JobStatus.RUNNING)
+        with self._lock:
+            for w in self._workers.values():
+                try:
+                    if w.isRunning() and w._job_id not in {j.job_id for j in self._queue.list_jobs() if j.status == JobStatus.RUNNING}:
+                        c += 1
+                except RuntimeError:
+                    pass
+        return c
 
     @property
     def queued_job_count(self) -> int:
@@ -292,10 +334,24 @@ class JobManager(QObject):
     # ------------------------------------------------------------------
 
     def _on_progress(self, job_id: str, current: int, total: int, message: str) -> None:
-        """Bridge progress from ManagedWorker to JobManager signal."""
-        # The individual view connections handle their own progress;
-        # this is for aggregate monitoring if needed.
-        pass
+        """Bridge progress from ManagedWorker to parent DataForgeApp.
+
+        The ManagedWorker emits progress_signal on its thread; this slot runs
+        on the main thread (Qt queued connection) and forwards to the
+        parent app's update_progress so the status bar leaves indeterminate
+        mode and shows real 0..total progress.
+        """
+        try:
+            parent = self.parent()
+            if parent is not None and hasattr(parent, "update_progress"):
+                parent.update_progress(current, total, message)
+        except Exception:
+            pass
+        # Also emit jobs_changed so any aggregate UI can refresh
+        try:
+            self.jobs_changed.emit()
+        except Exception:
+            pass
 
     def _on_worker_finished(self, job_id: str) -> None:
         """Clean up when a ManagedWorker finishes."""

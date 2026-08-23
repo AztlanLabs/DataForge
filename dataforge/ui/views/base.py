@@ -125,7 +125,9 @@ def friendly_error_message(error):
             "The target may be unreachable or under heavy load. "
             "Try again, or pick a smaller scope."
         )
-    if isinstance(error, KeyboardInterrupt):
+    if isinstance(error, (KeyboardInterrupt, InterruptedError)):
+        return "The operation was cancelled."
+    if "cancelled" in str(error).lower():
         return "The operation was cancelled."
     if isinstance(error, MemoryError):
         return (

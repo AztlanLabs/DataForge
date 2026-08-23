@@ -311,15 +311,13 @@ class SettingsView(BaseView):
             if hasattr(self, "_excl_tab_index"):
                 self.nb.setTabVisible(self._excl_tab_index, rank >= self.TIER_ORDER.index("Standard"))
             config.set("settings_ui_tier", tier_name)
-            # Tier now controls in-view complexity (advanced controls stay
-            # hidden behind tiered rows and the Exclusions tab), NOT the
-            # sidebar. The sidebar shows every group regardless of tier so
-            # users can always discover what DataForge can do.
-            # NOTE: do NOT call app.update_sidebar_experience() here — that
-            # method rebuilds the sidebar and then callbacks into
-            # current_view.apply_tier, which would recurse infinitely
-            # (settings.apply_tier -> app.update_sidebar -> settings.apply_tier -> ...).
-            # Sidebar visibility is tier-independent now; no rebuild needed on tier change.
+            # Tier controls both in-view complexity and sidebar visibility.
+            # Rebuild sidebar so groups gated by GROUP_MIN_TIER appear/disappear.
+            # Guarded by _in_sidebar_update / _in_apply_tier on both sides
+            # to prevent infinite recursion (settings -> app -> settings -> ...).
+            if getattr(self, "app", None) and hasattr(self.app, "update_sidebar_experience"):
+                if not getattr(self.app, "_in_sidebar_update", False):
+                    self.app.update_sidebar_experience()
         finally:
             self._in_apply_tier = False
 

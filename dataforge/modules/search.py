@@ -397,7 +397,7 @@ def iter_search_files(root_path: str, query: SearchQuery, recursive: bool = True
             count = 0
             for entry in scan_directory(root_path, recursive, max_depth=max_depth, cancel_token=cancel_token):
                 if cancel_token and cancel_token.is_set():
-                    raise InterruptedError("Search cancelled")
+                    return
                 count += 1
                 if progress_callback and count % 50 == 0:
                     progress_callback(count, 0, "Searching...")
@@ -415,7 +415,7 @@ def iter_search_files(root_path: str, query: SearchQuery, recursive: bool = True
                 if cancel_token and cancel_token.is_set():
                     for f in list(pending.keys()):
                         f.cancel()
-                    raise InterruptedError("Search cancelled")
+                    return
                 count += 1
                 if progress_callback and count % 50 == 0:
                     progress_callback(count, 0, "Searching...")
@@ -458,7 +458,7 @@ def iter_search_files(root_path: str, query: SearchQuery, recursive: bool = True
                     if matched:
                         yield e
     except InterruptedError:
-        raise
+        return
 
 
 def search_files(root_path: str, query: SearchQuery, recursive: bool = True, max_depth: int = -1, progress_callback=None, cancel_token=None) -> List[FileEntry]:

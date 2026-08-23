@@ -416,6 +416,15 @@ class PerformanceView(BaseView):
                 format_size(disk.get("free_bytes", 0)),
                 f"{disk.get('percent_used', 0)}%",
             ))
+        # Ensure repaint after heavy tree mutation, especially if crossfade is active
+        try:
+            self.cpu_bar.update()
+            self.ram_bar.update()
+            self.swap_bar.update()
+            self.disk_tree.tree.viewport().update()
+            self.disk_tree.tree.update()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Auto-refresh
@@ -435,9 +444,10 @@ class PerformanceView(BaseView):
     def _auto_refresh_tick(self):
         if not self.auto_refresh_active:
             return
-        # Only refresh the meters (lightweight)
+        # Non-blocking snapshot for timer ticks — interval=None avoids 400ms
+        # main-thread sleep that starved paint events and made bars appear blank.
         try:
-            snap = get_live_resource_snapshot()
+            snap = get_live_resource_snapshot(blocking=False)
             if "error" in snap:
                 return
             cpu_pct = int(snap.get("cpu_percent", 0))
@@ -453,6 +463,13 @@ class PerformanceView(BaseView):
             swap_pct = int(swap.get("percent", 0))
             self.swap_bar.setValue(swap_pct)
             self.swap_bar.setFormat(f"{swap_pct}%")
+            # Ensure bars repaint immediately even during crossfade
+            try:
+                self.cpu_bar.update()
+                self.ram_bar.update()
+                self.swap_bar.update()
+            except Exception:
+                pass
         except Exception:
             pass
 

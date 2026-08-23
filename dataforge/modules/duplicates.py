@@ -198,7 +198,7 @@ def find_duplicates(path: str, recursive: bool = True, max_depth: int = -1, prog
     algo = config.get("hash_algorithm", "sha256")
 
     if cancel_token and cancel_token.is_set():
-        raise InterruptedError("Cancelled")
+        return {}
 
     # Streaming size-map via queue.Queue — O(batch) not O(n)
     # scanner thread(s) -> queue.Queue[FileEntry] -> size-map
@@ -235,7 +235,7 @@ def find_duplicates(path: str, recursive: bool = True, max_depth: int = -1, prog
     # Streaming scan — do not materialize scanner output
     for entry in scan_directory(path, recursive, max_depth=max_depth, cancel_token=cancel_token):
         if cancel_token and cancel_token.is_set():
-            raise InterruptedError("Cancelled")
+            return {}
 
         # skip empty files (size 0 cannot be duplicate in useful sense)
         if entry.size == 0:
@@ -247,11 +247,11 @@ def find_duplicates(path: str, recursive: bool = True, max_depth: int = -1, prog
             progress_callback(count, 0, "Scanning files...")
         if entry_queue.qsize() >= BATCH_SIZE:
             if _drain_queue_to_size_map():
-                raise InterruptedError("Cancelled")
+                return {}
 
     # drain remainder
     if _drain_queue_to_size_map():
-        raise InterruptedError("Cancelled")
+        return {}
 
     logger.info(f"Scanned {count} files. Analyzing potential duplicates...")
 
@@ -261,7 +261,7 @@ def find_duplicates(path: str, recursive: bool = True, max_depth: int = -1, prog
         return {}
 
     if cancel_token and cancel_token.is_set():
-        raise InterruptedError("Cancelled")
+        return {}
 
     max_workers = _get_max_workers()
 
@@ -279,7 +279,7 @@ def find_duplicates(path: str, recursive: bool = True, max_depth: int = -1, prog
             for fut in as_completed(futures):
                 if cancel_token and cancel_token.is_set():
                     executor.shutdown(wait=False, cancel_futures=True)
-                    raise InterruptedError("Cancelled")
+                    return {}
                 entry = futures[fut]
                 try:
                     fh = fut.result()
@@ -299,7 +299,7 @@ def find_duplicates(path: str, recursive: bool = True, max_depth: int = -1, prog
         return {}
 
     if cancel_token and cancel_token.is_set():
-        raise InterruptedError("Cancelled")
+        return {}
 
     # Stage 3: full hash (sha256 etc.) only on fast collisions
     hash_map: Dict[str, List[FileEntry]] = defaultdict(list)
@@ -307,7 +307,7 @@ def find_duplicates(path: str, recursive: bool = True, max_depth: int = -1, prog
     # cache probe
     for entry in fast_candidates:
         if cancel_token and cancel_token.is_set():
-            raise InterruptedError("Cancelled")
+            return {}
         cached = file_cache.get_hash(entry.path, entry.size, entry.modified_at, algo)
         if cached:
             hash_map[cached].append(entry)
@@ -334,7 +334,7 @@ def find_duplicates(path: str, recursive: bool = True, max_depth: int = -1, prog
                             file_cache.set_hash_many(pending_rows)
                         except Exception:
                             pass
-                    raise InterruptedError("Cancelled")
+                    return {}
                 entry = futures[fut]
                 completed += 1
                 if progress_callback:
@@ -365,7 +365,7 @@ def find_duplicates(path: str, recursive: bool = True, max_depth: int = -1, prog
         verified: Dict[str, List[FileEntry]] = {}
         for h, entries in duplicates.items():
             if cancel_token and cancel_token.is_set():
-                raise InterruptedError("Cancelled")
+                return {}
             # group by content equality to keeper
             # keep only entries byte-identical to first
             keeper = entries[0]

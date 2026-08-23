@@ -613,38 +613,89 @@ def run_photorec(
     if progress_callback:
         progress_callback(0, 0, "Starting PhotoRec recovery...")
 
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=3600,  # 1 hour max
-        )
+    # Cancellable Popen with polling (was subprocess.run timeout=3600 uncancellable)
+    import time as _time
 
-        # Count recovered files
+    proc = None
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        # Poll for completion or cancel
+        start = _time.monotonic()
+        while proc.poll() is None:
+            if cancel_token is not None and cancel_token.is_set():
+                try:
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        proc.wait(timeout=2)
+                except Exception:
+                    pass
+                return {"cancelled": True, "message": "PhotoRec cancelled", "output_dir": output_dir}
+            if _time.monotonic() - start > 3600:
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=5)
+                except Exception:
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                return {"error": "PhotoRec timed out after 1 hour.", "output_dir": output_dir}
+            _time.sleep(0.2)
+            if progress_callback:
+                try:
+                    progress_callback(0, 0, "PhotoRec running...")
+                except Exception:
+                    pass
+        # Process finished
+        try:
+            stdout, stderr = proc.communicate(timeout=5)
+        except Exception:
+            stdout, stderr = "", ""
+        # Count recovered files (check cancel first)
+        if cancel_token is not None and cancel_token.is_set():
+            return {"cancelled": True, "message": "PhotoRec cancelled", "output_dir": output_dir}
         recovered_files = []
         if os.path.isdir(output_dir):
             for root, dirs, files in os.walk(output_dir):
+                if cancel_token is not None and cancel_token.is_set():
+                    return {"cancelled": True, "message": "PhotoRec cancelled", "output_dir": output_dir}
                 for fname in files:
                     fpath = os.path.join(root, fname)
+                    try:
+                        fsize = os.path.getsize(fpath)
+                    except OSError:
+                        fsize = 0
                     recovered_files.append({
                         "path": fpath,
                         "filename": fname,
-                        "size": os.path.getsize(fpath),
+                        "size": fsize,
                     })
 
         return {
             "recovered": recovered_files,
             "total_recovered": len(recovered_files),
             "output_dir": output_dir,
-            "returncode": result.returncode,
-            "stdout": result.stdout[:5000],
-            "stderr": result.stderr[:2000],
+            "returncode": proc.returncode if proc else -1,
+            "stdout": (stdout or "")[:5000],
+            "stderr": (stderr or "")[:2000],
         }
-    except subprocess.TimeoutExpired:
-        return {"error": "PhotoRec timed out after 1 hour."}
     except OSError as exc:
         return {"error": f"Failed to run photorec: {exc}"}
+    finally:
+        if proc is not None:
+            try:
+                if proc.poll() is None:
+                    proc.terminate()
+            except Exception:
+                pass
 
 
 # ---------------------------------------------------------------------------

@@ -468,9 +468,13 @@ def _command_available(cmd):
         return False
 
 
-def get_live_resource_snapshot():
+def get_live_resource_snapshot(blocking: bool = True):
     """
     Get a point-in-time snapshot of CPU, RAM, and disk usage.
+
+    Args:
+        blocking: If True (default) use interval 0.3s for accurate CPU%.
+                  If False, use interval=None non-blocking for UI timer ticks.
 
     Returns:
         dict with current resource utilization.
@@ -478,9 +482,18 @@ def get_live_resource_snapshot():
     if not HAS_PSUTIL:
         return {"error": "psutil required"}
 
+    if blocking:
+        cpu_pct = psutil.cpu_percent(interval=0.3)
+        cpu_per_core = psutil.cpu_percent(interval=0.1, percpu=True)
+    else:
+        # Non-blocking for QTimer ticks on main thread — interval=None returns
+        # last computed value without sleeping, avoiding 400ms UI freeze.
+        cpu_pct = psutil.cpu_percent(interval=None)
+        cpu_per_core = psutil.cpu_percent(interval=None, percpu=True)
+
     return {
-        "cpu_percent": psutil.cpu_percent(interval=0.3),
-        "cpu_per_core": psutil.cpu_percent(interval=0.1, percpu=True),
+        "cpu_percent": cpu_pct,
+        "cpu_per_core": cpu_per_core,
         "memory": {
             "total": psutil.virtual_memory().total,
             "used": psutil.virtual_memory().used,

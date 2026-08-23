@@ -92,6 +92,20 @@ class StorageDevicesView(BaseView):
 
     def _refresh(self):
         self.lbl_status.setText("Scanning storage devices...")
+        # Run off-thread so slow disk_partitions / stale NFS does not block UI
+        if getattr(self, "app", None) and hasattr(self.app, "run_workflow"):
+            try:
+                self.app.run_workflow(
+                    list_storage_devices,
+                    self._on_devices_loaded,
+                    progress=False,
+                    task_name="Scan storage devices",
+                    error_title="Storage scan failed",
+                )
+                return
+            except Exception:
+                pass
+        # Fallback sync (tests without app)
         try:
             self.devices = list_storage_devices()
         except Exception as exc:
@@ -99,6 +113,27 @@ class StorageDevicesView(BaseView):
             self.lbl_status.setText(f"Scan failed: {exc}")
             return
         self._populate_table()
+        if not self.devices:
+            self.lbl_status.setText("No storage devices detected.")
+        else:
+            self.lbl_status.setText(f"{len(self.devices)} storage device(s) detected.")
+
+    def _on_devices_loaded(self, devices):
+        # Handle cancelled dict from worker (e.g., cancel_token)
+        if isinstance(devices, dict) and devices.get("cancelled"):
+            self.lbl_status.setText("Storage scan cancelled.")
+            return
+        try:
+            self.devices = list(devices) if devices is not None else []
+        except Exception:
+            self.devices = []
+        self._populate_table()
+        # Ensure repaint after heavy table mutation, especially during crossfade
+        try:
+            self.table.viewport().update()
+            self.table.update()
+        except Exception:
+            pass
         if not self.devices:
             self.lbl_status.setText("No storage devices detected.")
         else:

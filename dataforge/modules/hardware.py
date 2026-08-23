@@ -49,19 +49,42 @@ def get_hardware_report(progress_callback=None, cancel_token=None):
     Returns:
         dict with cpu, ram, storage, gpu, network, motherboard sections.
     """
-    report = {
-        "system": _get_system_overview(),
-        "cpu": _get_cpu_details(),
-        "ram": _get_ram_details(),
-        "storage": _get_storage_details(),
-        "gpu": _get_gpu_details(),
-        "network": _get_network_details(),
-        "motherboard": _get_motherboard_details(),
-    }
+    def _check_cancel():
+        if cancel_token is not None and cancel_token.is_set():
+            raise InterruptedError("Hardware scan cancelled")
+
+    report = {}
+    steps = [
+        ("system", _get_system_overview),
+        ("cpu", _get_cpu_details),
+        ("ram", _get_ram_details),
+        ("storage", _get_storage_details),
+        ("gpu", _get_gpu_details),
+        ("network", _get_network_details),
+        ("motherboard", _get_motherboard_details),
+    ]
+    total = len(steps)
+    for idx, (key, fn) in enumerate(steps):
+        _check_cancel()
+        if progress_callback:
+            try:
+                progress_callback(idx, total, f"Scanning {key}...")
+            except Exception:
+                pass
+        try:
+            report[key] = fn()
+        except InterruptedError:
+            raise
+        except Exception as e:
+            report[key] = {"error": str(e)}
+        _check_cancel()
 
     if progress_callback:
-        progress_callback(1, 1, "Hardware scan complete")
-
+        try:
+            progress_callback(total, total, "Hardware scan complete")
+        except Exception:
+            pass
+    _check_cancel()
     return report
 
 

@@ -400,18 +400,45 @@ class DataForgeApp(QMainWindow):
             # Cancel all active jobs via JobManager
             count = self.job_manager.cancel_all()
             self.update_status(f"Cancelling {count} job(s)...")
+            # Disable STOP to prevent double-click, show feedback
+            try:
+                self.cancel_btn.setEnabled(False)
+                self.cancel_btn.setText("Cancelling…")
+            except Exception:
+                pass
+            # Fallback: if jobs don't finish within 2s (uncancellable worker),
+            # force-hide progress so UI doesn't appear frozen.
+            from PyQt5.QtCore import QTimer
+
+            def _force_hide_if_still_busy():
+                if not self.job_manager.is_busy:
+                    self._on_job_completed()
+                    try:
+                        self.cancel_btn.setEnabled(True)
+                        self.cancel_btn.setText("STOP")
+                    except Exception:
+                        pass
+                else:
+                    # Still busy after 2s — force hide to avoid stuck bar
+                    self.progress_bar.setRange(0, 100)
+                    self.progress_bar.setValue(0)
+                    self.progress_bar.setVisible(False)
+                    self.cancel_btn.setVisible(False)
+                    self.cancel_btn.setEnabled(True)
+                    self.cancel_btn.setText("STOP")
+                    self.update_status("Cancelled (forced)")
+
+            QTimer.singleShot(2000, _force_hide_if_still_busy)
 
     def add_view(self, view_cls: Type[BaseView]):
         view_instance = view_cls(self.content_stack, app=self)
         title = view_instance.get_title()
-        # 2e.1 view crossfade — every view gets an opacity effect so
-        # ``switch_view`` can fade it in from 0→1. Setting the effect after
-        # the view is parented ensures PyQt5 picks it up before the
-        # first paint; opacity is left at 1.0 so the very first view
-        # (Dashboard) renders normally until ``switch_view`` overrides it.
-        view_instance.setGraphicsEffect(QGraphicsOpacityEffect(view_instance))
-        view_instance.graphicsEffect().setOpacity(1.0)
-
+        # 2e.1 view crossfade — effect is installed transiently during
+        # switch_view animation only. Leaving a permanent
+        # QGraphicsOpacityEffect on every view forces offscreen pixmap
+        # composition and breaks QComboBox popup geometry (QTBUG-80786:
+        # popup at 0,0 / top-right when ancestor has effect). No effect at
+        # rest means popups map correctly and paint is faster.
         self.content_stack.addWidget(view_instance)
         self.views[title] = view_instance
 
@@ -460,9 +487,18 @@ class DataForgeApp(QMainWindow):
         if unregistered:
             groups["Plugins"] = unregistered
 
-        # Apply Detail level gating from Settings before rendering.
-        # The tier is kept as a hint for in-view expanders but the sidebar
-        # itself is no longer filtered by it; every group is rendered.
+        # Apply Detail level gating from Settings — sidebar groups are
+        # filtered by tier so Simple shows essentials, Standard adds
+        # Clean & Optimize, Everything reveals forensics. This restores
+        # the pre-36f16e0 discoverability intent with recursion guards.
+        GROUP_MIN_TIER = {
+            "Home": "Simple",
+            "Find & Organize": "Simple",
+            "Clean & Optimize": "Standard",
+            "Recover & Investigate": "Everything",
+            "System": "Simple",
+            "Plugins": "Simple",
+        }
         tier_name = config.get("settings_ui_tier", "Simple")
         tier_rank = self.TIER_RANK.get(tier_name, 0)
         self._current_tier_rank = tier_rank
@@ -484,8 +520,11 @@ class DataForgeApp(QMainWindow):
         # ``setIcon`` API renders them at the button's icon size.
         self._icons = build_icons(TONE_DARK if is_dark else TONE_LIGHT)
 
-        # Populate grouped layout
+        # Populate grouped layout — filter groups by tier
         for group_name, titles in groups.items():
+            min_tier = GROUP_MIN_TIER.get(group_name, "Simple")
+            if self.TIER_RANK.get(min_tier, 0) > tier_rank:
+                continue
             available = [t for t in titles if t in self.views]
             if not available:
                 continue
@@ -677,20 +716,33 @@ class DataForgeApp(QMainWindow):
         view = self.views.get(title)
         if view:
             same_view = (view is self.current_view)
-            self.content_stack.setCurrentWidget(view)
-            view.mount()
-            self.current_view = view
-            self.setWindowTitle(f"DataForge - {title}")
+            # Freeze updates during stack switch + mount to avoid blank/see-through
+            # artifacts when heavy trees are cleared/inserted during crossfade.
+            self.setUpdatesEnabled(False)
+            try:
+                self.content_stack.setCurrentWidget(view)
+                view.mount()
+                self.current_view = view
+                self.setWindowTitle(f"DataForge - {title}")
+            finally:
+                self.setUpdatesEnabled(True)
+                try:
+                    view.update()
+                    view.repaint()
+                except Exception:
+                    pass
 
             # 2e.1 view crossfade — start the new view at opacity 0 and
             # animate to 1. The first switch at startup is also faded in
             # so the dashboard reveal is consistent with the rest of the
-            # app. ``switch_view`` is the only call that mutates the
-            # effect's opacity.
+            # app. Effect is transient so QComboBox popups are not broken
+            # by a permanent QGraphicsEffect on the ancestor.
             if not same_view:
-                effect = view.graphicsEffect()
-                if isinstance(effect, QGraphicsOpacityEffect):
-                    self._animate_opacity(effect, 0.0, 1.0)
+                # Install transient effect for this switch only
+                effect = QGraphicsOpacityEffect(view)
+                view.setGraphicsEffect(effect)
+                effect.setOpacity(0.0)
+                self._animate_opacity(effect, 0.0, 1.0, view=view)
 
             # Highlight active nav button
             for btn, btn_title in self.nav_buttons:
@@ -700,19 +752,45 @@ class DataForgeApp(QMainWindow):
                 else:
                     btn.setChecked(False)
 
-    def _animate_opacity(self, effect, start, end):
+    def _animate_opacity(self, effect, start, end, view=None):
         """Fade a ``QGraphicsOpacityEffect`` from *start* to *end*.
 
         When :attr:`_reduce_motion` is True the animation runs with a
         zero duration (2e.3) so the effect snaps to its end value
-        immediately."""
+        immediately. The effect is transient — removed from the view when
+        the fade reaches 1.0 so popups and painting are not composited
+        through an offscreen pixmap."""
+        # Reduce-motion: snap without animation and remove effect immediately
+        if getattr(self, "_reduce_motion", False):
+            try:
+                effect.setOpacity(end)
+            except RuntimeError:
+                pass
+            if view is not None and end == 1.0:
+                try:
+                    view.setGraphicsEffect(None)
+                except RuntimeError:
+                    pass
+            return
         anim = QPropertyAnimation(effect, b"opacity")
-        anim.setDuration(0 if getattr(self, "_reduce_motion", False) else self.VIEW_ANIM_MS)
+        anim.setDuration(self.VIEW_ANIM_MS)
         anim.setEasingCurve(self.ANIM_EASING)
         anim.setStartValue(start)
         anim.setEndValue(end)
         self._active_animations.append(anim)
-        anim.finished.connect(lambda a=anim: self._drop_finished_animation(a))
+
+        def _on_finished(a=anim, eff=effect, v=view, e=end):
+            self._drop_finished_animation(a)
+            if v is not None and e == 1.0:
+                try:
+                    # Ensure final opacity is 1.0 before removing
+                    eff.setOpacity(1.0)
+                    v.setGraphicsEffect(None)
+                    v.update()
+                except RuntimeError:
+                    pass
+
+        anim.finished.connect(_on_finished)
         anim.start()
 
 
@@ -792,6 +870,20 @@ class DataForgeApp(QMainWindow):
         # raw string is still surfaced in the dialog so advanced users
         # can see the underlying cause; the friendly summary sits
         # above it as actionable context.
+        # Cancellation is not an error — show "Cancelled" in status bar,
+        # hide progress, and do not pop an error dialog.
+        if isinstance(error, (KeyboardInterrupt, InterruptedError)):
+            self.update_status("Cancelled")
+            self._on_job_completed()
+            return
+        if isinstance(error, str) and "cancelled" in error.lower():
+            self.update_status("Cancelled")
+            self._on_job_completed()
+            return
+        if isinstance(error, BaseException) and "cancelled" in str(error).lower():
+            self.update_status("Cancelled")
+            self._on_job_completed()
+            return
         from .views.base import friendly_error_message
         raw = str(error)
         friendly = friendly_error_message(error)
@@ -859,13 +951,31 @@ class DataForgeApp(QMainWindow):
 
         # Wrap callbacks to include UI cleanup
         def _on_success(result: Any) -> None:
-            if callback:
-                callback(result)
+            # Check for cancelled dict (from ManagedWorker or find_duplicates/search)
+            is_cancelled = False
+            if isinstance(result, dict) and result.get("cancelled"):
+                is_cancelled = True
+            try:
+                if callback:
+                    callback(result)
+            except Exception:
+                pass
+            if is_cancelled:
+                self.update_status("Cancelled")
             self._on_job_completed()
 
         def _on_error(error: Exception) -> None:
+            # Cancellation via exception should not show error dialog (already handled
+            # in show_workflow_error), but ensure status and cleanup
+            if isinstance(error, (KeyboardInterrupt, InterruptedError)) or "cancelled" in str(error).lower():
+                self.update_status("Cancelled")
+                self._on_job_completed()
+                return
             if on_error:
-                on_error(error)
+                try:
+                    on_error(error)
+                except Exception:
+                    pass
             else:
                 self.update_status(f"Error: {error}")
             self._on_job_completed()
@@ -888,12 +998,26 @@ class DataForgeApp(QMainWindow):
     def _on_job_completed(self) -> None:
         """Clean up UI when a job completes (success or error)."""
         if not self.job_manager.is_busy:
-            self.cancel_btn.setVisible(False)
+            try:
+                self.cancel_btn.setVisible(False)
+                self.cancel_btn.setEnabled(True)
+                self.cancel_btn.setText("STOP")
+            except Exception:
+                pass
             # Reset the bar back to a determinate 0..100 range
-            self.progress_bar.setRange(0, 100)
-            self.progress_bar.setValue(0)
-            self.progress_bar.setVisible(False)
+            try:
+                self.progress_bar.setRange(0, 100)
+                self.progress_bar.setValue(0)
+                self.progress_bar.setVisible(False)
+            except Exception:
+                pass
             self._current_task_name = None
+            # Ensure repaint after heavy operation to avoid blank/artifact carryover
+            try:
+                self.update()
+                self.repaint()
+            except Exception:
+                pass
 
     def _on_worker_finished(self):
         """Legacy cleanup slot — kept for backward compat."""

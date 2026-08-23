@@ -390,6 +390,16 @@ QTreeWidget:focus, QTreeView:focus, QListWidget:focus, QTextEdit:focus {
     border-color: $focus_ring;
     outline: none;
 }
+QComboBox QAbstractItemView {
+    background-color: $surface_elevated;
+    color: $text;
+    border: 1px solid $border_strong;
+    selection-background-color: $accent_focus;
+    selection-color: #ffffff;
+    border-radius: 6px;
+    outline: none;
+    padding: 2px;
+}
 QTreeView::item {
     padding: 6px;
     border-bottom: 1px solid $border_item;
@@ -437,10 +447,19 @@ QProgressBar {
     text-align: center;
     background-color: $surface_pressed;
     font-weight: bold;
+    /* Ensure bar paints opaque so chunk is not composited through transparent */
+    padding: 0px;
 }
 QProgressBar::chunk {
     background-color: $accent_focus;
-    border-radius: 5px;
+    border-radius: 6px;
+    margin: 0px;
+}
+QFrame[frameShape="5"] {
+    /* StyledPanel (QFrame::StyledPanel = 5) — used for CollapsibleCard inner and savings frames */
+    background-color: $surface;
+    border: 1px solid $border;
+    border-radius: 8px;
 }
 QLabel#dashboardFileSize {
     color: $text_mono;
