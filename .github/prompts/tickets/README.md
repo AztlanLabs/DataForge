@@ -4,9 +4,9 @@
 
 **Generic prompt:** `../parallel-ticket-agent.md` / `../../../.github/prompts/parallel-ticket-agent.prompt.md` — set `{{TICKET_ID}}`.
 
-> **Status 2026-08-22 20:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4 DONE → Wave 4 🔜 READY**
-> Wave 0 (69 tests) + Wave 1 (126 tests) + Wave 2 (98 tests) + Wave 3 (130 tests: `21+37+51+21`) = 423 tests green — Wave 3 fully green, unblocks Wave 4 (2 parallel agents). See `docs/PARALLEL_BACKLOG.md` Wave 0–3 Reviews (4/4).
-> **Overall: 23/25 DONE (92%) — 2 remaining.**
+> **Status 2026-08-22 22:30 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2 DONE → Wave 5 🔜 READY (12 tickets, 24 disjoint files)**
+> Wave 0 (69) + Wave 1 (126) + Wave 2 (98) + Wave 3 (130) + Wave 4 (635) = 1058 tests green. After Wave 4 a regression-audit of `AUDIT_REPORT.md` Part 4 + `FORENSIC_REVIEW.md` index surfaced 26 actionable gaps; Wave 5 design covers them with 12 disjoint tickets across 24 unique files: TICK-501..507 (R-CORE-3/4/6, F1, F4, F9, F14, U3, U4) + TICK-508..512 (F5/F7/F8 engine modules, F12 plugin isolation, F11 logger chain, F13 parser pool, U10/U11 docs). See `docs/PARALLEL_BACKLOG.md` Wave 0–4 Reviews (5/5) + Wave 5 Spec (12 tickets).
+> **Overall: 25/37 DONE (68%) — 12 remaining.**
 
 ## Execution Order (Wave DAG)
 
@@ -45,10 +45,27 @@
 - **TICK-303** ✅ DONE 2026-08-22 — Produce onefile (portable) + onedir (package) + nfpm deb/rpm | depends: "TICK-001" | writes: `build_exe.py`, `packaging/nfpm.yaml [NEW FILE]`, `packaging/README.md [NEW FILE]` → [`TICK-303.prompt.md`](./TICK-303.prompt.md)
 - **TICK-304** ✅ DONE 2026-08-22 — Add hash-chained audit log, CaseContext, and Evidence Mode gate (F1–F3/U2 + F9) | depends: "TICK-005", "TICK-109" | writes: `dataforge/core/audit.py [NEW FILE]`, `dataforge/core/case.py [NEW FILE]`, `dataforge/modules/forensics.py` → [`TICK-304.prompt.md`](./TICK-304.prompt.md)
 
-### Wave 4 🔜 READY 2026-08-22 — Wave 3 ✅ 4/4 gate green, 2 disjoint, unblocked
+### Wave 4 ✅ DONE 2026-08-22 22:30 UTC (2/2 — 635 tests, 2/2 validation_command green)
 
-- **TICK-401** — Replace single BackgroundWorker is_busy with JobManager + virtualized views | depends: "TICK-301", "TICK-304" | writes: `dataforge/ui/app.py`, `dataforge/ui/job_manager.py [NEW FILE]` → [`TICK-401.prompt.md`](./TICK-401.prompt.md)
-- **TICK-402** — Centralize version bump (pyproject → __init__ → Info.plist/wxs) | depends: "TICK-001", "TICK-303" | writes: `scripts/bump_version.py [NEW FILE]`, `pyproject.toml` → [`TICK-402.prompt.md`](./TICK-402.prompt.md)
+- **TICK-401** ✅ DONE 2026-08-22 — Replace single BackgroundWorker is_busy with JobManager + virtualized views | depends: "TICK-301", "TICK-304" | writes: `dataforge/ui/app.py`, `dataforge/ui/job_manager.py [NEW FILE]` → [`TICK-401.prompt.md`](./TICK-401.prompt.md)
+- **TICK-402** ✅ DONE 2026-08-22 — Centralize version bump (pyproject → __init__ → Info.plist/wxs) | depends: "TICK-001", "TICK-303" | writes: `scripts/bump_version.py [NEW FILE]`, `pyproject.toml` → [`TICK-402.prompt.md`](./TICK-402.prompt.md)
+
+### Wave 5 🔜 READY 2026-08-22 — Wave 4 ✅ 2/2 gate green, 12 disjoint, unblocked
+
+> **Goal:** Close remaining `AUDIT_REPORT.md` Part 4 (R-CORE/R-OPS) + `FORENSIC_REVIEW.md` F/U gaps surfaced by the 2026-08-22 audit. 12 tickets, 24 unique files (verified disjoint against the 7-ticket set pushed by `ca69d90`+`f581496`).
+
+- **TICK-501** — Fix R-CORE-3/4/6: config persistence, cache null-guard, scanner error reporting | depends: — | writes: `dataforge/core/config.py`, `dataforge/core/cache.py`, `dataforge/core/scanner.py` → [`TICK-501.prompt.md`](./TICK-501.prompt.md)
+- **TICK-502** — Move secure_delete to dedicated sanitisation module (F4) | depends: "TICK-304" | writes: `dataforge/modules/sanitisation.py [NEW FILE]`, `dataforge/modules/forensics.py` → [`TICK-502.prompt.md`](./TICK-502.prompt.md)
+- **TICK-503** — Wire AuditLog into FileActionService (F1) | depends: "TICK-304" | writes: `dataforge/core/services/file_actions.py` → [`TICK-503.prompt.md`](./TICK-503.prompt.md)
+- **TICK-504** — Fix tz-naive timestamps in non-forensic modules (F9) | depends: — | writes: `dataforge/modules/system_cleanup.py`, `dataforge/modules/search.py`, `dataforge/modules/recovery.py`, `dataforge/modules/integrity.py`, `dataforge/modules/performance.py`, `dataforge/ui/views/search.py` → [`TICK-504.prompt.md`](./TICK-504.prompt.md)
+- **TICK-505** — Fix ingest_disk_image list materialisation (F14) | depends: "TICK-304" | writes: `dataforge/modules/forensics.py` → [`TICK-505.prompt.md`](./TICK-505.prompt.md)
+- **TICK-506** — Virtualise timeline for >5k events (U3) | depends: — | writes: `dataforge/ui/views/forensics_view.py` → [`TICK-506.prompt.md`](./TICK-506.prompt.md)
+- **TICK-507** — Add hex field inspector / HexView widget (U4) | depends: — | writes: `dataforge/ui/widgets.py` → [`TICK-507.prompt.md`](./TICK-507.prompt.md)
+- **TICK-508** — Forensic engine: image_io (E01/AFF4) + streams (ADS/xattrs/MotW) + indicators (YARA/SSDEEP/NSRL) (F5 + F7 + F8) | depends: "TICK-002", "TICK-102", "TICK-103" | writes: `dataforge/core/image_io.py [NEW FILE]`, `dataforge/core/streams.py [NEW FILE]`, `dataforge/modules/indicators.py [NEW FILE]` → [`TICK-508.prompt.md`](./TICK-508.prompt.md)
+- **TICK-509** — Plugin loader isolation (subprocess + signing) (F12 remainder) | depends: "TICK-401" | writes: `dataforge/ui/plugin_loader.py` → [`TICK-509.prompt.md`](./TICK-509.prompt.md)
+- **TICK-510** — Hash-chain app.log (extends AuditLog chain) (F11 remainder) | depends: "TICK-101", "TICK-304" | writes: `dataforge/core/logger.py` → [`TICK-510.prompt.md`](./TICK-510.prompt.md)
+- **TICK-511** — Parser ProcessPool isolation (F13) | depends: "TICK-301" | writes: `dataforge/engine/parsers.py [NEW FILE]` → [`TICK-511.prompt.md`](./TICK-511.prompt.md)
+- **TICK-512** — Docs cross-platform claim fix for --parse-artifacts + trash (U10 + U11) | depends: "TICK-202" | writes: `docs/CLI_REFERENCE.md`, `README.md`, `docs/GUI_WORKFLOWS.md`, `dataforge/ui/views/about.py` → [`TICK-512.prompt.md`](./TICK-512.prompt.md)
 
 ## Relevant Documentation Per Ticket
 
@@ -58,7 +75,7 @@ Each per-ticket file now includes a **Relevant Documentation — Must Read Befor
 
 ### Sequential (default, safe)
 ```
-Wave 0 (0.1→0.2→0.3→0.4→0.5) → Wave 1 (9 agents after Wave 0 green) → Wave 2 → Wave 3 → Wave 4
+Wave 0 (0.1→0.2→0.3→0.4→0.5) → Wave 1 (9 agents after Wave 0 green) → Wave 2 → Wave 3 → Wave 4 → Wave 5
 ```
 
 ### Parallel within a Wave

@@ -5,13 +5,14 @@
 **Toolchain:** `pytest` (`requirements-dev.txt:4`), `pytest-cov`, `ruff`, `mypy` — all `validation_command` are `pytest`-based.  
 **Principles enforced:** Contract-first (Wave 0) → disjoint writes per wave (no file appears twice in same wave) → sequential re-entries documented → consolidation isolates central touchpoints.
 
-> **Wave Status — Updated 2026-08-22 23:30 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4 DONE**
+> **Wave Status — Updated 2026-08-22 22:30 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2 DONE**
 > - **Wave 0 (Contracts): 5/5 DONE — 69 tests.** Unblocks Wave 1.
 > - **Wave 1 (Parallel Fixes): 9/9 DONE — 126 tests.** Unblocks Wave 2.
-> - **Wave 2 (Service & Mutations): 5/5 DONE — 98 tests (`19+10+30+20+19`), 5/5 `validation_command` green, file parity verified. Unblocks Wave 3.** Reviewed below.
-> - **Wave 3 (Integration & Packaging): 4/4 DONE — 121 tests.** Unblocks Wave 4.
-> - **Wave 4: 0/2 — ⏳ Pending** (needs Wave 3)
-> - **Overall: 23/25 tickets DONE (92%) — 2 remaining.** See `docs/prompts/tickets/README.md` for per-ticket prompts.
+> - **Wave 2 (Service & Mutations): 5/5 DONE — 98 tests (`19+10+30+20+19`), 5/5 `validation_command` green, file parity verified. Unblocks Wave 3.**
+> - **Wave 3 (Integration & Packaging): 4/4 DONE — 130 tests.** Unblocks Wave 4.
+> - **Wave 4 (Final Consolidation): 2/2 DONE — 635 tests (`412+223`), 2/2 `validation_command` green, file parity verified (`TICK-401` JobManager + `TICK-402` version sync).** Unblocks Wave 5.
+> - **Wave 5 (Audit & Forensic Gap Closure): 0/12 — 🔜 READY TO START** (Wave 4 gate green; `TICK-501..507` initial Wave-5 set already pushed by `ca69d90`/`f581496`; `TICK-508..512` engine/plugin/parser/docs complement added — 12 disjoint tickets across 24 unique files covering R-CORE-3/4/6 + F1 + F4 + F9 + F14 + U3 + U4 + F5 + F7 + F8 + F11 + F12 + F13 + U10 + U11).
+> - **Overall: 25/37 tickets DONE (68%) — 12 remaining.** See `docs/prompts/tickets/README.md` for per-ticket prompts.
 
 > Read `CONSOLIDATED_SPEC.md` §2–7 for canonical definitions before picking a ticket. All `path:line` below verified at 2026-08-22.
 
