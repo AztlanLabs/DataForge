@@ -5,19 +5,23 @@
 **Toolchain:** `pytest` (`requirements-dev.txt:4`), `pytest-cov`, `ruff`, `mypy` — all `validation_command` are `pytest`-based.  
 **Principles enforced:** Contract-first (Wave 0) → disjoint writes per wave (no file appears twice in same wave) → sequential re-entries documented → consolidation isolates central touchpoints.
 
-> **Wave Status — Updated 2026-08-23 11:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1, Wave 7 ✅ 8/8, Wave 8 ✅ 7/8 DONE (1 remaining TICK-804), Wave 9 🔜 0/8 READY, Wave 10 🔜 0/3 READY**
+> **Wave Status — Updated 2026-08-23 12:00 UTC — Wave 0 ✅ 5/5, Wave 1 ✅ 9/9, Wave 2 ✅ 5/5, Wave 3 ✅ 4/4, Wave 4 ✅ 2/2, Wave 5 ✅ 11/11, Wave 6 ✅ 1/1, Wave 7 ✅ 8/8, Wave 8 ✅ 7/8, Wave 9 🔜 0/8, Wave 10 🔜 0/3, Wave 11 🔜 0/5, Wave 12 🔜 0/8, Wave 13 🔜 0/4, Wave 14 🔜 0/5**
 > - **Wave 0 (Contracts): 5/5 DONE — 69 tests.** Unblocks Wave 1.
 > - **Wave 1 (Parallel Fixes): 9/9 DONE — 126 tests.** Unblocks Wave 2.
-> - **Wave 2 (Service & Mutations): 5/5 DONE — 98 tests, 5/5 `validation_command` green, file parity verified. Unblocks Wave 3.**
+> - **Wave 2 (Service & Mutations): 5/5 DONE — 98 tests.** Unblocks Wave 3.
 > - **Wave 3 (Integration & Packaging): 4/4 DONE — 130 tests.** Unblocks Wave 4.
-> - **Wave 4 (Final Consolidation): 2/2 DONE — 635 tests (`412+223`), 2/2 `validation_command` green, file parity verified.** Unblocks Wave 5.
-> - **Wave 5 (Audit & Forensic Gap Closure): 11/11 DONE — 142 tests (+2 skipped, 1 NTFS caveat, 11/11 `validation_command` green, file parity verified, 11 disjoint files, no collision — TICK-505 moved to Wave 6 on 2026-08-23 to resolve `forensics.py` collision).** Reviewed below.
-> - **Wave 6 (Forensics Re-entry): 1/1 DONE — 13 tests, 1/1 `validation_command` green, `forensics.py` sequential re-entry after TICK-502 verified.** Reviewed below.
-> - **Wave 7 (Remaining Gaps + Engine Growth): 8/8 DONE — 128 tests (+1 skipped, 8/8 `validation_command` green, file parity verified, 8 disjoint files, no collision).** Reviewed below.
-> - **Wave 8 (Next Issues — Renamer, STOP, Icons, Cache, Menus, Automation, Memory, Hardware): 7/8 DONE — 65 tests (7/8 `validation_command` green, file parity verified, 7 disjoint files, 1 remaining `TICK-804` — `feat/TICK-804-cache-info` branch, not yet merged).** Reviewed below.
-> - **Wave 9 (Stability Hotfix — Hardware QPainter, Metadata cross-device, MediaTools rework, Duplicates SIGSEGV, Junk SIGSEGV, Preview malloc, Automations collapsible, Cursor pointers): 0/8 READY — 8 parallel disjoint files, depends on Wave 8 (needs TICK-804 merged for cache.py sequential? No, Wave 9 avoids cache.py, so can start now; Wave 10 depends on Wave 9).** See below.
-> - **Wave 10 (Quality — Global audit, Test consolidation, Dead code prune): 0/3 READY — 3 parallel disjoint files, depends on Wave 9.** See below.
-> - **Overall: 52/64 tickets DONE (81%) — 12 remaining (TICK-804 + 901-908 + 911-913).** See `docs/prompts/tickets/README.md` for per-ticket prompts.
+> - **Wave 4 (Final Consolidation): 2/2 DONE — 635 tests.** Unblocks Wave 5.
+> - **Wave 5 (Audit & Forensic Gap Closure): 11/11 DONE — 142 tests.** Unblocks Wave 6.
+> - **Wave 6 (Forensics Re-entry): 1/1 DONE — 13 tests.** Unblocks Wave 7.
+> - **Wave 7 (Remaining Gaps + Engine Growth): 8/8 DONE — 128 tests.** Unblocks Wave 8.
+> - **Wave 8 (Next Issues): 7/8 DONE — 65 tests. 1 remaining TICK-804.**
+> - **Wave 9 (Stability Hotfix): 0/8 READY — 8 parallel disjoint.** See below.
+> - **Wave 10 (Quality): 0/3 READY — 3 parallel disjoint, depends on Wave 9.** See below.
+> - **Wave 11 (Critical Stability P0): 0/5 READY — 5 tickets, sequential within wave. Depends on Wave 9+10.** See below.
+> - **Wave 12 (Operation Correctness P1): 0/8 READY — 8 tickets, partial parallel. Depends on Wave 11.** See below.
+> - **Wave 13 (Platform/API/CLI/Packaging): 0/4 READY — 4 parallel disjoint. Depends on Wave 12.** See below.
+> - **Wave 14 (Verification/Tests/Docs): 0/5 READY — 4 parallel + 1 sequential. Depends on Wave 13.** See below.
+> - **Overall: 52/86 tickets DONE (60%) — 34 remaining (TICK-804 + 901-908 + 911-935).** See `docs/prompts/tickets/README.md` for per-ticket prompts.
 
 > Read `CONSOLIDATED_SPEC.md` §2–7 for canonical definitions before picking a ticket. All `path:line` below verified at 2026-08-22.
 
@@ -1542,6 +1546,682 @@ requirements:
 verification:
   test_target: "tests/test_dead_code_prune.py [NEW FILE]"
   validation_command: "python -m pytest tests/test_dead_code_prune.py -q"
+```
+
+---
+
+## Wave 11 — Critical Stability (P0): Job lifecycle, threading, cancellation, evidence mode
+
+> **Source:** `docs/reviews/STABILITY_AUDIT_2026-08-23.md` P0.1–P0.10
+> **Gate:** All P0 crash/data-loss/audit-bypass issues resolved. No SIGSEGV, recursive repaint, or QThread destruction warnings under stress. Evidence mode blocks all wrapped mutations. Every job reaches one terminal state.
+> **Depends on:** Wave 9 (TICK-901–908) and Wave 10 (TICK-911–913) must be DONE.
+> **Execution:** Staged within wave: TICK-914 first (fixes progress/QThread), then TICK-915 (enforces max_workers/cancellation using 914's fix), then TICK-916–918 can run in parallel (each depends on 914 or 915). Max 1 agent at start, then 2–3 concurrent.
+
+| Ticket ID | Domain | Target Write Scope (exclusive) | Depends On | Scope |
+|---|---|---|---|---|
+| `TICK-914` | UI / Job Manager | `dataforge/ui/job_manager.py` | Wave 10 | Progress callback safety, QThread lifecycle, affinity contract |
+| `TICK-915` | Engine / Jobs | `dataforge/engine/jobs.py` | `TICK-914` | max_workers enforcement, cancellation guard, state ownership, TypeError retry, shutdown |
+| `TICK-916` | Core / File Actions | `dataforge/core/services/file_actions.py` | `TICK-915` | Parallel exception indexing, cancellation accounting, temp file safety |
+| `TICK-917` | UI / App + Evidence | `dataforge/ui/app.py`, `dataforge/core/case.py` | `TICK-914` | Evidence mode at mutation boundary, closeEvent shutdown, callback signature |
+| `TICK-918` | Forensics + API | `dataforge/modules/forensics.py`, `dataforge/api/schema.py` | `TICK-915` | File-type profiling fix, progress total sentinel, timeline atime, integrity contract |
+
+```yaml
+# TICK-914 — Progress callback safety + QThread lifecycle
+ticket_id: TICK-914
+title: "Progress callback safety + QThread lifecycle + affinity contract"
+wave: 11
+depends_on: [Wave 10]
+exclusive_write_files:
+  - dataforge/ui/job_manager.py
+audit_refs:
+  - "STABILITY_AUDIT_2026-08-23.md P0.1"
+  - "STABILITY_AUDIT_2026-08-23.md P0.2"
+  - "STABILITY_AUDIT_2026-08-23.md P0.3"
+description: |
+  Fix cross-thread Qt widget mutation from progress callbacks. ManagedWorker.run()
+  invokes orig_cb (app.post_progress) inline on the worker thread, which calls
+  update_progress() and mutates QProgressBar/QLabel. Also fix QThread lifecycle:
+  finished_signal is emitted before run() returns, causing deleteLater() on a
+  still-running thread. Add explicit GUI-affine delivery contract for all signals.
+acceptance_criteria:
+  - "GIVEN a progress=True job THEN update_progress is called exactly once per event AND only on the GUI thread"
+  - "GIVEN a ManagedWorker completes THEN QThread.finished (not finished_signal) triggers cleanup"
+  - "GIVEN app shutdown with active workers THEN no 'QThread: Destroyed while thread is still running' warning"
+  - "GIVEN a completion callback THEN it executes on the GUI thread (assert QThread.currentThread() == app.thread())"
+verification:
+  test_target: "tests/test_job_lifecycle_safety.py [NEW FILE]"
+  validation_command: "QT_QPA_PLATFORM=offscreen python -m pytest tests/test_job_lifecycle_safety.py -q"
+```
+
+```yaml
+# TICK-915 — Job engine: max_workers, cancellation, state ownership
+ticket_id: TICK-915
+title: "Job engine: max_workers enforcement, cancellation guard, state ownership"
+wave: 11
+depends_on: [TICK-914]
+exclusive_write_files:
+  - dataforge/engine/jobs.py
+audit_refs:
+  - "STABILITY_AUDIT_2026-08-23.md P0.4"
+  - "STABILITY_AUDIT_2026-08-23.md P0.5"
+  - "STABILITY_AUDIT_2026-08-23.md P0.9"
+  - "STABILITY_AUDIT_2026-08-23.md P0.10"
+  - "STABILITY_AUDIT_2026-08-23.md P1.20"
+description: |
+  Enforce max_workers so JobManager cannot spawn unbounded QThreads. Prevent
+  cancelled queued jobs from invoking their target. Fix Job state ownership so
+  ManagedWorker and manager callbacks do not race on the same Job object. Fix
+  _invoke_worker TypeError retry to inspect signature once. Fix shutdown to
+  transition pending jobs to CANCELLED and release future references. Fix
+  progress total sentinel (-1 violates schema).
+acceptance_criteria:
+  - "GIVEN max_workers=1 and 5 submitted jobs THEN at most 1 target runs concurrently"
+  - "GIVEN a cancelled queued job THEN its target is never invoked"
+  - "GIVEN a running job completes THEN exactly one terminal event is appended"
+  - "GIVEN shutdown(cancel_futures=True) THEN all pending jobs become CANCELLED"
+  - "GIVEN a target that raises TypeError THEN it is invoked exactly once (no retry)"
+  - "GIVEN progress with unknown total THEN JobEvent.total is None (not -1)"
+verification:
+  test_target: "tests/test_job_engine_contract.py [NEW FILE]"
+  validation_command: "QT_QPA_PLATFORM=offscreen python -m pytest tests/test_job_engine_contract.py -q"
+```
+
+```yaml
+# TICK-916 — File actions: parallel exceptions, cancellation, temp safety
+ticket_id: TICK-916
+title: "File actions: parallel exception indexing, cancellation accounting, temp safety"
+wave: 11
+depends_on: [TICK-915]
+exclusive_write_files:
+  - dataforge/core/services/file_actions.py
+audit_refs:
+  - "STABILITY_AUDIT_2026-08-23.md P0.6"
+  - "STABILITY_AUDIT_2026-08-23.md P1.7"
+  - "STABILITY_AUDIT_2026-08-23.md P1.20"
+description: |
+  Fix _run_batch_parallel() where futures.pop() before futures.get() drops
+  exception records. Ensure one record per requested item including failures
+  and cancelled items. Fix cancellation to wait for in-flight mutations and
+  report accurate completed/failed counts. Use unique secure temp files for
+  archives. Confine rename_path() to validated basenames.
+acceptance_criteria:
+  - "GIVEN 10 items and 1 worker exception THEN outcome has exactly 10 records AND 1 failure"
+  - "GIVEN cancellation during parallel move THEN outcome reports completed + failed + unstarted counts"
+  - "GIVEN rename with '..' in name THEN it is rejected as invalid"
+  - "GIVEN archive to existing destination THEN temp file is unique (no predictable .tmp)"
+verification:
+  test_target: "tests/test_file_actions_contract.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_file_actions_contract.py -q"
+```
+
+```yaml
+# TICK-917 — Evidence mode at mutation boundary + app shutdown
+ticket_id: TICK-917
+title: "Evidence mode at mutation boundary + app shutdown + callback contract"
+wave: 11
+depends_on: [TICK-914]
+exclusive_write_files:
+  - dataforge/ui/app.py
+  - dataforge/core/case.py
+audit_refs:
+  - "STABILITY_AUDIT_2026-08-23.md P0.7"
+  - "STABILITY_AUDIT_2026-08-23.md P1.2"
+  - "STABILITY_AUDIT_2026-08-23.md P1.1"
+description: |
+  Move evidence mode enforcement from JobManager keyword matching to the
+  mutation boundary (FileActionService, metadata operations). Every delete,
+  move, rename, archive, metadata write, strip, secure-delete, and pipeline
+  mutation must check a read-only policy. Add DataForgeApp.closeEvent() that
+  cancels all jobs and waits for termination. Fix restore_tree_selection()
+  callback contract. Stop swallowing completion callback exceptions.
+acceptance_criteria:
+  - "GIVEN evidence mode ON and a metadata write THEN it returns blocked (not executed)"
+  - "GIVEN evidence mode ON and an action pipeline with delete THEN delete is blocked"
+  - "GIVEN evidence mode ON and a wrapped worker (e.g. _pdf_compress_worker) calling mutation THEN blocked"
+  - "GIVEN app.closeEvent() with active jobs THEN all workers terminate before Qt teardown"
+  - "GIVEN restore_tree_selection with no-arg callback THEN no TypeError"
+verification:
+  test_target: "tests/test_evidence_mode_boundary.py [NEW FILE]"
+  validation_command: "QT_QPA_PLATFORM=offscreen python -m pytest tests/test_evidence_mode_boundary.py -q"
+```
+
+```yaml
+# TICK-918 — Forensics + API schema fixes
+ticket_id: TICK-918
+title: "Forensics: file-type profiling, progress sentinel, timeline atime, integrity contract"
+wave: 11
+depends_on: [TICK-915]
+exclusive_write_files:
+  - dataforge/modules/forensics.py
+  - dataforge/api/schema.py
+audit_refs:
+  - "STABILITY_AUDIT_2026-08-23.md P0.8"
+  - "STABILITY_AUDIT_2026-08-23.md P0.9"
+  - "STABILITY_AUDIT_2026-08-23.md P1.10"
+description: |
+  Fix profile_directory_types() entry.name → entry.filename. Fix timeline
+  atime which is actually mtime (FileEntry has no atime). Fix integrity
+  snapshot to recurse directories. Fix JobEvent.total to accept None for
+  unknown totals. Fix verify_file_state to check all configured hashes.
+  Constrain artifact parsing to evidence root.
+acceptance_criteria:
+  - "GIVEN 25+ files THEN profile_directory_types completes without AttributeError"
+  - "GIVEN timeline with atime selected THEN atime values differ from mtime"
+  - "GIVEN integrity snapshot of a directory THEN all files are enumerated"
+  - "GIVEN progress with unknown total THEN JobEvent validates (total=None)"
+verification:
+  test_target: "tests/test_forensics_contract.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_forensics_contract.py -q"
+```
+
+---
+
+## Wave 12 — Operation Correctness (P1): Media, metadata, search, duplicates, cleanup, recovery
+
+> **Source:** `docs/reviews/STABILITY_AUDIT_2026-08-23.md` P1.1–P1.13
+> **Gate:** Every user-facing operation returns accurate results, previews match execution, outputs are atomic, and destructive actions are safe.
+> **Depends on:** Wave 11 (TICK-914–918) must be DONE.
+> **Execution:** Staged within wave. Phase 1 (TICK-919–923) runs 5 agents in parallel (disjoint: modules + core). Phase 2 (TICK-924–926) runs after Phase 1 (each depends on its Phase 1 counterpart: 924→920, 925→921+922, 926→923). Views in Phase 2 (`ui/views/`) are distinct from modules in Phase 1 (`modules/`), so no file collision.
+
+| Ticket ID | Domain | Target Write Scope (exclusive) | Depends On | Scope |
+|---|---|---|---|---|
+| `TICK-919` | Core / Operations | `dataforge/core/operations/files.py` | Wave 11 | Result contract, rename confinement, transfer safety |
+| `TICK-920` | Core / Media Ops | `dataforge/core/media_ops.py` | Wave 11 | PDF merge/split/compress/convert correctness, image dry-run, atomic output |
+| `TICK-921` | Modules / Metadata | `dataforge/modules/metadata.py`, `dataforge/modules/cleaner.py` | Wave 11 | PNG write, exiftool detection, capability model, selective removal |
+| `TICK-922` | Modules / Search+Dupes | `dataforge/modules/search.py`, `dataforge/modules/duplicates.py` | Wave 11 | Stale results, validation, content verification, cache invalidation |
+| `TICK-923` | Modules / Cleanup+Recovery | `dataforge/modules/system_cleanup.py`, `dataforge/modules/recovery.py` | Wave 11 | Browser checkbox, type filters, cancellation display, path confinement |
+| `TICK-924` | UI / Media View | `dataforge/ui/views/media.py` | `TICK-920` | Path precedence, preview snapshot, collision detection, tree access removal |
+| `TICK-925` | UI / Metadata+Search+Dupes Views | `dataforge/ui/views/metadata_view.py`, `dataforge/ui/views/search.py`, `dataforge/ui/views/duplicates.py` | `TICK-921`, `TICK-922` | Stale state refresh, selection mode, path resolvers |
+| `TICK-926` | UI / Cleanup+Recovery+Tools Views | `dataforge/ui/views/system_cleanup.py`, `dataforge/ui/views/recovery_view.py`, `dataforge/ui/views/tools.py`, `dataforge/ui/views/forensics_view.py` | `TICK-923` | Checkbox wiring, PhotoRec types, renamer rules, hash verification |
+
+```yaml
+# TICK-919 — Core operations: result contract, rename confinement
+ticket_id: TICK-919
+title: "Core operations: unified result contract, rename confinement, transfer safety"
+wave: 12
+depends_on: [Wave 11]
+exclusive_write_files:
+  - dataforge/core/operations/files.py
+audit_refs:
+  - "STABILITY_AUDIT_2026-08-23.md P1.1"
+  - "STABILITY_AUDIT_2026-08-23.md P1.7"
+description: |
+  Define OperationReport dataclass with operation, requested, completed, failed,
+  skipped, cancelled, success, errors, outputs, warnings, dry_run fields. Fix
+  rename_path() to confine new_name to the source directory (reject separators
+  and ..). Ensure transfer_path() never overwrites without explicit confirmation.
+acceptance_criteria:
+  - "GIVEN a batch operation THEN result has requested == input count AND accurate completed/failed/skipped"
+  - "GIVEN rename with absolute path component THEN rejected with clear error"
+  - "GIVEN rename with '..' THEN rejected with clear error"
+verification:
+  test_target: "tests/test_operations_contract.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_operations_contract.py -q"
+```
+
+```yaml
+# TICK-920 — Media ops: PDF merge/split/compress/convert, image safety
+ticket_id: TICK-920
+title: "Media ops: PDF correctness, image dry-run safety, atomic output"
+wave: 12
+depends_on: [Wave 11]
+exclusive_write_files:
+  - dataforge/core/media_ops.py
+audit_refs:
+  - "STABILITY_AUDIT_2026-08-23.md P1.4"
+  - "STABILITY_AUDIT_2026-08-23.md P1.5"
+description: |
+  Fix merge_pdfs to return report dict instead of raising ImportError. Never
+  write output with 0 merged files. Count merged only when pages > 0. Fix
+  split_pdf to record paths after successful write. Unify error report shapes.
+  Fix compress_pdf to use real compression or label as lossless rewrite. Fix
+  convert_image to not create directories during dry run. Prevent same-file
+  overwrite. Use atomic temp-file replacement for all outputs.
+acceptance_criteria:
+  - "GIVEN merge with 0 valid inputs THEN no output file AND report.success=False"
+  - "GIVEN merge with 2 valid + 1 bad input THEN report.merged=2 AND output exists"
+  - "GIVEN split with 1 write failure THEN report.generated contains only successful files"
+  - "GIVEN compress dry_run THEN ratio is labeled as estimate (not fabricated)"
+  - "GIVEN image convert dry_run THEN no directory is created"
+  - "GIVEN same-format image convert without output dir THEN source is not overwritten"
+verification:
+  test_target: "tests/test_media_ops_contract.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_media_ops_contract.py -q"
+```
+
+```yaml
+# TICK-921 — Metadata: PNG write, exiftool detection, capability model
+ticket_id: TICK-921
+title: "Metadata: PNG write support, exiftool detection, capability model, selective removal"
+wave: 12
+depends_on: [Wave 11]
+exclusive_write_files:
+  - dataforge/modules/metadata.py
+  - dataforge/modules/cleaner.py
+audit_refs:
+  - "STABILITY_AUDIT_2026-08-23.md P1.6"
+description: |
+  Implement PNG text chunk writes via PngInfo. Rework _has_exiftool() to use
+  shutil.which() with Windows fallbacks and expose cache_clear(). Add format
+  capability report (read/write/supported fields per format). Add pypdf metadata
+  writer. Fix selective removal to never fall back from GPS-only to strip-all.
+  Fix metadata cancellation. Make writes atomic.
+acceptance_criteria:
+  - "GIVEN a PNG file WHEN writing text metadata THEN success (via PngInfo)"
+  - "GIVEN exiftool not installed THEN _has_exiftool() returns False AND message is actionable"
+  - "GIVEN get_supported_formats() THEN each format lists accurate read/write capabilities"
+  - "GIVEN GPS-only strip without exiftool on JPEG THEN returns error (not strip-all)"
+  - "GIVEN write_metadata with cancel_token set THEN returns cancelled immediately"
+verification:
+  test_target: "tests/test_metadata_capabilities.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_metadata_capabilities.py -q"
+```
+
+```yaml
+# TICK-922 — Search + Duplicates: stale state, validation, content verification
+ticket_id: TICK-922
+title: "Search + Duplicates: stale state cleanup, input validation, content verification"
+wave: 12
+depends_on: [Wave 11]
+exclusive_write_files:
+  - dataforge/modules/search.py
+  - dataforge/modules/duplicates.py
+audit_refs:
+  - "STABILITY_AUDIT_2026-08-23.md P1.7"
+description: |
+  Clear current_results at search start. Validate paths, size ranges, and
+  date ranges before submitting jobs. Fix duplicate Select Extras to verify
+  content before destructive actions. Fix stale path-role maps on tree rebuild.
+  Fix cache invalidation when content changes but size/mtime do not.
+acceptance_criteria:
+  - "GIVEN new search starts THEN current_results is cleared immediately"
+  - "GIVEN invalid path THEN search returns actionable error (not empty success)"
+  - "GIVEN min_size > max_size THEN rejected with clear message"
+  - "GIVEN Select Extras + delete THEN content is verified before deletion"
+verification:
+  test_target: "tests/test_search_dupes_contract.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_search_dupes_contract.py -q"
+```
+
+```yaml
+# TICK-923 — Cleanup + Recovery: controls, type filters, cancellation
+ticket_id: TICK-923
+title: "Cleanup + Recovery: checkbox wiring, type filters, cancellation display, path confinement"
+wave: 12
+depends_on: [Wave 11]
+exclusive_write_files:
+  - dataforge/modules/system_cleanup.py
+  - dataforge/modules/recovery.py
+audit_refs:
+  - "STABILITY_AUDIT_2026-08-23.md P1.8"
+  - "STABILITY_AUDIT_2026-08-23.md P1.9"
+description: |
+  Wire browser artifacts checkbox to scan request. Fix junk scan error callback
+  argument order. Deduplicate browser/junk savings. Normalize recovery type
+  identifiers (case-insensitive). Fix cancellation display in restore/carve
+  handlers. Constrain Trash rows to trash object paths. Limit carving memory.
+acceptance_criteria:
+  - "GIVEN browser artifacts checkbox unchecked THEN scan excludes browser profiles"
+  - "GIVEN junk scan fails THEN error dialog shows correct title and message"
+  - "GIVEN recovery carve with lowercase 'jpg' THEN JPEG signatures are matched"
+  - "GIVEN restore cancelled THEN status shows 'Cancelled' (not 'Restore complete')"
+verification:
+  test_target: "tests/test_cleanup_recovery_contract.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_cleanup_recovery_contract.py -q"
+```
+
+```yaml
+# TICK-924 — UI Media: path precedence, preview snapshot, tree access
+ticket_id: TICK-924
+title: "UI Media: path precedence fix, preview snapshot, collision detection, worker tree access"
+wave: 12
+depends_on: [TICK-920]
+exclusive_write_files:
+  - dataforge/ui/views/media.py
+audit_refs:
+  - "STABILITY_AUDIT_2026-08-23.md P1.3"
+  - "STABILITY_AUDIT_2026-08-23.md P1.4"
+  - "STABILITY_AUDIT_2026-08-23.md P1.5"
+description: |
+  Fix operator-precedence bug in pdf_compress path selection. Create immutable
+  preview snapshot for merge (capture paths/page orders at preview time). Fix
+  merge execute to use previewed paths instead of re-reading tree. Remove
+  img_tree.item() access from _img_convert_worker. Add collision detection for
+  image batch conversion. Add explicit overwrite confirmation for same-file.
+acceptance_criteria:
+  - "GIVEN PDF selected with empty values THEN path resolves correctly (not empty)"
+  - "GIVEN merge preview THEN execute uses same paths (not re-read from tree)"
+  - "GIVEN image convert worker on failure THEN no QTreeWidget access from worker thread"
+  - "GIVEN batch image convert with duplicate basenames THEN collision error before work starts"
+verification:
+  test_target: "tests/test_media_view_contract.py [NEW FILE]"
+  validation_command: "QT_QPA_PLATFORM=offscreen python -m pytest tests/test_media_view_contract.py -q"
+```
+
+```yaml
+# TICK-925 — UI Metadata + Search + Dupes views: stale state, selection
+ticket_id: TICK-925
+title: "UI Metadata + Search + Dupes: stale state refresh, selection mode, path resolvers"
+wave: 12
+depends_on: [TICK-921, TICK-922]
+exclusive_write_files:
+  - dataforge/ui/views/metadata_view.py
+  - dataforge/ui/views/search.py
+  - dataforge/ui/views/duplicates.py
+audit_refs:
+  - "STABILITY_AUDIT_2026-08-23.md P1.7"
+  - "STABILITY_AUDIT_2026-08-23.md P1.6"
+description: |
+  Refresh metadata display after strip/write (all panels, not just overview).
+  Clear stale duplicate path-role maps on tree rebuild. Enable extended
+  selection where plural actions are advertised. Add explicit path resolvers
+  for duplicate and recovery trees. Clear search results on new search.
+acceptance_criteria:
+  - "GIVEN metadata strip completes THEN all panels show updated state"
+  - "GIVEN metadata write completes THEN GPS/timestamps panels refresh"
+  - "GIVEN duplicate tree rebuilt THEN path-role map is cleared"
+  - "GIVEN bulk delete action THEN tree supports multi-selection"
+verification:
+  test_target: "tests/test_view_state_contract.py [NEW FILE]"
+  validation_command: "QT_QPA_PLATFORM=offscreen python -m pytest tests/test_view_state_contract.py -q"
+```
+
+```yaml
+# TICK-926 — UI Cleanup + Recovery + Tools + Forensics views
+ticket_id: TICK-926
+title: "UI Cleanup + Recovery + Tools + Forensics: checkbox wiring, PhotoRec, renamer, hash verification"
+wave: 12
+depends_on: [TICK-923]
+exclusive_write_files:
+  - dataforge/ui/views/system_cleanup.py
+  - dataforge/ui/views/recovery_view.py
+  - dataforge/ui/views/tools.py
+  - dataforge/ui/views/forensics_view.py
+audit_refs:
+  - "STABILITY_AUDIT_2026-08-23.md P1.8"
+  - "STABILITY_AUDIT_2026-08-23.md P1.9"
+  - "STABILITY_AUDIT_2026-08-23.md P1.10"
+  - "STABILITY_AUDIT_2026-08-23.md P1.11"
+  - "STABILITY_AUDIT_2026-08-23.md P1.12"
+description: |
+  Wire cleanup checkboxes to scan parameters. Pass selected file types to
+  PhotoRec. Fix hash verification to use selected row path (not basename).
+  Fix renamer to use confirmed preview rules (not live UI state). Fix
+  folder sync to use preview fingerprint. Fix Action Builder to report step
+  failures. Clone pipeline steps before submission. Fix generic context menus
+  on non-file trees.
+acceptance_criteria:
+  - "GIVEN cleanup browser checkbox toggled THEN scan includes/excludes browser profiles"
+  - "GIVEN PhotoRec with jpg selected THEN only JPEG signatures are carved"
+  - "GIVEN hash verify on duplicate basename THEN correct file is verified"
+  - "GIVEN renamer preview THEN apply uses same rules (not re-read from UI)"
+  - "GIVEN Action Builder step fails THEN pipeline reports failure (not success)"
+verification:
+  test_target: "tests/test_view_actions_contract.py [NEW FILE]"
+  validation_command: "QT_QPA_PLATFORM=offscreen python -m pytest tests/test_view_actions_contract.py -q"
+```
+
+---
+
+## Wave 13 — Platform, API, CLI, Packaging (P1.13–P1.19)
+
+> **Source:** `docs/reviews/STABILITY_AUDIT_2026-08-23.md` P1.13–P1.19
+> **Gate:** Clean install works, service starts, API fields are implemented or removed, packaging builds on all platforms.
+> **Depends on:** Wave 12 (TICK-919–926) must be DONE.
+
+| Ticket ID | Domain | Target Write Scope (exclusive) | Depends On | Scope |
+|---|---|---|---|---|
+| `TICK-927` | Core / Dependencies | `dataforge/core/acquire.py`, `pyproject.toml`, `requirements.txt` | Wave 12 | Optional deps, acquire cleanup, VSS, package extras |
+| `TICK-928` | Engine / Daemon+API | `dataforge/engine/daemon.py`, `dataforge/api/transport/http_gateway.py` | Wave 12 | API field implementation, HTTP auth, event subscription |
+| `TICK-929` | Service + Transport | `dataforge/service/__main__.py`, `dataforge/service/linux/dataforge.service`, `dataforge/api/transport/uds.py`, `dataforge/api/transport/named_pipe.py` | Wave 12 | Service args, transport fixes, pipe security |
+| `TICK-930` | Build / Packaging | `build_exe.py`, `buildspec/release/DataForge.spec`, `buildspec/debug/DataForge-debug.spec`, `packaging/wix/Product.wxs`, `packaging/nfpm.yaml` | Wave 12 | Platform maps, spec fixes, asset references |
+
+```yaml
+# TICK-927 — Dependencies + acquire + package extras
+ticket_id: TICK-927
+title: "Dependencies: optional imports, acquire cleanup, VSS, package extras"
+wave: 13
+depends_on: [Wave 12]
+exclusive_write_files:
+  - dataforge/core/acquire.py
+  - pyproject.toml
+  - requirements.txt
+audit_refs:
+  - "STABILITY_AUDIT_2026-08-23.md P1.13"
+  - "STABILITY_AUDIT_2026-08-23.md P1.20"
+description: |
+  Make psutil, Pillow, pypdf optional at import time (lazy imports). Fix
+  acquire_file() temp cleanup (closure captures None). Mark VSS as unsupported
+  instead of returning None. Define pyproject extras: cli, gui, media,
+  forensics, dev. Make CLI importable without Pillow. Add msgpack and
+  platformdirs to pyproject.toml.
+acceptance_criteria:
+  - "GIVEN pip install . (no requirements.txt) THEN fm --help works"
+  - "GIVEN full extras install THEN run_ui.py starts in offscreen mode"
+  - "GIVEN acquire_file with sudo THEN temp copy is cleaned up on close"
+  - "GIVEN VSS on Linux THEN returns explicit 'unsupported' (not None)"
+verification:
+  test_target: "tests/test_dependency_contract.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_dependency_contract.py -q"
+```
+
+```yaml
+# TICK-928 — Daemon API fields + HTTP auth + event subscription
+ticket_id: TICK-928
+title: "Daemon API: implement or remove advertised fields, HTTP auth, event subscription"
+wave: 13
+depends_on: [Wave 12]
+exclusive_write_files:
+  - dataforge/engine/daemon.py
+  - dataforge/api/transport/http_gateway.py
+audit_refs:
+  - "STABILITY_AUDIT_2026-08-23.md P1.15"
+  - "STABILITY_AUDIT_2026-08-23.md P1.16"
+  - "STABILITY_AUDIT_2026-08-23.md P1.17"
+description: |
+  Implement search sort/reverse/limit, duplicate hash_algorithm/verify_content,
+  integrity algorithm, and scan provider in daemon handlers. If not implementing,
+  remove from schema. Enforce HTTP token authentication for non-loopback binding.
+  Define event subscription as snapshot or stream with bounded queues.
+acceptance_criteria:
+  - "GIVEN search API request with sort_key THEN results are sorted"
+  - "GIVEN HTTP non-loopback binding without token THEN refused with clear error"
+  - "GIVEN event subscription THEN behavior is documented (snapshot or stream)"
+verification:
+  test_target: "tests/test_daemon_api_contract.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_daemon_api_contract.py -q"
+```
+
+```yaml
+# TICK-929 — Service arguments + transport fixes
+ticket_id: TICK-929
+title: "Service: fix entrypoint arguments, transport security, pipe SDDL"
+wave: 13
+depends_on: [Wave 12]
+exclusive_write_files:
+  - dataforge/service/__main__.py
+  - dataforge/service/linux/dataforge.service
+  - dataforge/api/transport/uds.py
+  - dataforge/api/transport/named_pipe.py
+audit_refs:
+  - "STABILITY_AUDIT_2026-08-23.md P1.14"
+  - "STABILITY_AUDIT_2026-08-23.md P1.18"
+description: |
+  Remove --dbus from service unit (or add support). Align source and packaged
+  systemd units. Fix UDS iterator unreachable terminal check. Fix named-pipe
+  SDDL application and shutdown. Fix client auto_discover to check HTTP.
+acceptance_criteria:
+  - "GIVEN dataforge.service starts THEN no argument error"
+  - "GIVEN source and packaged units THEN they use the same supported flags"
+  - "GIVEN UDS subscribe THEN terminal event is delivered correctly"
+verification:
+  test_target: "tests/test_service_transport_contract.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_service_transport_contract.py -q"
+```
+
+```yaml
+# TICK-930 — Packaging: build verification on all platforms
+ticket_id: TICK-930
+title: "Packaging: fix platform maps, spec files, asset references, build verification"
+wave: 13
+depends_on: [Wave 12]
+exclusive_write_files:
+  - build_exe.py
+  - buildspec/release/DataForge.spec
+  - buildspec/debug/DataForge-debug.spec
+  - packaging/wix/Product.wxs
+  - packaging/nfpm.yaml
+audit_refs:
+  - "STABILITY_AUDIT_2026-08-23.md P1.19"
+description: |
+  Fix macOS detect_platform() → "darwin" mapping. Remove hardcoded /mnt/pharos
+  paths from release spec. Update debug spec from Tkinter/ttkbootstrap to
+  PyQt5. Fix WiX to reference correct executable. Fix nfpm PNG asset reference.
+  Add build smoke test.
+acceptance_criteria:
+  - "GIVEN macOS build THEN platform maps resolve correctly"
+  - "GIVEN release spec THEN no hardcoded external paths"
+  - "GIVEN nfpm build THEN referenced assets exist"
+verification:
+  test_target: "tests/test_packaging_build.py [NEW FILE]"
+  validation_command: "python -m pytest tests/test_packaging_build.py -q"
+```
+
+---
+
+## Wave 14 — Verification, Test Coverage, Documentation
+
+> **Source:** Full audit verification matrix
+> **Gate:** All regression tests pass, documentation is current, green build on clean environment.
+> **Depends on:** Wave 13 (TICK-927–930) must be DONE.
+> **Execution:** TICK-931–934 run 4 agents in parallel (disjoint test files). TICK-935 runs last (depends on 931–934, updates docs). TICK-935 should ideally be Wave 15, but is kept in Wave 14 as a sequential tail with explicit depends_on.
+
+| Ticket ID | Domain | Target Write Scope (exclusive) | Depends On | Scope |
+|---|---|---|---|---|
+| `TICK-931` | Tests / GUI Threading | `tests/test_gui_thread_affinity.py [NEW FILE]` | Wave 13 | Thread affinity assertions for all callback types |
+| `TICK-932` | Tests / Operations | `tests/test_operation_reports.py [NEW FILE]` | Wave 13 | Result contract, cancellation, evidence mode for all operations |
+| `TICK-933` | Tests / Integration | `tests/test_full_workflow.py [NEW FILE]` | Wave 13 | End-to-end workflow smoke tests for every view |
+| `TICK-934` | Tests / Stale Fixtures | `tests/test_comprehensive.py`, `tests/test_contract_regressions.py`, `tests/test_plugin_loader_isolation.py` | Wave 13 | Fix 5 current test failures |
+| `TICK-935` | Docs / Audit Closeout | `docs/PARALLEL_BACKLOG.md`, `docs/prompts/tickets/README.md`, `docs/reviews/STABILITY_AUDIT_2026-08-23.md` | Wave 14 | Update status, close audit, update test counts |
+
+```yaml
+# TICK-931 — GUI thread affinity regression tests
+ticket_id: TICK-931
+title: "GUI thread affinity regression tests for all callback types"
+wave: 14
+depends_on: [Wave 13]
+exclusive_write_files:
+  - tests/test_gui_thread_affinity.py
+description: |
+  Create comprehensive thread-affinity test suite. Assert progress, result,
+  error, dialog, and tree callbacks execute on QApplication.instance().thread().
+  Assert one UI progress update per logical event. Assert completion callback
+  that submits another job works correctly. Assert shutdown leaves no running
+  QThread. Assert worker functions contain no Qt widget access.
+acceptance_criteria:
+  - "GIVEN any progress=True job THEN progress callbacks run on GUI thread"
+  - "GIVEN any job completion THEN on_success runs on GUI thread"
+  - "GIVEN any job error THEN on_error runs on GUI thread"
+  - "GIVEN shutdown THEN no QThread warnings in stderr"
+verification:
+  test_target: "tests/test_gui_thread_affinity.py"
+  validation_command: "QT_QPA_PLATFORM=offscreen python -m pytest tests/test_gui_thread_affinity.py -q"
+```
+
+```yaml
+# TICK-932 — Operation report and contract tests
+ticket_id: TICK-932
+title: "Operation report contract tests: result shape, cancellation, evidence mode"
+wave: 14
+depends_on: [Wave 13]
+exclusive_write_files:
+  - tests/test_operation_reports.py
+description: |
+  Test every operation returns the unified OperationReport shape. Test
+  cancellation reports accurate counts. Test evidence mode blocks all
+  mutation types. Test parallel failure produces one record per item.
+  Test rename confinement. Test archive temp file uniqueness.
+acceptance_criteria:
+  - "GIVEN any batch operation THEN result.requested == input count"
+  - "GIVEN cancellation THEN result states completed/failed/unstarted"
+  - "GIVEN evidence mode THEN all mutations return blocked"
+verification:
+  test_target: "tests/test_operation_reports.py"
+  validation_command: "python -m pytest tests/test_operation_reports.py -q"
+```
+
+```yaml
+# TICK-933 — Full workflow integration smoke tests
+ticket_id: TICK-933
+title: "Full workflow integration smoke tests for every user-facing view"
+wave: 14
+depends_on: [Wave 13]
+exclusive_write_files:
+  - tests/test_full_workflow.py
+description: |
+  Create end-to-end smoke tests for every view: Dashboard scan, Search
+  preview+execute, Duplicates scan+action, PDF merge/split/compress,
+  Image convert, Metadata scan+write+strip, Cleanup scan+clean, Recovery
+  scan+restore, Forensics hash+entropy+timeline, Tools integrity+renamer+sync,
+  Action Builder pipeline, Automations save+load+run. Each test uses real
+  temporary fixtures and verifies the complete preview→confirm→execute→result
+  cycle.
+acceptance_criteria:
+  - "GIVEN each view THEN at least one end-to-end workflow passes"
+  - "GIVEN each destructive operation THEN preview matches execution"
+  - "GIVEN each operation THEN result has accurate success/failure state"
+verification:
+  test_target: "tests/test_full_workflow.py"
+  validation_command: "QT_QPA_PLATFORM=offscreen python -m pytest tests/test_full_workflow.py -q"
+```
+
+```yaml
+# TICK-934 — Fix current stale test fixtures
+ticket_id: TICK-934
+title: "Fix 5 current test failures: plugin permissions, DataForgeApp fixtures, animation baseline"
+wave: 14
+depends_on: [Wave 13]
+exclusive_write_files:
+  - tests/test_comprehensive.py
+  - tests/test_contract_regressions.py
+  - tests/test_plugin_loader_isolation.py
+description: |
+  Fix test_comprehensive.TestPluginLoader to handle world-writable plugin
+  directory (use controlled fixture or skip on unsafe permissions). Fix
+  test_contract_regressions to call QMainWindow.__init__() properly. Fix
+  animation baseline test to account for startup animation. Fix
+  test_plugin_loader_isolation for same permission condition.
+acceptance_criteria:
+  - "GIVEN world-writable plugin dir THEN test skips gracefully (not fails)"
+  - "GIVEN DataForgeApp fixture THEN QMainWindow.__init__() is called"
+  - "GIVEN animation test THEN startup baseline is accounted for"
+  - "GIVEN full test suite THEN 0 failures from stale fixtures"
+verification:
+  test_target: "tests/test_comprehensive.py tests/test_contract_regressions.py tests/test_plugin_loader_isolation.py"
+  validation_command: "QT_QPA_PLATFORM=offscreen python -m pytest tests/test_comprehensive.py tests/test_contract_regressions.py tests/test_plugin_loader_isolation.py -q"
+```
+
+```yaml
+# TICK-935 — Documentation closeout + backlog status update
+ticket_id: TICK-935
+title: "Documentation closeout: update backlog, audit status, test counts, ticket index"
+wave: 14
+depends_on: [TICK-931, TICK-932, TICK-933, TICK-934]
+exclusive_write_files:
+  - docs/PARALLEL_BACKLOG.md
+  - docs/prompts/tickets/README.md
+  - docs/reviews/STABILITY_AUDIT_2026-08-23.md
+description: |
+  Update PARALLEL_BACKLOG.md wave status for Waves 11-14. Update ticket
+  README with new ticket index. Mark audit findings as resolved with commit
+  references. Update test counts. Verify documentation matches implementation.
+acceptance_criteria:
+  - "GIVEN all Wave 11-14 tickets DONE THEN backlog shows correct status"
+  - "GIVEN audit document THEN each finding has resolution reference"
+  - "GIVEN README THEN test count matches actual suite"
+verification:
+  test_target: "N/A (documentation only)"
+  validation_command: "python -m pytest --collect-only -q | tail -1"
 ```
 
 ---
