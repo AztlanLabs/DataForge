@@ -11,8 +11,12 @@ two stay in lockstep.
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
+    QApplication, QMenu,
 )
 from PyQt5.QtCore import Qt
+import os
+import subprocess
+import sys
 
 from .base import BaseView
 from ..theme_tokens import TYPE_SCALE
@@ -74,6 +78,9 @@ class StorageDevicesView(BaseView):
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.table.doubleClicked.connect(self._show_details)
+        # TICK-805: per-window context menu for storage devices
+        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_table_context_menu)
         layout.addWidget(self.table, 1)
 
         self.details_panel = QLabel("", self)
@@ -180,6 +187,139 @@ class StorageDevicesView(BaseView):
         if "error" in info:
             rows.append(f"<b>Note:</b> {info['error']}")
         return "<br>".join(rows)
+
+    def get_context_actions(self, treeview, pos, item=None, path=None):
+        """TICK-805: per-window menu for Storage — Show Details + Copy Mount + Open."""
+        # Resolve row/mountpoint from table
+        row = -1
+        mount = path
+        try:
+            if item is not None and hasattr(item, "row"):
+                row = item.row()
+            else:
+                # pos is viewport-relative for QTableWidget
+                if treeview is not None and hasattr(treeview, "itemAt"):
+                    it = treeview.itemAt(pos) if pos is not None else None
+                    if it is not None:
+                        row = it.row()
+                if row < 0 and hasattr(self.table, "currentRow"):
+                    row = self.table.currentRow()
+        except Exception:
+            row = self.table.currentRow() if hasattr(self, "table") else -1
+        # Fallback mount from devices list
+        if not mount and 0 <= row < len(getattr(self, "devices", [])):
+            try:
+                mount = self.devices[row].get("mountpoint", "")
+            except Exception:
+                mount = None
+        has_mount = bool(mount and mount != _EM_DASH)
+
+        def _do_show_details(r=row):
+            # Select row then show details
+            try:
+                if 0 <= r < self.table.rowCount():
+                    self.table.selectRow(r)
+            except Exception:
+                pass
+            self._show_details()
+
+        def _do_copy_mount(m=mount):
+            try:
+                QApplication.clipboard().setText(m or "")
+            except Exception:
+                pass
+
+        def _do_open_location(m=mount):
+            folder = m or ""
+            if not folder or folder == _EM_DASH:
+                return
+            try:
+                if sys.platform == "win32":
+                    os.startfile(folder)
+                elif sys.platform == "darwin":
+                    subprocess.call(["open", folder])
+                else:
+                    subprocess.call(["xdg-open", folder])
+            except Exception as exc:
+                try:
+                    if getattr(self, "app", None) and hasattr(self.app, "show_error_dialog"):
+                        self.app.show_error_dialog("Open Failed", str(exc))
+                except Exception:
+                    pass
+
+        actions: list = []
+        actions.append(("Show Details", _do_show_details, True))
+        actions.append(("Copy Mount Point", _do_copy_mount, has_mount))
+        actions.append(("Open in File Manager", _do_open_location, has_mount))
+        actions.append(None)
+        actions.append(("Copy Filesystem", lambda: QApplication.clipboard().setText(self.devices[row].get("fstype", "") if 0 <= row < len(self.devices) else ""), 0 <= row < len(self.devices)))
+        actions.append(("Refresh", self._refresh, True))
+        return actions
+
+    def _show_table_context_menu(self, pos):
+        """Build QMenu from get_context_actions for the storage table."""
+        # Resolve item at pos
+        item = None
+        try:
+            item = self.table.itemAt(pos)
+        except Exception:
+            item = None
+        # Row mount for path
+        row = item.row() if item is not None else self.table.currentRow()
+        path = None
+        if 0 <= row < len(self.devices):
+            path = self.devices[row].get("mountpoint")
+        actions = None
+        try:
+            actions = self.get_context_actions(self.table, pos, item, path)
+        except Exception:
+            actions = None
+        # Fallback to Show Details generic if override returned None (should not happen for storage)
+        if actions is None:
+            # Generic fallback: just Show Details
+            menu = QMenu(self)
+            act = menu.addAction("Show Details")
+            act.triggered.connect(self._show_details)
+            menu.exec_(self.table.viewport().mapToGlobal(pos))
+            return
+        # Build menu from descriptors
+        menu = QMenu(self)
+        for desc in actions:
+            if desc is None:
+                menu.addSeparator()
+                continue
+            if isinstance(desc, dict):
+                if desc.get("separator"):
+                    menu.addSeparator()
+                    continue
+                label = desc.get("label") or desc.get("text") or ""
+                enabled = desc.get("enabled", True)
+                cb = desc.get("callback") or desc.get("slot")
+                act = menu.addAction(label)
+                act.setEnabled(bool(enabled))
+                if callable(cb):
+                    act.triggered.connect(lambda checked, c=cb: c())
+                continue
+            if isinstance(desc, (list, tuple)):
+                if len(desc) == 0:
+                    continue
+                label = desc[0]
+                if label is None:
+                    menu.addSeparator()
+                    continue
+                cb = desc[1] if len(desc) > 1 else None
+                enabled = desc[2] if len(desc) > 2 else True
+                act = menu.addAction(str(label))
+                act.setEnabled(bool(enabled))
+                if callable(cb):
+                    act.triggered.connect(lambda checked, c=cb: c())
+                continue
+            if isinstance(desc, str):
+                if desc.strip() == "---":
+                    menu.addSeparator()
+                else:
+                    menu.addAction(desc)
+        menu.exec_(self.table.viewport().mapToGlobal(pos))
 
     def _init_tooltips(self):
         from ..widgets import attach_tooltips
