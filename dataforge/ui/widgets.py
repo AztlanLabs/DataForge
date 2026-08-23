@@ -445,15 +445,6 @@ class EnhancedTreeview(QWidget):
 
         # QTreeWidget
         self.tree = QTreeWidget(self)
-        # Ensure viewport paints opaque to avoid see-through
-        # black/background glitch when parent view is faded via
-        # QGraphicsOpacityEffect (reported 2026-08-23: inner window shows
-        # black/other-window background for ~1s then corrects).
-        try:
-            self.tree.viewport().setAutoFillBackground(True)
-            self.tree.viewport().setAttribute(Qt.WA_OpaquePaintEvent, True)
-        except AttributeError:
-            pass
         self.tree.setAlternatingRowColors(True)
         self.tree.setSortingEnabled(True)
         # U8: disable drag-and-drop (QTreeWidget allows DnD by default)
@@ -576,16 +567,6 @@ class EnhancedTreeview(QWidget):
         if path_override is not None:
             self._item_path_role[iid] = path_override
         return iid
-
-    def refresh_viewport(self):
-        """Force viewport repaint after bulk inserts — avoids black/see-through
-        glitch when parent view is faded via QGraphicsOpacityEffect."""
-        try:
-            self.tree.viewport().update()
-            self.tree.update()
-            self.update()
-        except Exception:
-            pass
         
     def delete(self, *items):
         for item_id in items:

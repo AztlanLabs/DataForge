@@ -168,7 +168,7 @@ class DataForgeApp(QMainWindow):
     # 2e.1 motion constants — every animated transition reads its duration
     # from here so a single call (2e.3's reduce-motion setting) can shorten
     # or skip them all in one place.
-    SIDEBAR_ANIM_MS = 120
+    SIDEBAR_ANIM_MS = 180
     VIEW_ANIM_MS = 160
     ANIM_EASING = QEasingCurve.OutCubic
 
@@ -638,42 +638,31 @@ class DataForgeApp(QMainWindow):
         container = self.group_containers.get(group_name)
         if container is not None:
             if is_collapsed:
-                # Collapsing: animate from current height to 0, then hide
-                # Use container.height() (actual visible height) not maximumHeight() (16777215)
-                # to avoid animating over huge invisible range which appears as no animation / lag.
-                start_h = container.height() if container.isVisible() else container.sizeHint().height()
-                if start_h <= 0:
-                    start_h = container.sizeHint().height() or 200
-                # Ensure maxHeight allows animation
-                container.setMaximumHeight(start_h)
-                anim = self._animate_max_height(container, start_h, 0, restore_to=None)
-
-                def _hide_after(anim_obj=anim, w=container):
+                # Collapsing: animate maxHeight to 0, then hide to remove from layout
+                # Keep visible during animation so height animates, hide on finished
+                def _hide_on_collapsed_finished(anim=None, w=container):
                     try:
                         w.setVisible(False)
-                        # Reset maxHeight so next expand can measure correctly
-                        w.setMaximumHeight(16777215)
                     except RuntimeError:
                         pass
 
+                anim = self._animate_max_height(container, container.maximumHeight(), 0, restore_to=None)
                 if anim is not None:
+                    # Hook hide after animation (if reduced motion, anim is None and we hide immediately)
                     try:
-                        anim.finished.connect(lambda w=container: _hide_after(w=w))
+                        anim.finished.connect(lambda w=container: w.setVisible(False))
                     except RuntimeError:
-                        _hide_after(w=container)
+                        container.setVisible(False)
                 else:
-                    _hide_after(w=container)
+                    container.setVisible(False)
             else:
                 # Expanding: make visible before animating to target height
                 container.setVisible(True)
-                container.setMaximumHeight(0)
                 # Ensure layout recalculates before measuring target
                 container.adjustSize()
-                container.updateGeometry()
                 target = max(container.sizeHint().height(), container.minimumSizeHint().height())
                 if target <= 0:
-                    target = 250
-                # Use faster 120ms for sidebar (was 180ms) to reduce perceived lag
+                    target = 200  # fallback reasonable height
                 self._animate_max_height(
                     container,
                     0,
