@@ -11,12 +11,13 @@ from PyQt5.QtWidgets import (
     QCheckBox, QSpinBox, QGroupBox, QGridLayout, QTabWidget,
     QLineEdit, QMessageBox, QSplitter
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSize
 
 from .base import BaseView
 from ..theme_tokens import TYPE_SCALE
 from .. import dialogs
 from ..widgets import EnhancedTreeview, CollapsibleCard, attach_tooltips, FilePreviewPanel
+from ..resources.icons import build_icons, TONE_LIGHT, TONE_DARK
 from ...core.utils import format_size
 from ...modules.recovery import (
     scan_trash,
@@ -26,6 +27,72 @@ from ...modules.recovery import (
     run_photorec,
 )
 from ...modules.file_signatures import get_all_categories
+
+# ---------------------------------------------------------------------------
+# Icon helpers — view-internal icons must use QPixmap.loadFromData (f89055b)
+# ---------------------------------------------------------------------------
+def _data_url_to_bytes(data_url: str) -> bytes:
+    import base64 as _b64
+
+    if "," not in data_url:
+        return b""
+    return _b64.b64decode(data_url.split(",", 1)[1])
+
+
+def _icon_for(key: str):
+    try:
+        from ...core.config import config as _cfg
+
+        is_dark = _cfg.get("theme", "cosmo") == "darkly"
+    except Exception:
+        is_dark = False
+    tone = TONE_DARK if is_dark else TONE_LIGHT
+    try:
+        from PyQt5.QtGui import QIcon, QPixmap
+
+        icons = build_icons(tone)
+        url = icons.get(key, "")
+        if not url:
+            return QIcon()
+        data = _data_url_to_bytes(url)
+        pm = QPixmap()
+        pm.loadFromData(data, "SVG")
+        if pm.isNull():
+            pm.loadFromData(data, "SVG+XML")
+        if not pm.isNull():
+            return QIcon(pm)
+    except Exception:
+        pass
+    from PyQt5.QtGui import QIcon
+
+    return QIcon()
+
+
+def _apply_button_icon(btn, key: str) -> None:
+    try:
+        icon = _icon_for(key)
+        if not icon.isNull():
+            btn.setIcon(icon)
+            try:
+                size = btn.fontMetrics().height()
+                btn.setIconSize(QSize(size, size))
+            except Exception:
+                btn.setIconSize(QSize(16, 16))
+    except Exception:
+        pass
+
+
+def _apply_tab_icon(tabs, index: int, key: str) -> None:
+    try:
+        icon = _icon_for(key)
+        if not icon.isNull():
+            tabs.setTabIcon(index, icon)
+            try:
+                tabs.setIconSize(QSize(16, 16))
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 
 class RecoveryView(BaseView):
@@ -82,6 +149,7 @@ class RecoveryView(BaseView):
         )
         self.btn_scan_trash.setProperty("variant", "success")
         self.btn_scan_trash.clicked.connect(self._start_trash_scan)
+        _apply_button_icon(self.btn_scan_trash, "search")
 
         # Summary bar
         summary_frame = QFrame(trash_tab)
@@ -131,12 +199,14 @@ class RecoveryView(BaseView):
         ta_layout = QHBoxLayout(trash_actions)
         ta_layout.setContentsMargins(0, 5, 0, 0)
 
-        self.btn_restore_selected = QPushButton("♻️ Restore Selected", trash_actions)
+        self.btn_restore_selected = QPushButton("Restore Selected", trash_actions)
+        _apply_button_icon(self.btn_restore_selected, "cleanup")
         self.btn_restore_selected.setProperty("variant", "success")
         self.btn_restore_selected.clicked.connect(self._restore_selected)
         ta_layout.addWidget(self.btn_restore_selected)
 
-        self.btn_restore_all = QPushButton("♻️ Restore All", trash_actions)
+        self.btn_restore_all = QPushButton("Restore All", trash_actions)
+        _apply_button_icon(self.btn_restore_all, "cleanup")
         self.btn_restore_all.setProperty("variant", "success")
         self.btn_restore_all.clicked.connect(self._restore_all)
         ta_layout.addWidget(self.btn_restore_all)
@@ -147,7 +217,8 @@ class RecoveryView(BaseView):
         ta_layout.addWidget(self.lbl_restore_status)
         trash_layout.addWidget(trash_actions)
 
-        self.tabs.addTab(trash_tab, "🗑 Trash Recovery")
+        self.tabs.addTab(trash_tab, "Trash Recovery")
+        _apply_tab_icon(self.tabs, self.tabs.indexOf(trash_tab), "cleanup")
 
         # ===== Tab 2: Deep Recovery =====
         deep_tab = QWidget()
@@ -172,6 +243,7 @@ class RecoveryView(BaseView):
         self.entry_image.setPlaceholderText("/path/to/disk.img or /dev/sdb")
         img_layout.addWidget(self.entry_image)
         self.btn_browse_image = QPushButton("Browse", img_frame)
+        _apply_button_icon(self.btn_browse_image, "search")
         self.btn_browse_image.clicked.connect(self._browse_image)
         img_layout.addWidget(self.btn_browse_image)
         d_body_layout.addWidget(img_frame)
@@ -185,6 +257,7 @@ class RecoveryView(BaseView):
         self.entry_output.setPlaceholderText("/path/to/recovery/output")
         out_layout.addWidget(self.entry_output)
         self.btn_browse_output = QPushButton("Browse", out_frame)
+        _apply_button_icon(self.btn_browse_output, "search")
         self.btn_browse_output.clicked.connect(self._browse_output)
         out_layout.addWidget(self.btn_browse_output)
         d_body_layout.addWidget(out_frame)
@@ -220,12 +293,14 @@ class RecoveryView(BaseView):
         btn_layout = QHBoxLayout(btn_frame)
         btn_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.btn_carve = QPushButton("🔍 Carve Files (Built-in)", btn_frame)
+        self.btn_carve = QPushButton("Carve Files (Built-in)", btn_frame)
+        _apply_button_icon(self.btn_carve, "search")
         self.btn_carve.setProperty("variant", "warning")
         self.btn_carve.clicked.connect(self._start_carve)
         btn_layout.addWidget(self.btn_carve)
 
-        self.btn_photorec = QPushButton("⚡ PhotoRec Recovery", btn_frame)
+        self.btn_photorec = QPushButton("PhotoRec Recovery", btn_frame)
+        _apply_button_icon(self.btn_photorec, "hardware")
         photorec_available = check_photorec_available()
         if photorec_available:
             self.btn_photorec.setProperty("variant", "primary")
@@ -271,7 +346,8 @@ class RecoveryView(BaseView):
         
         deep_layout.addWidget(self.deep_splitter, 1)
 
-        self.tabs.addTab(deep_tab, "💾 Deep Recovery")
+        self.tabs.addTab(deep_tab, "Deep Recovery")
+        _apply_tab_icon(self.tabs, self.tabs.indexOf(deep_tab), "recovery")
 
         self._init_tooltips()
 

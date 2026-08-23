@@ -11,15 +11,82 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QGroupBox, QTabWidget, QSplitter, QTextEdit,
     QLineEdit, QMessageBox
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSize
 
 from .base import BaseView
 from ..theme_tokens import TYPE_SCALE
 from .. import dialogs
 from ..widgets import EnhancedTreeview, FilePreviewPanel, CollapsibleCard, attach_tooltips
+from ..resources.icons import build_icons, TONE_LIGHT, TONE_DARK
 from ...core.scanner import scan_directory
 from ...modules.metadata import MetadataEngine
 from ...modules.search import export_result_rows
+
+# ---------------------------------------------------------------------------
+# Icon helpers — view-internal icons must use QPixmap.loadFromData (f89055b)
+# ---------------------------------------------------------------------------
+def _data_url_to_bytes(data_url: str) -> bytes:
+    import base64 as _b64
+
+    if "," not in data_url:
+        return b""
+    return _b64.b64decode(data_url.split(",", 1)[1])
+
+
+def _icon_for(key: str):
+    try:
+        from ...core.config import config as _cfg
+
+        is_dark = _cfg.get("theme", "cosmo") == "darkly"
+    except Exception:
+        is_dark = False
+    tone = TONE_DARK if is_dark else TONE_LIGHT
+    try:
+        from PyQt5.QtGui import QIcon, QPixmap
+
+        icons = build_icons(tone)
+        url = icons.get(key, "")
+        if not url:
+            return QIcon()
+        data = _data_url_to_bytes(url)
+        pm = QPixmap()
+        pm.loadFromData(data, "SVG")
+        if pm.isNull():
+            pm.loadFromData(data, "SVG+XML")
+        if not pm.isNull():
+            return QIcon(pm)
+    except Exception:
+        pass
+    from PyQt5.QtGui import QIcon
+
+    return QIcon()
+
+
+def _apply_button_icon(btn, key: str) -> None:
+    try:
+        icon = _icon_for(key)
+        if not icon.isNull():
+            btn.setIcon(icon)
+            try:
+                size = btn.fontMetrics().height()
+                btn.setIconSize(QSize(size, size))
+            except Exception:
+                btn.setIconSize(QSize(16, 16))
+    except Exception:
+        pass
+
+
+def _apply_tab_icon(tabs, index: int, key: str) -> None:
+    try:
+        icon = _icon_for(key)
+        if not icon.isNull():
+            tabs.setTabIcon(index, icon)
+            try:
+                tabs.setIconSize(QSize(16, 16))
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 
 class MetadataView(BaseView):
@@ -95,6 +162,7 @@ class MetadataView(BaseView):
         )
         self.btn_scan.setProperty("variant", "primary")
         self.btn_scan.clicked.connect(self._start_scan)
+        _apply_button_icon(self.btn_scan, "search")
 
         self.lbl_scan_summary = QLabel("No metadata scan run yet.", c_body)
         self.lbl_scan_summary.setProperty("class", "muted")
@@ -176,7 +244,8 @@ class MetadataView(BaseView):
         self.overview_preview = FilePreviewPanel(overview_tab)
         self.overview_splitter.addWidget(self.overview_preview)
         self.overview_splitter.setSizes([320, 240])
-        self.detail_tabs.addTab(overview_tab, "📋 Overview")
+        self.detail_tabs.addTab(overview_tab, "Overview")
+        _apply_tab_icon(self.detail_tabs, self.detail_tabs.indexOf(overview_tab), "metadata")
 
         # Tab: Raw JSON
         raw_tab = QWidget()
@@ -185,7 +254,8 @@ class MetadataView(BaseView):
         self.raw_text.setReadOnly(True)
         self.raw_text.setStyleSheet(f"font-family: 'Courier New', Consolas, monospace; font-size: {TYPE_SCALE['body']}px;")
         raw_layout.addWidget(self.raw_text)
-        self.detail_tabs.addTab(raw_tab, "{ } Raw Data")
+        self.detail_tabs.addTab(raw_tab, "Raw Data")
+        _apply_tab_icon(self.detail_tabs, self.detail_tabs.indexOf(raw_tab), "search")
 
         # Tab: GPS
         gps_tab = QWidget()
@@ -195,7 +265,8 @@ class MetadataView(BaseView):
         self.lbl_gps.setAlignment(Qt.AlignCenter)
         self.lbl_gps.setWordWrap(True)
         gps_layout.addWidget(self.lbl_gps)
-        self.detail_tabs.addTab(gps_tab, "📍 GPS")
+        self.detail_tabs.addTab(gps_tab, "GPS")
+        _apply_tab_icon(self.detail_tabs, self.detail_tabs.indexOf(gps_tab), "exif")
 
         # Tab: Timestamps
         ts_tab = QWidget()
@@ -207,7 +278,8 @@ class MetadataView(BaseView):
         self.ts_tree.column("source", width=200, stretch=False)
         self.ts_tree.heading("timestamp", text="Date/Time")
         ts_layout.addWidget(self.ts_tree)
-        self.detail_tabs.addTab(ts_tab, "🕐 Timestamps")
+        self.detail_tabs.addTab(ts_tab, "Timestamps")
+        _apply_tab_icon(self.detail_tabs, self.detail_tabs.indexOf(ts_tab), "dashboard")
 
         self.splitter.addWidget(right_widget)
         self.splitter.setSizes([500, 500])
@@ -216,12 +288,14 @@ class MetadataView(BaseView):
         action_frame = QGroupBox("Metadata Actions", self)
         action_layout = QHBoxLayout(action_frame)
 
-        self.btn_strip_all = QPushButton("🗑 Strip All Metadata", action_frame)
+        self.btn_strip_all = QPushButton("Strip All Metadata", action_frame)
+        _apply_button_icon(self.btn_strip_all, "cleanup")
         self.btn_strip_all.setProperty("variant", "danger")
         self.btn_strip_all.clicked.connect(self._strip_selected)
         action_layout.addWidget(self.btn_strip_all)
 
-        self.btn_strip_gps = QPushButton("📍 Strip GPS Only", action_frame)
+        self.btn_strip_gps = QPushButton("Strip GPS Only", action_frame)
+        _apply_button_icon(self.btn_strip_gps, "performance")
         self.btn_strip_gps.setProperty("variant", "warning")
         self.btn_strip_gps.clicked.connect(self._strip_gps_selected)
         action_layout.addWidget(self.btn_strip_gps)
@@ -236,13 +310,15 @@ class MetadataView(BaseView):
         self.edit_value.setPlaceholderText("New value")
         self.edit_value.setMaximumWidth(150)
         action_layout.addWidget(self.edit_value)
-        self.btn_edit = QPushButton("✏️ Write", action_frame)
+        self.btn_edit = QPushButton("Write", action_frame)
+        _apply_button_icon(self.btn_edit, "search")
         self.btn_edit.setProperty("variant", "info")
         self.btn_edit.clicked.connect(self._write_field)
         action_layout.addWidget(self.btn_edit)
 
         # Export
-        self.btn_export = QPushButton("💾 Export Report", action_frame)
+        self.btn_export = QPushButton("Export Report", action_frame)
+        _apply_button_icon(self.btn_export, "storage")
         self.btn_export.setProperty("variant", "info")
         self.btn_export.clicked.connect(self._export_metadata)
         action_layout.addWidget(self.btn_export)
@@ -355,7 +431,7 @@ class MetadataView(BaseView):
 
         for meta in results:
             has_meta = "Yes" if meta.get("fields") else "No"
-            has_gps = "📍" if meta.get("has_gps") else ""
+            has_gps = "GPS" if meta.get("has_gps") else ""
 
             item_id = self.file_tree.insert("", "end", values=(
                 meta.get("filename", ""),
@@ -455,7 +531,7 @@ class MetadataView(BaseView):
             alt = gps.get("altitude")
             alt_str = f"\nAltitude: {alt:.1f}m" if alt else ""
             self.lbl_gps.setText(
-                f"📍 GPS Coordinates Found\n\n"
+                f"GPS Coordinates Found\n\n"
                 f"Latitude: {lat:.6f}\n"
                 f"Longitude: {lon:.6f}"
                 f"{alt_str}\n\n"

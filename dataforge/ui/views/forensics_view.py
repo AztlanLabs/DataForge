@@ -13,13 +13,14 @@ from PyQt5.QtWidgets import (
     QCheckBox, QComboBox, QMessageBox, QSpinBox, QSplitter, QTreeView, QHeaderView, QAbstractItemView, QMenu,
     QApplication
 )
-from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QSortFilterProxyModel, QTimer
-from PyQt5.QtGui import QColor, QBrush
+from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QSortFilterProxyModel, QTimer, QSize
+from PyQt5.QtGui import QColor, QBrush, QIcon, QPixmap
 
 from .base import BaseView
 from ..theme_tokens import TOKENS, TYPE_SCALE, GLYPH_SUCCESS, GLYPH_WARNING, GLYPH_ERROR, glyph_for_status
 from .. import dialogs
 from ..widgets import EnhancedTreeview, CollapsibleCard, attach_tooltips, FilePreviewPanel
+from ..resources.icons import build_icons, TONE_LIGHT, TONE_DARK
 from ...core.utils import format_size
 from ...modules.forensics import (
     calculate_hashes,
@@ -48,6 +49,70 @@ from ...modules.password_tools import (
     check_pdf2john_available,
     list_common_wordlists,
 )
+
+
+# ---------------------------------------------------------------------------
+# Icon helpers — view-internal icons must use QPixmap.loadFromData (f89055b)
+# to avoid null pixmap / "?" fallback that QIcon(data_url) produces.
+# ---------------------------------------------------------------------------
+def _data_url_to_bytes(data_url: str) -> bytes:
+    import base64 as _b64
+
+    if "," not in data_url:
+        return b""
+    return _b64.b64decode(data_url.split(",", 1)[1])
+
+
+def _icon_for(key: str) -> QIcon:
+    try:
+        from ...core.config import config as _cfg
+
+        is_dark = _cfg.get("theme", "cosmo") == "darkly"
+    except Exception:
+        is_dark = False
+    tone = TONE_DARK if is_dark else TONE_LIGHT
+    try:
+        icons = build_icons(tone)
+        url = icons.get(key, "")
+        if not url:
+            return QIcon()
+        data = _data_url_to_bytes(url)
+        pm = QPixmap()
+        pm.loadFromData(data, "SVG")
+        if pm.isNull():
+            pm.loadFromData(data, "SVG+XML")
+        if not pm.isNull():
+            return QIcon(pm)
+    except Exception:
+        pass
+    return QIcon()
+
+
+def _apply_button_icon(btn, key: str) -> None:
+    try:
+        icon = _icon_for(key)
+        if not icon.isNull():
+            btn.setIcon(icon)
+            try:
+                size = btn.fontMetrics().height()
+                btn.setIconSize(QSize(size, size))
+            except Exception:
+                btn.setIconSize(QSize(16, 16))
+    except Exception:
+        pass
+
+
+def _apply_tab_icon(tabs: QTabWidget, index: int, key: str) -> None:
+    try:
+        icon = _icon_for(key)
+        if not icon.isNull():
+            tabs.setTabIcon(index, icon)
+            try:
+                tabs.setIconSize(QSize(16, 16))
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 
 class TimelineModel(QAbstractTableModel):
@@ -315,7 +380,7 @@ class ForensicsView(BaseView):
 
         # Warning banner
         warning = QLabel(
-            "⚠️ Forensics — Use responsibly. Some features require elevated "
+            "Forensics — Use responsibly. Some features require elevated "
             "privileges and carry legal implications. Never analyze data you don't "
             "have authorization to examine.",
             self,
@@ -452,13 +517,15 @@ class ForensicsView(BaseView):
         export_frame = QWidget(tab)
         ef_layout = QHBoxLayout(export_frame)
         ef_layout.setContentsMargins(0, 5, 0, 0)
-        self.btn_export_report = QPushButton("📄 Export Forensic Report", export_frame)
+        self.btn_export_report = QPushButton("Export Forensic Report", export_frame)
+        _apply_button_icon(self.btn_export_report, "forensics")
         self.btn_export_report.clicked.connect(self._export_report)
         ef_layout.addWidget(self.btn_export_report)
         ef_layout.addStretch()
         tab_layout.addWidget(export_frame)
 
-        self.tabs.addTab(tab, "💿 Disk Analysis")
+        self.tabs.addTab(tab, "Disk Analysis")
+        _apply_tab_icon(self.tabs, self.tabs.indexOf(tab), "storage")
         self.last_ingest_results = None
 
     # ------------------------------------------------------------------
@@ -475,11 +542,13 @@ class ForensicsView(BaseView):
         h_layout = QHBoxLayout(header)
         h_layout.setContentsMargins(0, 0, 0, 5)
 
-        self.btn_add_hash_files = QPushButton("📁 Add Files", header)
+        self.btn_add_hash_files = QPushButton("Add Files", header)
+        _apply_button_icon(self.btn_add_hash_files, "search")
         self.btn_add_hash_files.clicked.connect(self._add_hash_files)
         h_layout.addWidget(self.btn_add_hash_files)
 
-        self.btn_add_hash_dir = QPushButton("📂 Add Folder", header)
+        self.btn_add_hash_dir = QPushButton("Add Folder", header)
+        _apply_button_icon(self.btn_add_hash_dir, "storage")
         self.btn_add_hash_dir.clicked.connect(self._add_hash_dir)
         h_layout.addWidget(self.btn_add_hash_dir)
 
@@ -495,7 +564,8 @@ class ForensicsView(BaseView):
         self.chk_sha512 = QCheckBox("SHA-512", header)
         h_layout.addWidget(self.chk_sha512)
 
-        self.btn_calc_hash = QPushButton("🔐 Calculate", header)
+        self.btn_calc_hash = QPushButton("Calculate", header)
+        _apply_button_icon(self.btn_calc_hash, "forensics")
         self.btn_calc_hash.setProperty("variant", "success")
         self.btn_calc_hash.clicked.connect(self._calculate_hashes)
         h_layout.addWidget(self.btn_calc_hash)
@@ -529,7 +599,8 @@ class ForensicsView(BaseView):
         self.verify_algo = QComboBox(verify_group)
         self.verify_algo.addItems(["sha256", "md5", "sha1", "sha512"])
         v_layout.addWidget(self.verify_algo)
-        self.btn_verify = QPushButton("✓ Verify", verify_group)
+        self.btn_verify = QPushButton("Verify", verify_group)
+        _apply_button_icon(self.btn_verify, "search")
         self.btn_verify.clicked.connect(self._verify_selected_hash)
         v_layout.addWidget(self.btn_verify)
         tab_layout.addWidget(verify_group)
@@ -537,7 +608,8 @@ class ForensicsView(BaseView):
         self.hash_files_list = []
         self._hash_path_by_item = {}  # tree item_id -> full path
         self.hash_tree.set_path_resolver(self._resolve_hash_path)
-        self.tabs.addTab(tab, "🔐 Hash Calculator")
+        self.tabs.addTab(tab, "Hash Calculator")
+        _apply_tab_icon(self.tabs, self.tabs.indexOf(tab), "forensics")
 
     # ------------------------------------------------------------------
     # Tab 3: OS Artifact Parser
@@ -560,7 +632,8 @@ class ForensicsView(BaseView):
         btn_browse = QPushButton("Browse", header)
         btn_browse.clicked.connect(lambda: self._browse_to(self.artifact_path))
         h_layout.addWidget(btn_browse)
-        self.btn_parse = QPushButton("🔍 Parse Artifacts", header)
+        self.btn_parse = QPushButton("Parse Artifacts", header)
+        _apply_button_icon(self.btn_parse, "search")
         self.btn_parse.setProperty("variant", "warning")
         self.btn_parse.clicked.connect(self._parse_artifacts)
         h_layout.addWidget(self.btn_parse)
@@ -582,7 +655,8 @@ class ForensicsView(BaseView):
         self.lbl_artifact_status.setProperty("class", "muted")
         tab_layout.addWidget(self.lbl_artifact_status)
 
-        self.tabs.addTab(tab, "🔎 OS Artifacts")
+        self.tabs.addTab(tab, "OS Artifacts")
+        _apply_tab_icon(self.tabs, self.tabs.indexOf(tab), "hardware")
 
     # ------------------------------------------------------------------
     # Tab 4: Password Tools
@@ -607,7 +681,8 @@ class ForensicsView(BaseView):
         btn_browse_pwd = QPushButton("Browse", ef_frame)
         btn_browse_pwd.clicked.connect(lambda: self._browse_file_to(self.pwd_source))
         ef_layout.addWidget(btn_browse_pwd)
-        self.btn_extract = QPushButton("🔓 Extract Hashes", ef_frame)
+        self.btn_extract = QPushButton("Extract Hashes", ef_frame)
+        _apply_button_icon(self.btn_extract, "forensics")
         self.btn_extract.setProperty("variant", "primary")
         self.btn_extract.clicked.connect(self._extract_hashes)
         ef_layout.addWidget(self.btn_extract)
@@ -642,7 +717,8 @@ class ForensicsView(BaseView):
         self.strength_input.setPlaceholderText("Enter password to analyze")
         self.strength_input.setEchoMode(QLineEdit.Password)
         sf_layout.addWidget(self.strength_input)
-        self.btn_strength = QPushButton("📊 Analyze", sf_frame)
+        self.btn_strength = QPushButton("Analyze", sf_frame)
+        _apply_button_icon(self.btn_strength, "performance")
         self.btn_strength.clicked.connect(self._analyze_strength)
         sf_layout.addWidget(self.btn_strength)
         sg_layout.addWidget(sf_frame)
@@ -691,7 +767,8 @@ class ForensicsView(BaseView):
         self.attack_hash_type.setPlaceholderText("e.g. 17200 (hashcat -m) or ZIP (john --format)")
         ag_layout.addWidget(self.attack_hash_type, 2, 3, 1, 2)
 
-        self.btn_run_attack = QPushButton("⚔️ Run Dictionary Attack", attack_group)
+        self.btn_run_attack = QPushButton("Run Dictionary Attack", attack_group)
+        _apply_button_icon(self.btn_run_attack, "hardware")
         self.btn_run_attack.setProperty("variant", "danger")
         self.btn_run_attack.clicked.connect(self._run_dict_attack)
         ag_layout.addWidget(self.btn_run_attack, 3, 0, 1, 5)
@@ -721,7 +798,8 @@ class ForensicsView(BaseView):
         lbl_tools.setStyleSheet(f"font-size: {TYPE_SCALE['caption']}px;")
         tab_layout.addWidget(lbl_tools)
 
-        self.tabs.addTab(tab, "🔑 Password Tools")
+        self.tabs.addTab(tab, "Password Tools")
+        _apply_tab_icon(self.tabs, self.tabs.indexOf(tab), "settings")
 
     # ------------------------------------------------------------------
     # Helpers
@@ -756,7 +834,8 @@ class ForensicsView(BaseView):
         btn_browse = QPushButton("Browse", header)
         btn_browse.clicked.connect(lambda: self._browse_to(self.ftype_path))
         h_layout.addWidget(btn_browse)
-        self.btn_ftype = QPushButton("🔍 Profile Types", header)
+        self.btn_ftype = QPushButton("Profile Types", header)
+        _apply_button_icon(self.btn_ftype, "search")
         self.btn_ftype.setProperty("variant", "info")
         self.btn_ftype.clicked.connect(self._profile_filetypes)
         h_layout.addWidget(self.btn_ftype)
@@ -821,7 +900,8 @@ class ForensicsView(BaseView):
         ftype_split.setSizes([200, 400])
         tab_layout.addWidget(ftype_split, 1)
 
-        self.tabs.addTab(tab, "🧬 File Types")
+        self.tabs.addTab(tab, "File Types")
+        _apply_tab_icon(self.tabs, self.tabs.indexOf(tab), "metadata")
 
     def _resolve_ftype_path(self, item_id):
         return self._ftype_path_by_item.get(item_id)
@@ -923,10 +1003,12 @@ class ForensicsView(BaseView):
         header = QWidget(tab)
         h_layout = QHBoxLayout(header)
         h_layout.setContentsMargins(0, 0, 0, 5)
-        self.btn_ent_files = QPushButton("📁 Add Files", header)
+        self.btn_ent_files = QPushButton("Add Files", header)
+        _apply_button_icon(self.btn_ent_files, "search")
         self.btn_ent_files.clicked.connect(self._add_entropy_files)
         h_layout.addWidget(self.btn_ent_files)
-        self.btn_ent_dir = QPushButton("📂 Add Folder", header)
+        self.btn_ent_dir = QPushButton("Add Folder", header)
+        _apply_button_icon(self.btn_ent_dir, "storage")
         self.btn_ent_dir.clicked.connect(self._add_entropy_dir)
         h_layout.addWidget(self.btn_ent_dir)
         h_layout.addWidget(QLabel("Max bytes/sample:"))
@@ -935,7 +1017,8 @@ class ForensicsView(BaseView):
         self.spin_ent_bytes.setValue(1024 * 1024)
         self.spin_ent_bytes.setSingleStep(1024)
         h_layout.addWidget(self.spin_ent_bytes)
-        self.btn_ent_calc = QPushButton("📊 Compute Entropy", header)
+        self.btn_ent_calc = QPushButton("Compute Entropy", header)
+        _apply_button_icon(self.btn_ent_calc, "performance")
         self.btn_ent_calc.setProperty("variant", "primary")
         self.btn_ent_calc.clicked.connect(self._compute_entropy)
         h_layout.addWidget(self.btn_ent_calc)
@@ -982,7 +1065,8 @@ class ForensicsView(BaseView):
         tab_layout.addWidget(single)
 
         self.entropy_files_list = []
-        self.tabs.addTab(tab, "📈 Entropy")
+        self.tabs.addTab(tab, "Entropy")
+        _apply_tab_icon(self.tabs, self.tabs.indexOf(tab), "performance")
 
     def _resolve_entropy_path(self, item_id):
         return self._entropy_path_by_item.get(item_id)
@@ -1088,7 +1172,8 @@ class ForensicsView(BaseView):
         self.timeline_sort = QComboBox(header)
         self.timeline_sort.addItems(["mtime", "atime", "ctime"])
         h_layout.addWidget(self.timeline_sort)
-        self.btn_timeline = QPushButton("🕰 Build Timeline", header)
+        self.btn_timeline = QPushButton("Build Timeline", header)
+        _apply_button_icon(self.btn_timeline, "dashboard")
         self.btn_timeline.setProperty("variant", "warning")
         self.btn_timeline.clicked.connect(self._build_timeline)
         h_layout.addWidget(self.btn_timeline)
@@ -1177,7 +1262,8 @@ class ForensicsView(BaseView):
         self._timeline_path_by_item: dict[str, str] = {}
         # EnhancedTreeview no longer used for timeline; virtualisation via QTreeView
 
-        self.tabs.addTab(tab, "🕰 Timeline")
+        self.tabs.addTab(tab, "Timeline")
+        _apply_tab_icon(self.tabs, self.tabs.indexOf(tab), "dashboard")
 
     def _resolve_timeline_path(self, item_id=None):  # noqa: ANN001
         """Resolve filesystem path for timeline row.
@@ -1433,7 +1519,8 @@ class ForensicsView(BaseView):
         self.spin_hex_offset.setValue(0)
         self.spin_hex_offset.setSingleStep(4096)
         h_layout.addWidget(self.spin_hex_offset)
-        self.btn_hex_view = QPushButton("👁 View Hex", header)
+        self.btn_hex_view = QPushButton("View Hex", header)
+        _apply_button_icon(self.btn_hex_view, "search")
         self.btn_hex_view.setProperty("variant", "success")
         self.btn_hex_view.clicked.connect(self._view_hex)
         h_layout.addWidget(self.btn_hex_view)
@@ -1451,7 +1538,8 @@ class ForensicsView(BaseView):
         self.lbl_hex_info.setWordWrap(True)
         tab_layout.addWidget(self.lbl_hex_info)
 
-        self.tabs.addTab(tab, "👁 Hex Viewer")
+        self.tabs.addTab(tab, "Hex Viewer")
+        _apply_tab_icon(self.tabs, self.tabs.indexOf(tab), "search")
 
     def _view_hex(self):
         path = self.hex_path.text().strip()
@@ -1482,7 +1570,7 @@ class ForensicsView(BaseView):
         tab_layout.setContentsMargins(5, 5, 5, 5)
 
         info = QLabel(
-            "⚠️ This is a triage-only LSB heuristic: it does not extract data "
+            "This is a triage-only LSB heuristic: it does not extract data "
             "nor prove steganography exists. It flags PNG/BMP/TIFF images whose "
             "LSB channel distribution looks uniform (a hallmark of overwritten "
             "hidden data).",
@@ -1503,7 +1591,8 @@ class ForensicsView(BaseView):
         btn_browse = QPushButton("Browse", header)
         btn_browse.clicked.connect(lambda: self._browse_file_to(self.stego_path))
         h_layout.addWidget(btn_browse)
-        self.btn_stego = QPushButton("🕵 Analyze", header)
+        self.btn_stego = QPushButton("Analyze", header)
+        _apply_button_icon(self.btn_stego, "media")
         self.btn_stego.setProperty("variant", "primary")
         self.btn_stego.clicked.connect(self._analyze_stego)
         h_layout.addWidget(self.btn_stego)
@@ -1516,7 +1605,8 @@ class ForensicsView(BaseView):
         )
         tab_layout.addWidget(self.stego_result, 1)
 
-        self.tabs.addTab(tab, "🕵 Steganography")
+        self.tabs.addTab(tab, "Steganography")
+        _apply_tab_icon(self.tabs, self.tabs.indexOf(tab), "media")
 
     def _analyze_stego(self):
         path = self.stego_path.text().strip()
@@ -1536,7 +1626,7 @@ class ForensicsView(BaseView):
         blocks.append(f"LSB ones ratio: {result.get('lsb_one_ratio', 0):.4f} (ideal random ~0.5000)")
         blocks.append(f"LSB swap ratio: {result.get('lsb_swap_ratio', 0):.4f}")
         blocks.append("")
-        marker = "🚩" if result.get("suspicious") else "✅"
+        marker = GLYPH_WARNING if result.get("suspicious") else GLYPH_SUCCESS
         blocks.append(f"{marker} Verdict: {result.get('verdict', '')}")
         self.stego_result.setPlainText("\n".join(blocks))
 
@@ -1550,7 +1640,7 @@ class ForensicsView(BaseView):
         tab_layout.setContentsMargins(5, 5, 5, 5)
 
         warn = QLabel(
-            "⚠️ Secure Delete overwrites the file with random data multiple "
+            "Secure Delete overwrites the file with random data multiple "
             "times before unlinking it. This is irreversible once complete. "
             "Use only on data you are legally authorized to destroy.",
             tab,
@@ -1575,7 +1665,8 @@ class ForensicsView(BaseView):
         self.spin_secure_passes.setRange(1, 35)
         self.spin_secure_passes.setValue(3)
         h_layout.addWidget(self.spin_secure_passes)
-        self.btn_secure_delete = QPushButton("🗑 Secure Delete", header)
+        self.btn_secure_delete = QPushButton("Secure Delete", header)
+        _apply_button_icon(self.btn_secure_delete, "cleanup")
         self.btn_secure_delete.setProperty("variant", "danger")
         self.btn_secure_delete.clicked.connect(self._do_secure_delete)
         h_layout.addWidget(self.btn_secure_delete)
@@ -1588,7 +1679,8 @@ class ForensicsView(BaseView):
         )
         tab_layout.addWidget(self.secure_result, 1)
 
-        self.tabs.addTab(tab, "🗑 Secure Delete")
+        self.tabs.addTab(tab, "Secure Delete")
+        _apply_tab_icon(self.tabs, self.tabs.indexOf(tab), "cleanup")
 
     def _do_secure_delete(self):
         path = self.secure_path.text().strip()
@@ -1672,7 +1764,8 @@ class ForensicsView(BaseView):
         self.lbl_integrity_status.setWordWrap(True)
         tab_layout.addWidget(self.lbl_integrity_status)
 
-        self.tabs.addTab(tab, "🛡 Integrity")
+        self.tabs.addTab(tab, "Integrity")
+        _apply_tab_icon(self.tabs, self.tabs.indexOf(tab), "duplicates")
 
     def _run_integrity(self):
         mode = self.integrity_mode.currentText()
