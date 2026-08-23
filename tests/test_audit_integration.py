@@ -11,7 +11,6 @@ Acceptance criteria:
 import os
 import sqlite3
 import tempfile
-import zipfile
 
 import pytest
 
