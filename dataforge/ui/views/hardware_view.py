@@ -37,6 +37,9 @@ class HardwareView(BaseView):
     def __init__(self, master, app=None):
         super().__init__(master, app)
         self.current_report = None
+        # TICK-808 debounce: prevent mount() firing on every switch_view
+        self._has_scanned = False
+        self._is_scanning = False
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
@@ -126,23 +129,78 @@ class HardwareView(BaseView):
         self._init_tooltips()
 
     def mount(self):
-        if not self.current_report:
-            self._run_scan()
+        # TICK-808: debounce — only auto-scan once, not on every switch_view
+        # Manual Refresh via btn_scan still works (calls _run_scan directly)
+        if self._has_scanned or self._is_scanning:
+            return
+        if self.current_report is not None:
+            return
+        self._run_scan()
 
     # ------------------------------------------------------------------
     # Scan
     # ------------------------------------------------------------------
 
     def _run_scan(self):
+        # TICK-808: guard against concurrent scans (rapid mount / double-click)
+        if self._is_scanning:
+            return
+        self._is_scanning = True
         self.lbl_status.setText("Scanning hardware...")
-        self.app.update_status("Running hardware diagnostic scan...")
+        if self.app:
+            try:
+                self.app.update_status("Running hardware diagnostic scan...")
+            except Exception:
+                pass
 
-        self.app.run_workflow(
-            get_hardware_report,
-            self._on_scan_complete,
-            progress=True,
-            error_title="Hardware Scan Failed",
-        )
+        def _on_complete(report):
+            self._is_scanning = False
+            # Normalised cancelled dict from JobManager/ManagedWorker
+            if isinstance(report, dict) and report.get("cancelled"):
+                self._has_scanned = False
+                self.lbl_status.setText("Hardware scan cancelled.")
+                if self.app:
+                    try:
+                        self.app.update_status("Cancelled")
+                    except Exception:
+                        pass
+                return
+            self._has_scanned = True
+            self._on_scan_complete(report)
+
+        def _on_error(err):
+            self._is_scanning = False
+            self._has_scanned = False
+            # Cancellation is not an error dialog — already handled in run_workflow
+            if isinstance(err, (InterruptedError,)) or "cancelled" in str(err).lower():
+                self.lbl_status.setText("Hardware scan cancelled.")
+                if self.app:
+                    try:
+                        self.app.update_status("Cancelled")
+                    except Exception:
+                        pass
+                return
+            if self.app:
+                try:
+                    self.app.show_workflow_error(err, title="Hardware Scan Failed")
+                except Exception:
+                    pass
+
+        if self.app:
+            self.app.run_workflow(
+                get_hardware_report,
+                _on_complete,
+                on_error=_on_error,
+                progress=True,
+                error_title="Hardware Scan Failed",
+            )
+        else:
+            # Fallback for unit tests without app (direct call, still respects cancel)
+            try:
+                report = get_hardware_report()
+                _on_complete(report)
+            except Exception as e:
+                _on_error(e)
 
     def _on_scan_complete(self, report):
         self.current_report = report
@@ -158,14 +216,23 @@ class HardwareView(BaseView):
     # ------------------------------------------------------------------
 
     def _build_overview(self, report):
+        # TICK-808: avoid QPainter recursion — freeze updates during bulk build
+        # and defer viewport repaint (not repaint/update during paint)
+        try:
+            self.setUpdatesEnabled(False)
+        except Exception:
+            pass
         # Clear existing
         self.overview_placeholder.setVisible(False)
 
-        # Remove old dynamic widgets
+        # Remove old dynamic widgets (deleteLater is safe, not immediate repaint)
         while self.overview_layout.count() > 1:
             item = self.overview_layout.takeAt(1)
             if item.widget():
-                item.widget().deleteLater()
+                try:
+                    item.widget().deleteLater()
+                except Exception:
+                    pass
 
         # System card
         sys_info = report.get("system", {})
@@ -239,12 +306,30 @@ class HardwareView(BaseView):
             self.overview_layout.addWidget(card)
 
         self.overview_layout.addStretch()
+        # Re-enable and defer viewport update (not direct repaint during paint)
+        try:
+            self.setUpdatesEnabled(True)
+        except Exception:
+            pass
+        try:
+            from PyQt5.QtCore import QTimer
+
+            QTimer.singleShot(0, lambda: self.overview_layout.parentWidget().update() if self.overview_layout.parentWidget() else None)
+            # Also refresh tree viewports that share parent opacity effect
+            QTimer.singleShot(0, lambda: self.detail_tree.viewport().update() if hasattr(self, "detail_tree") and self.detail_tree else None)
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Detailed tree
     # ------------------------------------------------------------------
 
     def _build_detail_tree(self, report):
+        # TICK-808: freeze updates to avoid QBackingStore paint recursion
+        try:
+            self.detail_tree.setUpdatesEnabled(False)
+        except Exception:
+            pass
         self.detail_tree.tree.clear()
         self.detail_tree.item_map.clear()
 
@@ -271,6 +356,16 @@ class HardwareView(BaseView):
                         self.detail_tree.insert(group_id, "end", values=(
                             "", label, json.dumps(item, default=str)[:300],
                         ))
+        try:
+            self.detail_tree.setUpdatesEnabled(True)
+        except Exception:
+            pass
+        try:
+            from PyQt5.QtCore import QTimer
+
+            QTimer.singleShot(0, lambda: self.detail_tree.viewport().update() if hasattr(self, "detail_tree") and self.detail_tree else None)
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Recommendations

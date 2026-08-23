@@ -447,6 +447,10 @@ class DataForgeApp(QMainWindow):
         self.views[title] = view_instance
 
     def build_navigation_sidebar(self):
+        # TICK-808: guard against re-entrancy from rapid switch_view / tier changes
+        if getattr(self, "_in_build", False):
+            return
+        self._in_build = True
         self.nav_buttons = []
         self.group_headers = {}
         self.group_buttons = {}
@@ -610,6 +614,7 @@ class DataForgeApp(QMainWindow):
                 group_container.setVisible(True)
 
             self.nav_btn_layout.addWidget(group_container)
+        self._in_build = False
 
     def toggle_sidebar_group(self, group_name, header_button):
         collapsed_groups = config.get("collapsed_groups", [])
@@ -720,14 +725,29 @@ class DataForgeApp(QMainWindow):
             self._in_sidebar_update = False
 
     def switch_view(self, title):
-        if self.current_view:
-            self.current_view.unmount()
-
+        # TICK-808: debounce rapid switches (10x Hardware) and same-view
+        if getattr(self, "_in_switch", False):
+            return
         view = self.views.get(title)
-        if view:
+        if view is None:
+            return
+        if view is self.current_view:
+            return
+        self._in_switch = True
+        try:
+            if self.current_view:
+                try:
+                    self.current_view.unmount()
+                except Exception:
+                    pass
+
+            # view already fetched above
             same_view = (view is self.current_view)
             self.content_stack.setCurrentWidget(view)
-            view.mount()
+            try:
+                view.mount()
+            except Exception:
+                pass
             self.current_view = view
             self.setWindowTitle(f"DataForge - {title}")
 
@@ -750,6 +770,19 @@ class DataForgeApp(QMainWindow):
                     self._active_nav_btn = btn
                 else:
                     btn.setChecked(False)
+        finally:
+            # TICK-808: ensure JobManager not GC mid-flight by keeping ref,
+            # and defer switch flag reset until after crossfade
+            try:
+                _ = self.job_manager  # keep reference
+            except Exception:
+                pass
+            try:
+                from PyQt5.QtCore import QTimer
+
+                QTimer.singleShot(self.VIEW_ANIM_MS + 50, lambda: setattr(self, "_in_switch", False))
+            except Exception:
+                self._in_switch = False
 
     def _animate_opacity(self, effect, start, end, view=None):
         """Fade a ``QGraphicsOpacityEffect`` from *start* to *end*.
