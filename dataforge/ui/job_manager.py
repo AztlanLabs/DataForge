@@ -16,6 +16,14 @@ Design notes
 * The public API mirrors ``DataForgeApp.run_background`` / ``run_workflow``
   so existing views need minimal changes — they call ``app.run_background``
   which now delegates to ``JobManager.submit``.
+* TICK-802 fix: Eliminate double execution. Previously JobManager called
+  ``JobQueue.submit`` (which runs via ThreadPoolExecutor) *and* started a
+  ``ManagedWorker`` QThread for the same target — the job ran twice.
+  Now ``JobQueue`` is used as pure registry (``execute=False``) and
+  ``ManagedWorker`` is the sole executor. ``JobQueue`` tracks Job metadata
+  (status/events/cancel_token) while the QThread does the work. This fixes
+  STOP latency, is_busy drift, and progress duplication. Documented as
+  Option B (preferred) in TICK-802 prompt.
 """
 
 from __future__ import annotations
@@ -23,11 +31,12 @@ from __future__ import annotations
 import inspect
 import logging
 import threading
+import time
 from typing import Any, Callable, Dict, List, Optional, Protocol
 
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
 
-from dataforge.api.schema import JobStatus
+from dataforge.api.schema import JobEvent, JobStatus
 from dataforge.engine.jobs import QUEUE_DEPTH, Job, JobQueue
 
 logger = logging.getLogger(__name__)
@@ -75,6 +84,7 @@ class ManagedWorker(QThread):
         args: tuple = (),
         kwargs: Optional[Dict[str, Any]] = None,
         cancel_token: Optional[threading.Event] = None,
+        job: Optional[Job] = None,
     ) -> None:
         super().__init__()
         self._job_id = job_id
@@ -82,8 +92,30 @@ class ManagedWorker(QThread):
         self._args = args
         self._kwargs = kwargs or {}
         self._cancel_token = cancel_token
+        self._job = job
 
     def run(self) -> None:
+        # TICK-802: ensure Job status is updated synchronously in worker thread
+        # so is_busy/job.status checks don't require event-loop processing.
+        if self._job is not None:
+            try:
+                if self._job.status == JobStatus.QUEUED and not self._job.is_cancelled():
+                    self._job.status = JobStatus.RUNNING
+                    self._job.started_at = time.time()
+                    self._job.events.append(
+                        JobEvent(
+                            job_id=self._job.job_id,
+                            type="status",
+                            status=JobStatus.RUNNING,
+                            message="running",
+                        )
+                    )
+                elif self._job.is_cancelled() and self._job.status != JobStatus.CANCELLED:
+                    self._job.status = JobStatus.CANCELLED
+                    if self._job.finished_at is None:
+                        self._job.finished_at = time.time()
+            except Exception:
+                pass
         try:
             sig = inspect.signature(self._target)
             params = sig.parameters
@@ -108,20 +140,146 @@ class ManagedWorker(QThread):
                 kwargs_copy["progress_callback"] = progress_callback
 
             result = self._target(*self._args, **kwargs_copy)
-            # If cancelled during execution, normalize to cancelled dict for UI
+            # TICK-802: normalize token-cancelled to dict so UI hides STOP
             if self._cancel_token is not None and self._cancel_token.is_set():
-                if isinstance(result, dict) and "cancelled" not in result:
-                    # Some targets return {"cancelled": True} already; others return normal result
-                    # Leave as-is but let app treat is_set as cancelled
+                if self._job is not None:
+                    try:
+                        self._job.status = JobStatus.CANCELLED
+                        if isinstance(result, dict) and result.get("cancelled"):
+                            self._job.results = result
+                        elif isinstance(result, dict):
+                            out = dict(result)
+                            out["cancelled"] = True
+                            self._job.results = out
+                            result = out
+                        else:
+                            self._job.results = {"cancelled": True, "result": result}
+                            result = self._job.results
+                        if self._job.finished_at is None:
+                            self._job.finished_at = time.time()
+                        if not self._job.events or self._job.events[-1].status != JobStatus.CANCELLED:
+                            self._job.events.append(
+                                JobEvent(
+                                    job_id=self._job.job_id,
+                                    type="status",
+                                    status=JobStatus.CANCELLED,
+                                    message="cancelled",
+                                )
+                            )
+                    except Exception:
+                        pass
+                if isinstance(result, dict) and result.get("cancelled"):
+                    self.result_signal.emit(result)
+                elif isinstance(result, dict):
+                    out = dict(result)
+                    out["cancelled"] = True
+                    self.result_signal.emit(out)
+                else:
+                    self.result_signal.emit({"cancelled": True, "result": result})
+                return
+            if self._job is not None:
+                try:
+                    is_cancelled_result = isinstance(result, dict) and result.get("cancelled") is True
+                    if is_cancelled_result:
+                        self._job.status = JobStatus.CANCELLED
+                        self._job.results = result
+                        if self._job.finished_at is None:
+                            self._job.finished_at = time.time()
+                        if not self._job.events or self._job.events[-1].status != JobStatus.CANCELLED:
+                            self._job.events.append(
+                                JobEvent(
+                                    job_id=self._job.job_id,
+                                    type="status",
+                                    status=JobStatus.CANCELLED,
+                                    message="cancelled",
+                                )
+                            )
+                    else:
+                        self._job.status = JobStatus.DONE
+                        self._job.results = result
+                        self._job.finished_at = time.time()
+                        self._job.events.append(
+                            JobEvent(
+                                job_id=self._job.job_id,
+                                type="result",
+                                status=JobStatus.DONE,
+                                payload={"result": result} if isinstance(result, dict) else {"result": result},
+                                message="done",
+                            )
+                        )
+                except Exception:
                     pass
             self.result_signal.emit(result)
         except InterruptedError as e:
+            if self._job is not None:
+                try:
+                    self._job.status = JobStatus.CANCELLED
+                    self._job.results = {"cancelled": True, "message": str(e)}
+                    self._job.error = None
+                    if self._job.finished_at is None:
+                        self._job.finished_at = time.time()
+                    if not self._job.events or self._job.events[-1].status != JobStatus.CANCELLED:
+                        self._job.events.append(
+                            JobEvent(
+                                job_id=self._job.job_id,
+                                type="status",
+                                status=JobStatus.CANCELLED,
+                                message="cancelled",
+                            )
+                        )
+                except Exception:
+                    pass
             # Normalize cancellation exception to cancelled result (not error dialog)
             try:
                 self.result_signal.emit({"cancelled": True, "message": str(e)})
             except Exception:
                 self.error_signal.emit(e)
         except Exception as e:
+            # TICK-802: token set or message indicates cancel → normalize to cancelled dict
+            is_cancel = False
+            if self._cancel_token is not None and self._cancel_token.is_set():
+                is_cancel = True
+            if "cancelled" in str(e).lower():
+                is_cancel = True
+            if is_cancel and self._job is not None:
+                try:
+                    self._job.status = JobStatus.CANCELLED
+                    self._job.results = {"cancelled": True, "message": str(e)}
+                    self._job.error = None
+                    if self._job.finished_at is None:
+                        self._job.finished_at = time.time()
+                    if not self._job.events or self._job.events[-1].status != JobStatus.CANCELLED:
+                        self._job.events.append(
+                            JobEvent(
+                                job_id=self._job.job_id,
+                                type="status",
+                                status=JobStatus.CANCELLED,
+                                message="cancelled",
+                            )
+                        )
+                except Exception:
+                    pass
+            if is_cancel:
+                try:
+                    self.result_signal.emit({"cancelled": True, "message": str(e)})
+                    return
+                except Exception:
+                    pass
+            if self._job is not None and not is_cancel:
+                try:
+                    self._job.status = JobStatus.FAILED
+                    self._job.error = str(e)
+                    self._job.finished_at = time.time()
+                    self._job.events.append(
+                        JobEvent(
+                            job_id=self._job.job_id,
+                            type="error",
+                            status=JobStatus.FAILED,
+                            message=str(e),
+                        )
+                    )
+                except Exception:
+                    pass
             self.error_signal.emit(e)
         finally:
             self.finished_signal.emit(self._job_id)
@@ -239,12 +397,14 @@ class JobManager(QObject):
                 on_error(PermissionError("EVIDENCE MODE — writes blocked"))
             return None
 
-        # Submit to engine JobQueue
+        # TICK-802: Use JobQueue as pure registry (execute=False) — ManagedWorker is sole executor.
+        # Prevents double execution (ThreadPool + QThread both running target).
         try:
             job = self._queue.submit(
                 target,
                 params=kwargs,
                 progress_callback=None,  # we bridge via ManagedWorker
+                execute=False,
             )
         except Exception as e:
             logger.error("Failed to submit job: %s", e)
@@ -252,19 +412,105 @@ class JobManager(QObject):
                 on_error(e)
             return None
 
-        # Create ManagedWorker for Qt signal bridging
+        # TICK-802: Do NOT mark RUNNING here — keep QUEUED so _queued_count
+        # accurately reflects depth for burst submits (8 queued + workers). Worker
+        # will set RUNNING synchronously at run() start. is_busy remains true
+        # via worker.isRunning() even while QUEUED.
+
+        # Create ManagedWorker for Qt signal bridging (sole executor)
         worker = ManagedWorker(
             job_id=job.job_id,
             target=target,
             args=args,
             kwargs=kwargs,
             cancel_token=job.cancel_token,
+            job=job,
         )
+
+        # Internal handlers to keep JobQueue metadata in sync (must be before user handlers)
+        def _internal_on_result(result: Any) -> None:
+            j = self._queue.get(job.job_id)
+            if j is not None:
+                with self._queue._lock:
+                    is_cancelled_result = isinstance(result, dict) and result.get("cancelled") is True
+                    token_cancelled = j.is_cancelled()
+                    if is_cancelled_result or token_cancelled:
+                        j.status = JobStatus.CANCELLED
+                        j.results = result if isinstance(result, dict) else {"cancelled": True, "result": result}
+                        if j.finished_at is None:
+                            j.finished_at = time.time()
+                        if not j.events or j.events[-1].status != JobStatus.CANCELLED:
+                            j.events.append(
+                                JobEvent(
+                                    job_id=j.job_id,
+                                    type="status",
+                                    status=JobStatus.CANCELLED,
+                                    message="cancelled",
+                                )
+                            )
+                    else:
+                        j.status = JobStatus.DONE
+                        j.results = result
+                        j.finished_at = time.time()
+                        j.events.append(
+                            JobEvent(
+                                job_id=j.job_id,
+                                type="result",
+                                status=JobStatus.DONE,
+                                payload={"result": result} if isinstance(result, dict) else {"result": result},
+                                message="done",
+                            )
+                        )
+                try:
+                    self.jobs_changed.emit()
+                except Exception:
+                    pass
+
+        def _internal_on_error(err: Exception) -> None:
+            j = self._queue.get(job.job_id)
+            if j is not None:
+                with self._queue._lock:
+                    is_cancel = j.is_cancelled() or isinstance(err, InterruptedError) or "cancelled" in str(err).lower()
+                    if is_cancel:
+                        j.status = JobStatus.CANCELLED
+                        j.results = {"cancelled": True, "message": str(err)}
+                        j.error = None
+                        if j.finished_at is None:
+                            j.finished_at = time.time()
+                        if not j.events or j.events[-1].status != JobStatus.CANCELLED:
+                            j.events.append(
+                                JobEvent(
+                                    job_id=j.job_id,
+                                    type="status",
+                                    status=JobStatus.CANCELLED,
+                                    message="cancelled",
+                                )
+                            )
+                    else:
+                        j.status = JobStatus.FAILED
+                        j.error = str(err)
+                        j.finished_at = time.time()
+                        j.events.append(
+                            JobEvent(
+                                job_id=j.job_id,
+                                type="error",
+                                status=JobStatus.FAILED,
+                                message=str(err),
+                            )
+                        )
+                try:
+                    self.jobs_changed.emit()
+                except Exception:
+                    pass
+
+        # Connect internal sync handlers first
+        worker.result_signal.connect(_internal_on_result)
+        worker.error_signal.connect(_internal_on_error)
 
         # Connect signals
         if progress:
             worker.progress_signal.connect(
-                lambda c, t, m: self._on_progress(job.job_id, c, t, m)
+                lambda c, t, m, jid=job.job_id: self._on_progress(jid, c, t, m)
             )
 
         if on_success:
@@ -290,19 +536,71 @@ class JobManager(QObject):
 
         Returns True if the job was found and cancellation was requested.
         The job will finish naturally after its cancel token is set.
+        TICK-802: cancels both JobQueue future and ManagedWorker token; ensures
+        status becomes CANCELLED even if RUNNING.
         """
         success = self._queue.cancel(job_id)
+        # Also ensure worker token is set even if queue says already cancelled/terminal
+        # (e.g., worker still isRunning() but job already marked CANCELLED)
+        with self._lock:
+            w = self._workers.get(job_id)
+            if w is not None:
+                try:
+                    tok = w._cancel_token  # type: ignore[attr-defined]
+                    if tok is not None and not tok.is_set():
+                        tok.set()
+                        success = True
+                except Exception:
+                    pass
+                # Ensure job object marked cancelled if still RUNNING
+                j = self._queue.get(job_id)
+                if j is not None and j.status == JobStatus.RUNNING:
+                    try:
+                        j.cancel()
+                        success = True
+                    except Exception:
+                        pass
         if success:
-            self.jobs_changed.emit()
+            try:
+                self.jobs_changed.emit()
+            except Exception:
+                pass
         return success
 
     def cancel_all(self) -> int:
-        """Cancel all running/queued jobs. Returns count cancelled."""
+        """Cancel all running/queued jobs. Returns count cancelled.
+
+        TICK-802: cancels both queue futures and QThreads, ensures is_busy
+        becomes False quickly. Iterates snapshot of jobs + live workers.
+        """
         count = 0
-        for job in self._queue.list_jobs():
+        # Snapshot to avoid mutation during iteration
+        snapshot = list(self._queue.list_jobs())
+        for job in snapshot:
             if job.status in (JobStatus.QUEUED, JobStatus.RUNNING):
                 if self.cancel(job.job_id):
                     count += 1
+        # Also handle workers that areRunning but job already CANCELLED/DONE (edge)
+        with self._lock:
+            for wid, w in list(self._workers.items()):
+                try:
+                    if w.isRunning():
+                        j = self._queue.get(wid)
+                        # If job not in snapshot or already cancelled but worker still alive, ensure token set
+                        if j is None or j.status in (JobStatus.QUEUED, JobStatus.RUNNING):
+                            if self.cancel(wid):
+                                # avoid double count
+                                if j is None or j.status not in (JobStatus.CANCELLED,):
+                                    count += 1
+                        else:
+                            # Job already CANCELLED but worker still running — ensure token
+                            tok = w._cancel_token  # type: ignore[attr-defined]
+                            if tok is not None and not tok.is_set():
+                                tok.set()
+                except RuntimeError:
+                    pass
+                except Exception:
+                    pass
         return count
 
     # ------------------------------------------------------------------
