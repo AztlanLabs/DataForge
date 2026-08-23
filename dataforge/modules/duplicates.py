@@ -2,6 +2,7 @@ import filecmp
 import hashlib
 import os
 import queue
+import stat
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List
@@ -28,7 +29,16 @@ def _get_max_workers() -> int:
 
 
 def _fast_hash(path: str, cancel_token=None) -> str | None:
-    """xxhash64(first 4KiB) prefilter — fallback to blake2b 8B if xxhash missing."""
+    """xxhash64(first 4KiB) prefilter — fallback to blake2b 8B if xxhash missing. Hardened."""
+    if cancel_token is not None and cancel_token.is_set():
+        return None
+    # Validate regular file existence to handle deleted/truncated race without SIGSEGV
+    try:
+        st = os.stat(path)
+        if not stat.S_ISREG(st.st_mode):
+            return None
+    except OSError:
+        return None
     if cancel_token is not None and cancel_token.is_set():
         return None
     try:
@@ -37,6 +47,8 @@ def _fast_hash(path: str, cancel_token=None) -> str | None:
 
             h = xxhash.xxh64()
             with open(path, "rb") as f:
+                if cancel_token is not None and cancel_token.is_set():
+                    return None
                 data = f.read(4096)
                 if data:
                     h.update(data)
@@ -44,11 +56,15 @@ def _fast_hash(path: str, cancel_token=None) -> str | None:
         except ImportError:
             h2 = hashlib.blake2b(digest_size=8)
             with open(path, "rb") as f:
+                if cancel_token is not None and cancel_token.is_set():
+                    return None
                 data = f.read(4096)
                 if data:
                     h2.update(data)
             return h2.hexdigest()
     except OSError:
+        return None
+    except Exception:
         return None
 
 
@@ -214,10 +230,20 @@ def build_duplicate_export_rows(records, include_group_summary: bool = True) -> 
 
 
 def _hash_worker(path, size, mtime, algo, cancel_token):
-    """Worker function for threading."""
+    """Worker function for threading. Hardened: never propagates exception, returns None on error."""
     if cancel_token and cancel_token.is_set():
         return path, None
-    return path, get_file_hash(path, algo, cancel_token)
+    try:
+        h = get_file_hash(path, algo, cancel_token)
+        if not h:
+            return path, None
+        return path, h
+    except OSError as e:
+        logger.debug(f"hash_worker OSError {path}: {e}")
+        return path, None
+    except Exception as e:
+        logger.debug(f"hash_worker error {path}: {e}")
+        return path, None
 
 
 def find_duplicates(path: str, recursive: bool = True, max_depth: int = -1, progress_callback=None, cancel_token=None, verify_content: bool = False) -> Dict[str, List[FileEntry]]:
@@ -330,10 +356,17 @@ def find_duplicates(path: str, recursive: bool = True, max_depth: int = -1, prog
     for entries in potential_dupes.values():
         all_potential.extend(entries)
 
-    # fast hash in parallel
+    # fast hash in parallel — harden cancel + no SIGSEGV on deleted files
     if all_potential:
+        if cancel_token and cancel_token.is_set():
+            raise InterruptedError("cancelled")
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(_fast_hash, e.path, cancel_token): e for e in all_potential}
+            futures: dict = {}
+            for e in all_potential:
+                if cancel_token and cancel_token.is_set():
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    raise InterruptedError("cancelled")
+                futures[executor.submit(_fast_hash, e.path, cancel_token)] = e
             for fut in as_completed(futures):
                 if cancel_token and cancel_token.is_set():
                     executor.shutdown(wait=False, cancel_futures=True)
@@ -377,21 +410,20 @@ def find_duplicates(path: str, recursive: bool = True, max_depth: int = -1, prog
         total_hashes = len(files_to_hash)
         completed = 0
         pending_rows: List[tuple] = []
-        cache_batch = int(config.get("cache_batch_size", 1000) or 1000)
+        # Deferred batch flush: serialize cache access — do NOT call set_hash_many concurrently with get_hash.
+        # Accumulate in main thread, single flush after ThreadPool completes (spec TICK-904).
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(_hash_worker, e.path, e.size, e.modified_at, algo, cancel_token): e
-                for e in files_to_hash
-            }
+            if cancel_token and cancel_token.is_set():
+                raise InterruptedError("cancelled")
+            futures = {}
+            for e in files_to_hash:
+                if cancel_token and cancel_token.is_set():
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    raise InterruptedError("cancelled")
+                futures[executor.submit(_hash_worker, e.path, e.size, e.modified_at, algo, cancel_token)] = e
             for fut in as_completed(futures):
                 if cancel_token and cancel_token.is_set():
                     executor.shutdown(wait=False, cancel_futures=True)
-                    # flush pending batch before abort if needed
-                    if pending_rows:
-                        try:
-                            file_cache.set_hash_many(pending_rows)
-                        except Exception:
-                            pass
                     raise InterruptedError("cancelled")
                 entry = futures[fut]
                 completed += 1
@@ -402,14 +434,9 @@ def find_duplicates(path: str, recursive: bool = True, max_depth: int = -1, prog
                     if file_hash:
                         hash_map[file_hash].append(entry)
                         pending_rows.append((entry.path, entry.size, entry.modified_at, file_hash, algo))
-                        if len(pending_rows) >= cache_batch:
-                            try:
-                                file_cache.set_hash_many(pending_rows)
-                            except Exception as e:
-                                logger.error(f"Batch cache write failed: {e}")
-                            pending_rows.clear()
                 except Exception as e:
                     logger.error(f"Error hashing {entry.path}: {e}")
+        # Single deferred flush after pool — avoids SQLite SIGSEGV from concurrent insert+select
         if pending_rows:
             try:
                 file_cache.set_hash_many(pending_rows)
