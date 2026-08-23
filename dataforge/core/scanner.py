@@ -1,11 +1,55 @@
 import concurrent.futures
+import logging
 import os
 import queue
 import stat as stat_mod
-from typing import Generator, Optional
+from typing import Callable, Generator, Optional
 
 from .common import FileEntry
-from .config import config
+
+logger = logging.getLogger(__name__)
+
+
+def _current_config():
+    """Return the current ConfigManager singleton, handling reload."""
+    try:
+        import importlib
+
+        mod = importlib.import_module("dataforge.core.config")
+        cfg = getattr(mod, "config", None)
+        if cfg is not None:
+            return cfg
+    except Exception:
+        pass
+    # Fallback: try ConfigManager singleton
+    try:
+        from .config import ConfigManager
+
+        inst = ConfigManager._instance
+        if inst is not None:
+            return inst
+    except Exception:
+        pass
+    # Last resort: direct import (may be stale but better than None)
+    from .config import config as _cfg
+
+    return _cfg
+
+
+class _ConfigProxy:
+    """Proxy that always delegates to the current config singleton.
+
+    This keeps ``dataforge.core.scanner.config`` patchable via
+    ``patch("dataforge.core.scanner.config")`` while ensuring normal
+    operation always sees the latest config after a reload.
+    """
+
+    def get(self, *args, **kwargs):
+        return _current_config().get(*args, **kwargs)
+
+
+# Backwards-compatible alias for tests that patch ``scanner.config``.
+config = _ConfigProxy()
 
 
 def _get_max_workers() -> int:
@@ -63,6 +107,7 @@ def _scan_single_dir(
     excl_folders: set,
     excl_exts: tuple,
     cancel_token=None,
+    on_error: Optional[Callable[[str, Exception], None]] = None,
 ) -> tuple[list[FileEntry], list[tuple[str, int]]]:
     files: list[FileEntry] = []
     subdirs: list[tuple[str, int]] = []
@@ -77,13 +122,15 @@ def _scan_single_dir(
                 try:
                     if entry.is_symlink():
                         continue
-                except OSError:
+                except OSError as e:
+                    _log_scan_error(entry.path, e, on_error)
                     continue
 
                 # Directory handling — use follow_symlinks=False to avoid double stat
                 try:
                     is_dir = entry.is_dir(follow_symlinks=False)
-                except OSError:
+                except OSError as e:
+                    _log_scan_error(entry.path, e, on_error)
                     continue
 
                 if is_dir:
@@ -103,13 +150,15 @@ def _scan_single_dir(
                     continue
                 try:
                     is_file = entry.is_file(follow_symlinks=False)
-                except OSError:
+                except OSError as e:
+                    _log_scan_error(entry.path, e, on_error)
                     continue
                 if not is_file:
                     continue
                 try:
                     st = entry.stat(follow_symlinks=False)
-                except OSError:
+                except OSError as e:
+                    _log_scan_error(entry.path, e, on_error)
                     continue
                 # Build FileEntry directly from DirEntry.stat — no double stat
                 files.append(
@@ -120,13 +169,32 @@ def _scan_single_dir(
                         st=st,
                     )
                 )
-    except OSError:
-        pass
+    except OSError as e:
+        _log_scan_error(dir_path, e, on_error)
     return files, subdirs
 
 
+def _log_scan_error(path: str, exc: Exception, on_error=None) -> None:
+    """Log a scan OSError with specific handling and invoke optional callback."""
+    if isinstance(exc, FileNotFoundError):
+        logger.warning("Path not found: %s", path)
+    elif isinstance(exc, PermissionError):
+        logger.warning("Permission denied: %s", path)
+    else:
+        logger.warning("OS error scanning %s: %s", path, exc)
+    if on_error is not None:
+        try:
+            on_error(path, exc)
+        except Exception:
+            pass
+
+
 def scan_directory(
-    root_path: str, recursive: bool = True, max_depth: int = -1, cancel_token=None
+    root_path: str,
+    recursive: bool = True,
+    max_depth: int = -1,
+    cancel_token=None,
+    on_error: Optional[Callable[[str, Exception], None]] = None,
 ) -> Generator[FileEntry, None, None]:
     """
     Generator that yields FileEntry objects for files in the directory.
@@ -138,6 +206,7 @@ def scan_directory(
     - Populates st_ino/st_dev/st_blocks for hardlink/sparse awareness
     - Batch emission (1k) via queue.Queue
     - Honors excluded_folders/extensions and cancel_token promptly
+    - OSError during scan is logged (warning) and forwarded to on_error if provided
     """
     if cancel_token is not None and cancel_token.is_set():
         return
@@ -162,7 +231,8 @@ def scan_directory(
         try:
             if os.path.islink(root_path):
                 return
-        except OSError:
+        except OSError as e:
+            _log_scan_error(root_path, e, on_error)
             pass
         entry = build_file_entry(root_path)
         if entry is not None:
@@ -174,7 +244,8 @@ def scan_directory(
         # Use scandir to validate existence and readability without extra stat
         with os.scandir(root_path):
             pass
-    except OSError:
+    except OSError as e:
+        _log_scan_error(root_path, e, on_error)
         return
     if not os.path.isdir(root_path):
         return
@@ -209,7 +280,9 @@ def scan_directory(
                 return
 
             futures = {
-                executor.submit(_scan_single_dir, d, depth, excl_folders, excl_exts, cancel_token): (d, depth)
+                executor.submit(
+                    _scan_single_dir, d, depth, excl_folders, excl_exts, cancel_token, on_error
+                ): (d, depth)
                 for d, depth in current_level
             }
             next_level: list[tuple[str, int]] = []
@@ -222,7 +295,16 @@ def scan_directory(
                     return
                 try:
                     files, subdirs = fut.result()
-                except Exception:
+                except OSError as e:
+                    _log_scan_error(futures[fut][0], e, on_error)
+                    continue
+                except Exception as e:
+                    logger.warning("Unexpected error scanning %s: %s", futures[fut][0], e)
+                    if on_error is not None:
+                        try:
+                            on_error(futures[fut][0], e)
+                        except Exception:
+                            pass
                     continue
                 # Enqueue files into batch queue
                 for fe in files:

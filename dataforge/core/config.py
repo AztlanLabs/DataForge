@@ -190,6 +190,10 @@ class ConfigManager:
             if not self._validate_one(key, val, default_val):
                 continue
             self.data[key] = val
+        # Preserve unknown keys (user-defined, plugins, collapsed_groups, etc.)
+        for key, val in loaded.items():
+            if key not in self.DEFAULT_CONFIG:
+                self.data[key] = val
 
     def _validate_one(self, key: str, val: Any, default: Any) -> bool:
         if key in ("max_thread_workers", "search_thread_workers"):
