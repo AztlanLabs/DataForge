@@ -33,10 +33,17 @@ class CacheManager:
 
         self.db_path = db_path
         self.conn = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        self._batch_buffer: List[tuple[str, int, float, str, str]] = []
+        self._batch_size_val: int = 1000
         self._user_version: int = 0
         self._pending_migrations: List[Path] = []
         self._init_db()
+        # initialise batch size from config (if available)
+        try:
+            self._batch_size_val = self._get_batch_size()
+        except Exception:
+            pass
 
     def _init_db(self):
         try:
@@ -107,10 +114,75 @@ class CacheManager:
             self._pending_migrations = fresh
         return self._pending_migrations
 
+    # --- Batch helpers (R-CORE-5) ---
+    def _get_batch_size(self) -> int:
+        try:
+            from .config import config
+
+            v = config.get("cache_batch_size", 1000)
+            if isinstance(v, int) and 1 <= v <= 100000:
+                return v
+        except Exception:
+            pass
+        return getattr(self, "_batch_size_val", 1000)
+
+    @property
+    def _batch_size(self) -> int:
+        return getattr(self, "_batch_size_val", 1000)
+
+    @_batch_size.setter
+    def _batch_size(self, value: int) -> None:
+        if isinstance(value, int) and 1 <= value <= 100000:
+            self._batch_size_val = int(value)
+        elif value is None:
+            self._batch_size_val = 1000
+        else:
+            # allow any int, clamp to 1..100000 for safety
+            try:
+                iv = int(value)  # type: ignore[arg-type]
+                if 1 <= iv <= 100000:
+                    self._batch_size_val = iv
+                else:
+                    self._batch_size_val = 1000
+            except Exception:
+                self._batch_size_val = 1000
+
+    def _flush_batch_locked(self) -> None:
+        """Flush pending batch buffer; caller must hold _lock."""
+        if not self._batch_buffer:
+            return
+        if self.conn is None:
+            self._batch_buffer.clear()
+            return
+        rows = list(self._batch_buffer)
+        self._batch_buffer.clear()
+        try:
+            self.conn.executemany(
+                "INSERT OR REPLACE INTO file_hashes (path, size, mtime, hash, algo) VALUES (?, ?, ?, ?, ?)",
+                rows,
+            )
+            self.conn.commit()
+        except sqlite3.Error as e:
+            logger.error(f"Failed to batch cache hashes: {e}")
+
+    def flush(self) -> None:
+        """Flush any buffered set_hash writes."""
+        if self.conn is None:
+            with self._lock:
+                self._batch_buffer.clear()
+            return None
+        with self._lock:
+            self._flush_batch_locked()
+        return None
+
     def get_hash(self, path, size, mtime, algo='md5'):
         if self.conn is None:
             return None
         with self._lock:
+            # Check buffered writes first (most recent wins)
+            for b_path, b_size, b_mtime, b_hash, b_algo in reversed(self._batch_buffer):
+                if b_path == path and b_size == size and b_mtime == mtime and b_algo == algo:
+                    return b_hash
             cursor = self.conn.cursor()
             cursor.execute(
                 "SELECT hash FROM file_hashes WHERE path=? AND size=? AND mtime=? AND algo=?",
@@ -121,16 +193,15 @@ class CacheManager:
 
     def set_hash(self, path, size, mtime, hash_val, algo='md5'):
         if self.conn is None:
-            return
+            return None
         try:
             with self._lock:
-                self.conn.execute(
-                    "INSERT OR REPLACE INTO file_hashes (path, size, mtime, hash, algo) VALUES (?, ?, ?, ?, ?)",
-                    (path, size, mtime, hash_val, algo)
-                )
-                self.conn.commit()
+                self._batch_buffer.append((path, size, mtime, hash_val, algo))
+                if len(self._batch_buffer) >= self._batch_size:
+                    self._flush_batch_locked()
         except sqlite3.Error as e:
             logger.error(f"Failed to cache hash for {path}: {e}")
+        return None
 
     def set_hash_many(self, rows: List[tuple[str, int, float, str, str]]) -> None:
         if self.conn is None:
@@ -168,9 +239,12 @@ class CacheManager:
 
     def clear(self):
         if self.conn is None:
+            with self._lock:
+                self._batch_buffer.clear()
             return
         try:
             with self._lock:
+                self._batch_buffer.clear()
                 self.conn.execute("DELETE FROM file_hashes")
                 self.conn.commit()
                 old_iso = self.conn.isolation_level
@@ -185,7 +259,15 @@ class CacheManager:
 
     def close(self):
         with self._lock:
+            try:
+                self._flush_batch_locked()
+            except Exception:
+                pass
             if self.conn:
-                self.conn.close()
+                try:
+                    self.conn.close()
+                except Exception:
+                    pass
+                self.conn = None
 
 file_cache = CacheManager()
