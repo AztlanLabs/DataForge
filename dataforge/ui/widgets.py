@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
     QGridLayout, QCheckBox, QSpinBox, QComboBox, QLayout
 )
 from PyQt5.QtCore import Qt, QSize, QRect, QPoint
-from PyQt5.QtGui import QPixmap, QImage, QPainter, QFont, QColor
+from PyQt5.QtGui import QPixmap, QImage, QPainter, QFont, QColor, QTextCharFormat, QTextCursor
 
 from . import dialogs
 from ..core.config import config
@@ -1103,6 +1103,604 @@ class EnhancedTreeview(QWidget):
                 self._show_error("Error", record.message)
 
         self._run_or_inline(_do_copy, _on_done, error_title="Copy Failed")
+
+
+class HexView(QWidget):
+    """Hex viewer with field inspector for forensic analysis.
+
+    Displays hex dump with offset, hex bytes, ASCII columns, and a
+    field inspector that interprets common forensic structures
+    (MBR, GPT, PE, ELF, ZIP, PNG, etc.) selected byte contexts.
+    """
+
+    # Responsive cap — only this many bytes are rendered at once so a
+    # multi-megabyte file does not freeze the UI. Users can navigate via
+    # byte offset.
+    MAX_DISPLAY_BYTES = 64 * 1024  # 64 KiB = 4096 rows x16
+    BYTES_PER_ROW = 16
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._data: bytes = b""
+        self._offset: int = 0  # base file offset of _data[0]
+        self._selected_byte: int = -1  # index into _data, -1 = none
+        self._bytes_per_row: int = self.BYTES_PER_ROW
+        self._max_display_bytes: int = self.MAX_DISPLAY_BYTES
+        self._setup_ui()
+
+    # ------------------------------------------------------------------
+    # UI construction
+    # ------------------------------------------------------------------
+    def _setup_ui(self):
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(5, 5, 5, 5)
+        outer.setSpacing(5)
+
+        # Top bar: offset display + navigation + size
+        top = QWidget(self)
+        top_layout = QHBoxLayout(top)
+        top_layout.setContentsMargins(0, 0, 0, 0)
+        top_layout.setSpacing(8)
+
+        self.offset_label = QLabel("Offset: 0x00000000", top)
+        self.offset_label.setStyleSheet("font-family: 'Courier New', Consolas, monospace;")
+        self.offset_label.setToolTip("Current base offset / selected byte offset")
+        top_layout.addWidget(self.offset_label)
+
+        self.size_label = QLabel("Size: 0 bytes", top)
+        self.size_label.setProperty("class", "muted")
+        top_layout.addWidget(self.size_label)
+
+        top_layout.addStretch(1)
+
+        top_layout.addWidget(QLabel("Jump to byte:", top))
+        self.spin_offset = QSpinBox(top)
+        self.spin_offset.setRange(0, 0)
+        self.spin_offset.setSingleStep(16)
+        self.spin_offset.setToolTip("Jump to byte offset (decimal index into loaded data)")
+        self.spin_offset.valueChanged.connect(self._on_spin_offset_changed)
+        top_layout.addWidget(self.spin_offset)
+
+        self.lbl_selected = QLabel("No selection", top)
+        self.lbl_selected.setStyleSheet("font-family: 'Courier New', Consolas, monospace;")
+        top_layout.addWidget(self.lbl_selected)
+
+        outer.addWidget(top)
+
+        # Middle: hex display + field inspector
+        middle = QWidget(self)
+        mid_layout = QHBoxLayout(middle)
+        mid_layout.setContentsMargins(0, 0, 0, 0)
+        mid_layout.setSpacing(8)
+
+        self.hex_display = QTextEdit(middle)
+        self.hex_display.setReadOnly(True)
+        self.hex_display.setFont(QFont("Courier New", 10))
+        self.hex_display.setLineWrapMode(QTextEdit.NoWrap)
+        self.hex_display.setStyleSheet(
+            "font-family: 'Courier New', Consolas, monospace;"
+        )
+        # Clicking inside hex view updates selection via cursor position
+        # We hook cursorPositionChanged after initial setup to avoid recursion
+        mid_layout.addWidget(self.hex_display, 2)
+
+        self.field_inspector = QTreeWidget(middle)
+        self.field_inspector.setHeaderLabels(["Field", "Value", "Description"])
+        self.field_inspector.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.field_inspector.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.field_inspector.header().setSectionResizeMode(2, QHeaderView.Stretch)
+        mid_layout.addWidget(self.field_inspector, 1)
+
+        outer.addWidget(middle, 1)
+
+        self.info_label = QLabel("", self)
+        self.info_label.setProperty("class", "muted")
+        self.info_label.setWordWrap(True)
+        outer.addWidget(self.info_label)
+
+        # Internal flag to avoid recursing on cursor changes caused by highlighting
+        self._highlighting = False
+        try:
+            self.hex_display.cursorPositionChanged.connect(self._on_cursor_changed)
+        except Exception:
+            pass
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+    def set_data(self, data: bytes, offset: int = 0):
+        """Set the data to display.
+
+        Args:
+            data: raw bytes to visualise.
+            offset: base file offset for the first byte (displayed in the offset column).
+        """
+        if data is None:
+            data = b""
+        # Ensure bytes
+        if not isinstance(data, (bytes, bytearray)):
+            data = bytes(data)
+        else:
+            data = bytes(data)
+        self._data = data
+        self._offset = int(offset) if offset is not None else 0
+        self._selected_byte = -1
+        self.offset_label.setText(f"Offset: 0x{self._offset:08x}")
+        self.size_label.setText(f"Size: {len(self._data)} bytes")
+        max_off = max(0, len(self._data) - 1)
+        # Update spin range without triggering selection
+        try:
+            self.spin_offset.blockSignals(True)
+            self.spin_offset.setRange(0, max_off if self._data else 0)
+            self.spin_offset.setValue(0)
+        finally:
+            self.spin_offset.blockSignals(False)
+        self.lbl_selected.setText("No selection")
+        self._update_display()
+        self._update_field_inspector(-1)
+
+    def load_file(self, path: str, max_bytes: int = 0, offset: int = 0):
+        """Convenience: load up to max_bytes from a file at offset and display."""
+        if not path or not os.path.isfile(path):
+            self.set_data(b"", offset=offset)
+            self.hex_display.setPlainText(f"Error: file not found: {path}")
+            return
+        try:
+            size = os.path.getsize(path)
+            if max_bytes and max_bytes > 0:
+                read_len = max_bytes
+            else:
+                read_len = min(size, 1024 * 1024)  # default 1 MiB cap for UI
+            with open(path, "rb") as f:
+                f.seek(offset)
+                data = f.read(read_len)
+            self.set_data(data, offset=offset)
+            truncated = size > offset + len(data)
+            self.info_label.setText(
+                f"File: {os.path.basename(path)} | Read {len(data)} / {size} bytes at 0x{offset:08x}"
+                + (" (truncated)" if truncated else "")
+            )
+        except Exception as exc:
+            self.set_data(b"", offset=offset)
+            self.hex_display.setPlainText(f"Error: {exc}")
+
+    def get_data(self) -> bytes:
+        return self._data
+
+    def get_offset(self) -> int:
+        return self._offset
+
+    def get_selected_byte(self) -> int:
+        return self._selected_byte
+
+    def get_bytes_per_row(self) -> int:
+        return self._bytes_per_row
+
+    def get_hex_lines(self):
+        """Return current hex dump lines (for testing without parsing QTextEdit)."""
+        lines = []
+        display_len = min(len(self._data), self._max_display_bytes)
+        for i in range(0, display_len, self._bytes_per_row):
+            chunk = self._data[i:i + self._bytes_per_row]
+            offset_str = f"{self._offset + i:08x}"
+            hex_str = " ".join(f"{b:02x}" for b in chunk)
+            hex_padded = f"{hex_str:<48s}"
+            ascii_str = "".join(chr(b) if 32 <= b < 127 else "." for b in chunk)
+            lines.append(f"{offset_str}  {hex_padded}  |{ascii_str}|")
+        if len(self._data) > self._max_display_bytes:
+            lines.append(f"... truncated: {len(self._data) - self._max_display_bytes} more bytes not shown")
+        return lines
+
+    def select_byte(self, index: int):
+        """Select a byte index (0-based into _data) and highlight."""
+        if not isinstance(index, int):
+            try:
+                index = int(index)
+            except Exception:
+                return
+        if index < 0 or index >= len(self._data):
+            self._selected_byte = -1
+            self.lbl_selected.setText("No selection")
+            self.hex_display.setExtraSelections([])
+            self._update_field_inspector(-1)
+            return
+        self._selected_byte = index
+        abs_off = self._offset + index
+        byte_val = self._data[index]
+        char = chr(byte_val) if 32 <= byte_val < 127 else "."
+        self.lbl_selected.setText(f"Sel: 0x{abs_off:08x} ({index}) = 0x{byte_val:02x} '{char}'")
+        self.offset_label.setText(f"Offset: 0x{abs_off:08x}")
+        # Keep spin in sync without loop
+        try:
+            self.spin_offset.blockSignals(True)
+            self.spin_offset.setValue(index)
+        finally:
+            self.spin_offset.blockSignals(False)
+        self._highlight_selection()
+        self._update_field_inspector(index)
+
+    def set_offset(self, offset: int):
+        """Set base offset and refresh display."""
+        self._offset = int(offset)
+        self.offset_label.setText(f"Offset: 0x{self._offset:08x}")
+        self._update_display()
+        if self._selected_byte >= 0:
+            self._highlight_selection()
+            self._update_field_inspector(self._selected_byte)
+
+    def set_bytes_per_row(self, n: int):
+        if n in (8, 16, 32):
+            self._bytes_per_row = n
+            self._update_display()
+            if self._selected_byte >= 0:
+                self._highlight_selection()
+
+    # ------------------------------------------------------------------
+    # Display helpers
+    # ------------------------------------------------------------------
+    def _update_display(self):
+        lines = self.get_hex_lines()
+        # Block cursor signal while replacing text to avoid spurious _on_cursor_changed
+        try:
+            self.hex_display.blockSignals(True)
+            self.hex_display.setPlainText("\n".join(lines))
+        finally:
+            self.hex_display.blockSignals(False)
+        # Info about truncation
+        if len(self._data) > self._max_display_bytes:
+            self.info_label.setText(
+                f"Showing {self._max_display_bytes} / {len(self._data)} bytes. Use offset / load with offset to view more."
+            )
+        else:
+            if not self.info_label.text().startswith("File:"):
+                self.info_label.setText("" if len(self._data) < 1024 else f"{len(self._data)} bytes loaded")
+        # Re-apply highlight if selection still valid
+        if self._selected_byte >= 0 and self._selected_byte < self._max_display_bytes:
+            self._highlight_selection()
+        else:
+            self.hex_display.setExtraSelections([])
+
+    def _highlight_selection(self):
+        if self._highlighting:
+            return
+        if self._selected_byte < 0 or self._selected_byte >= len(self._data):
+            self.hex_display.setExtraSelections([])
+            return
+        if self._selected_byte >= self._max_display_bytes:
+            self.hex_display.setExtraSelections([])
+            return
+        self._highlighting = True
+        try:
+            row = self._selected_byte // self._bytes_per_row
+            col = self._selected_byte % self._bytes_per_row
+            text = self.hex_display.toPlainText()
+            if not text:
+                return
+            lines = text.split("\n")
+            if row >= len(lines):
+                return
+            # Compute start offset of the row in the document
+            # Each prior line + '\n' (1 char)
+            line_start = 0
+            for r in range(row):
+                # +1 for newline; but last line may not have newline — we added split, so consistent
+                line_start += len(lines[r]) + 1
+            # Within the line: offset 8 chars + 2 spaces =10, hex area 48, then "  |" (2+1) etc
+            # hex column for this byte
+            hex_pos = line_start + 10 + col * 3
+            ascii_pos = line_start + 10 + 48 + 2 + 1 + col
+            doc_len = len(text)
+            if hex_pos < 0 or hex_pos + 2 > doc_len:
+                return
+            if ascii_pos < 0 or ascii_pos + 1 > doc_len:
+                return
+            fmt = QTextCharFormat()
+            fmt.setBackground(QColor("#ffeb3b"))  # forensic highlight yellow
+            fmt.setForeground(QColor("#000000"))
+            selections = []
+            # Hex byte (2 chars)
+            c1 = self.hex_display.textCursor()
+            c1.setPosition(hex_pos)
+            c1.setPosition(hex_pos + 2, QTextCursor.KeepAnchor)
+            e1 = QTextEdit.ExtraSelection()
+            e1.cursor = c1
+            e1.format = fmt
+            selections.append(e1)
+            # ASCII char (1 char) — verify line has that many ascii chars
+            # For partial last row, ascii length may be shorter than col+1
+            chunk_len = min(self._bytes_per_row, self._max_display_bytes - row * self._bytes_per_row, len(self._data) - row * self._bytes_per_row)
+            if col < chunk_len:
+                c2 = self.hex_display.textCursor()
+                c2.setPosition(ascii_pos)
+                c2.setPosition(ascii_pos + 1, QTextCursor.KeepAnchor)
+                e2 = QTextEdit.ExtraSelection()
+                e2.cursor = c2
+                e2.format = fmt
+                selections.append(e2)
+            self.hex_display.setExtraSelections(selections)
+            # Ensure selection is visible (scroll)
+            # Move cursor to hex_pos to bring into view without changing selection highlight logic
+            # We keep extra selections, cursor itself can stay anywhere
+        finally:
+            self._highlighting = False
+
+    # ------------------------------------------------------------------
+    # Navigation handlers
+    # ------------------------------------------------------------------
+    def _on_spin_offset_changed(self, val: int):
+        if 0 <= val < len(self._data):
+            self.select_byte(val)
+
+    def _on_cursor_changed(self):
+        if self._highlighting:
+            return
+        if not self._data:
+            return
+        # Map cursor position back to byte offset for click-to-select
+        try:
+            cursor = self.hex_display.textCursor()
+            pos = cursor.position()
+            text = self.hex_display.toPlainText()
+            if not text:
+                return
+            lines = text.split("\n")
+            # Find which row the cursor is in
+            cur_start = 0
+            row = -1
+            col = -1
+            for r, line in enumerate(lines):
+                line_end = cur_start + len(line)
+                if cur_start <= pos <= line_end:
+                    row = r
+                    # Determine if pos is inside hex area or ascii area
+                    rel = pos - cur_start
+                    if 10 <= rel < 10 + 48:
+                        # Inside hex area — map to byte col
+                        # Each hex byte occupies 3 chars except last may be 2
+                        # Approx col = (rel -10)//3, but clamp
+                        col = (rel - 10) // 3
+                        if col >= self._bytes_per_row:
+                            col = -1
+                        # If cursor on space between bytes, snap to left byte
+                        # Check that hex_pos for that col indeed maps to rel
+                        # If rel is on a space (e.g., 12,15), we still select preceding byte
+                        # So col computed as above is fine
+                    elif 10 + 48 + 2 + 1 <= rel < 10 + 48 + 2 + 1 + self._bytes_per_row:
+                        col = rel - (10 + 48 + 2 + 1)
+                    else:
+                        col = -1
+                    break
+                cur_start = line_end + 1  # + newline
+            if row >= 0 and col >= 0:
+                idx = row * self._bytes_per_row + col
+                if 0 <= idx < len(self._data) and idx < self._max_display_bytes:
+                    # Avoid feedback loop if already selected
+                    if idx != self._selected_byte:
+                        # Use block to avoid recursive cursor signals when we highlight
+                        self.select_byte(idx)
+        except Exception:
+            pass
+
+    # ------------------------------------------------------------------
+    # Field inspector
+    # ------------------------------------------------------------------
+    def _update_field_inspector(self, offset: int):
+        self.field_inspector.clear()
+        if not self._data:
+            self.field_inspector.addTopLevelItem(QTreeWidgetItem(["(no data)", "", "Load a file or set bytes to inspect"]))
+            return
+        if offset < 0 or offset >= len(self._data):
+            # File-level overview when no byte selected — show header signatures
+            root = QTreeWidgetItem(["File", f"{len(self._data)} bytes at 0x{self._offset:08x}", "Base offset + size"])
+            self.field_inspector.addTopLevelItem(root)
+            # Common file signatures at offset 0
+            self._add_file_signatures(self.field_inspector, base=0)
+            # If file is medium, show stats
+            self.field_inspector.expandAll()
+            return
+
+        items = []
+        b = self._data[offset]
+        items.append(QTreeWidgetItem(["Byte", f"0x{b:02x}", f"{b}  '{chr(b) if 32 <= b < 127 else '.'}'"]))
+
+        # Multi-byte interpretations
+        if offset + 1 < len(self._data):
+            u16_le = int.from_bytes(self._data[offset:offset+2], "little")
+            u16_be = int.from_bytes(self._data[offset:offset+2], "big")
+            items.append(QTreeWidgetItem(["UInt16 LE", f"0x{u16_le:04x}", f"{u16_le}"]))
+            items.append(QTreeWidgetItem(["UInt16 BE", f"0x{u16_be:04x}", f"{u16_be}"]))
+            i16_le = int.from_bytes(self._data[offset:offset+2], "little", signed=True)
+            items.append(QTreeWidgetItem(["Int16 LE", f"{i16_le}", f"0x{u16_le:04x}"]))
+        if offset + 3 < len(self._data):
+            u32_le = int.from_bytes(self._data[offset:offset+4], "little")
+            u32_be = int.from_bytes(self._data[offset:offset+4], "big")
+            items.append(QTreeWidgetItem(["UInt32 LE", f"0x{u32_le:08x}", f"{u32_le}"]))
+            items.append(QTreeWidgetItem(["UInt32 BE", f"0x{u32_be:08x}", f"{u32_be}"]))
+            i32_le = int.from_bytes(self._data[offset:offset+4], "little", signed=True)
+            items.append(QTreeWidgetItem(["Int32 LE", f"{i32_le}", "signed"]))
+            try:
+                import struct as _struct
+                f_le = _struct.unpack_from("<f", self._data, offset)[0]
+                f_be = _struct.unpack_from(">f", self._data, offset)[0]
+                items.append(QTreeWidgetItem(["Float32 LE", f"{f_le:.6g}", f"0x{u32_le:08x}"]))
+                items.append(QTreeWidgetItem(["Float32 BE", f"{f_be:.6g}", f"0x{u32_be:08x}"]))
+            except Exception:
+                pass
+        if offset + 7 < len(self._data):
+            u64_le = int.from_bytes(self._data[offset:offset+8], "little")
+            u64_be = int.from_bytes(self._data[offset:offset+8], "big")
+            items.append(QTreeWidgetItem(["UInt64 LE", f"0x{u64_le:016x}", f"{u64_le}"]))
+            items.append(QTreeWidgetItem(["UInt64 BE", f"0x{u64_be:016x}", f"{u64_be}"]))
+            try:
+                import struct as _struct
+                d_le = _struct.unpack_from("<d", self._data, offset)[0]
+                items.append(QTreeWidgetItem(["Float64 LE", f"{d_le:.6g}", "double"]))
+            except Exception:
+                pass
+
+        # ASCII string preview (next up to 32 bytes)
+        nxt = self._data[offset: offset+32]
+        ascii_preview = "".join(chr(x) if 32 <= x < 127 else "." for x in nxt)
+        items.append(QTreeWidgetItem(["ASCII preview", ascii_preview[:32], f"{len(nxt)} bytes from offset"]))
+
+        # Offset info
+        abs_off = self._offset + offset
+        items.append(QTreeWidgetItem(["File offset", f"0x{abs_off:08x} ({abs_off})", f"Base 0x{self._offset:08x} + {offset}"]))
+        items.append(QTreeWidgetItem(["Row / Col", f"row {offset // self._bytes_per_row}, col {offset % self._bytes_per_row}", f"{self._bytes_per_row} bytes/row"]))
+
+        # Forensic structure interpretation at this offset or file start
+        # If at file start, show file-level structures
+        if offset == 0:
+            struct_items = self._inspect_file_start()
+            if struct_items:
+                for it in struct_items:
+                    items.append(it)
+        else:
+            # Check for structures that might start at this offset (e.g., PE at e_lfanew, GPT at 512)
+            extra = self._inspect_at_offset(offset)
+            for it in extra:
+                items.append(it)
+
+        self.field_inspector.addTopLevelItems(items)
+        self.field_inspector.expandAll()
+
+    def _add_file_signatures(self, tree: QTreeWidget, base: int = 0):
+        """Add top-level file signature items (called for overview)."""
+        for it in self._inspect_file_start():
+            tree.addTopLevelItem(it)
+
+    def _inspect_file_start(self):
+        """Inspect file start for common forensic structures. Returns list[QTreeWidgetItem]."""
+        out = []
+        d = self._data
+        n = len(d)
+
+        # MBR
+        if n >= 512:
+            sig = d[510:512]
+            out.append(QTreeWidgetItem(["MBR Signature", sig.hex() if len(sig)==2 else "(short)", "0x55AA = valid MBR boot signature" if sig == b"\x55\xaa" else "Missing/invalid MBR signature (expected 55 AA)"]))
+            if sig == b"\x55\xaa":
+                # Partition table
+                for i in range(4):
+                    off = 446 + i*16
+                    if off + 16 <= n:
+                        entry = d[off:off+16]
+                        status = entry[0]
+                        ptype = entry[4]
+                        lba = int.from_bytes(entry[8:12], "little")
+                        sectors = int.from_bytes(entry[12:16], "little")
+                        desc = f"Status 0x{status:02x}, LBA {lba}, Sectors {sectors}"
+                        out.append(QTreeWidgetItem([f"Partition {i+1}", f"Type 0x{ptype:02x} {self._mbr_type_name(ptype)}", desc]))
+            # GPT at LBA1
+            if n >= 1024:
+                gpt_sig = d[512:520]
+                out.append(QTreeWidgetItem(["GPT Signature", gpt_sig.hex(), "EFI PART = valid GPT header" if gpt_sig == b"EFI PART" else "No GPT signature at LBA1 (512)"]))
+
+        # ELF
+        if n >= 4 and d[0:4] == b"\x7fELF":
+            out.append(QTreeWidgetItem(["ELF Magic", "7f 45 4c 46", "ELF executable/object"]))
+            if n >= 16:
+                ei_class = d[4]
+                ei_data = d[5]
+                cls = {1: "32-bit", 2: "64-bit"}.get(ei_class, f"unknown ({ei_class})")
+                data = {1: "LE", 2: "BE"}.get(ei_data, f"unknown ({ei_data})")
+                out.append(QTreeWidgetItem(["ELF Class/Data", f"{cls} / {data}", f"EI_CLASS={ei_class}, EI_DATA={ei_data}"]))
+            if n >= 20:
+                try:
+                    e_type = int.from_bytes(d[16:18], "little")
+                    e_machine = int.from_bytes(d[18:20], "little")
+                    out.append(QTreeWidgetItem(["ELF Type/Machine", f"type={e_type} machine={e_machine}", self._elf_type_name(e_type) + " / " + self._elf_machine_name(e_machine)]))
+                except Exception:
+                    pass
+
+        # PE (MZ + PE)
+        if n >= 2 and d[0:2] == b"MZ":
+            out.append(QTreeWidgetItem(["DOS Magic", "MZ", "DOS/PE executable"]))
+            if n >= 64:
+                try:
+                    e_lfanew = int.from_bytes(d[60:64], "little")
+                    out.append(QTreeWidgetItem(["e_lfanew", f"0x{e_lfanew:08x} ({e_lfanew})", "Offset to PE header"]))
+                    if e_lfanew + 6 <= n and d[e_lfanew:e_lfanew+2] == b"PE":
+                        sig = d[e_lfanew:e_lfanew+4]
+                        out.append(QTreeWidgetItem(["PE Signature", sig.hex(), "PE\\x00\\x00 — valid PE" if sig == b"PE\x00\x00" else "PE signature"]))
+                        if e_lfanew + 6 <= n:
+                            machine = int.from_bytes(d[e_lfanew+4:e_lfanew+6], "little")
+                            out.append(QTreeWidgetItem(["PE Machine", f"0x{machine:04x}", self._pe_machine_name(machine)]))
+                        if e_lfanew + 20 <= n:
+                            num_sec = int.from_bytes(d[e_lfanew+6:e_lfanew+8], "little")
+                            out.append(QTreeWidgetItem(["PE Sections", f"{num_sec}", "NumberOfSections"]))
+                except Exception:
+                    pass
+
+        # Common file signatures (PNG, ZIP, JPEG, PDF, etc.)
+        sig_map = [
+            (b"\x89PNG\r\n\x1a\n", "PNG", "PNG image"),
+            (b"PK\x03\x04", "ZIP", "ZIP archive / Office"),
+            (b"PK\x05\x06", "ZIP EOCD", "ZIP end of central dir"),
+            (b"PK\x07\x08", "ZIP span", "ZIP spanned"),
+            (b"\xff\xd8\xff", "JPEG", "JPEG image"),
+            (b"%PDF", "PDF", "PDF document"),
+            (b"GIF87a", "GIF87a", "GIF image"),
+            (b"GIF89a", "GIF89a", "GIF image"),
+            (b"\x1f\x8b", "GZIP", "GZIP archive"),
+            (b"BZ", "BZIP2", "BZIP2 archive"),
+            (b"SQLite format 3\x00", "SQLite", "SQLite database"),
+            (b"\x7fELF", "ELF", "ELF binary"),
+            (b"MZ", "MZ", "DOS/PE binary"),
+        ]
+        for magic, name, desc in sig_map:
+            if d.startswith(magic):
+                # Already handled for some above; dedup
+                if not any(name in it.text(0) for it in out):
+                    out.append(QTreeWidgetItem([f"Signature: {name}", magic.hex(), desc]))
+
+        if not out:
+            out.append(QTreeWidgetItem(["Signature", "(unknown)", "No known file signature at offset 0"]))
+
+        return out
+
+    def _inspect_at_offset(self, offset: int):
+        out = []
+        d = self._data
+        n = len(d)
+        # GPT header might be at 512 regardless of selected offset
+        if offset == 512 and n >= 520 and d[512:520] == b"EFI PART":
+            out.append(QTreeWidgetItem(["GPT at 512", "EFI PART", "GPT header signature"]))
+            if n >= 512+92:
+                try:
+                    hdr_size = int.from_bytes(d[512+12:512+16], "little")
+                    num_entries = int.from_bytes(d[512+80:512+84], "little")
+                    entry_size = int.from_bytes(d[512+84:512+88], "little")
+                    out.append(QTreeWidgetItem(["GPT HeaderSize", f"{hdr_size}", "bytes"]))
+                    out.append(QTreeWidgetItem(["GPT Entries", f"{num_entries} x {entry_size} bytes", "Partition entries"]))
+                except Exception:
+                    pass
+        # PE signature at this offset
+        if offset + 4 <= n and d[offset:offset+4] == b"PE\x00\x00":
+            out.append(QTreeWidgetItem(["PE Signature here", "PE\\x00\\x00", "PE header at this offset"]))
+        if offset + 2 <= n and d[offset:offset+2] == b"MZ":
+            out.append(QTreeWidgetItem(["MZ here", "MZ", "DOS header at this offset"]))
+        if offset + 4 <= n and d[offset:offset+4] == b"\x7fELF":
+            out.append(QTreeWidgetItem(["ELF here", "7f454c46", "ELF at this offset"]))
+        return out
+
+    @staticmethod
+    def _mbr_type_name(ptype: int) -> str:
+        table = {0x00: "Empty", 0x07: "NTFS/HPFS", 0x0b: "FAT32", 0x0c: "FAT32 LBA", 0x83: "Linux", 0x82: "Linux swap", 0xee: "GPT protective", 0xef: "EFI System"}
+        return table.get(ptype, "")
+
+    @staticmethod
+    def _pe_machine_name(machine: int) -> str:
+        table = {0x014c: "i386", 0x8664: "AMD64", 0x0200: "IA64", 0x01c0: "ARM", 0xaa64: "ARM64", 0x0ebc: "EBC"}
+        return table.get(machine, f"machine 0x{machine:04x}")
+
+    @staticmethod
+    def _elf_type_name(t: int) -> str:
+        return {0: "None", 1: "REL", 2: "EXEC", 3: "DYN", 4: "CORE"}.get(t, str(t))
+
+    @staticmethod
+    def _elf_machine_name(m: int) -> str:
+        return {3: "x86", 62: "x86-64", 40: "ARM", 183: "AArch64", 8: "MIPS"}.get(m, str(m))
 
 
 class FilePreviewPanel(QWidget):
