@@ -3,13 +3,14 @@ from PyQt5.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QLabel, QDialogButtonBox,
     QFrame
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from abc import ABCMeta, abstractmethod
 import re
 
 from .. import dialogs
 from ...core.utils import format_size
+from ..theme_tokens import CURSORS
 
 class QWidgetABCMeta(type(QWidget), ABCMeta):
     pass
@@ -148,6 +149,60 @@ class BaseView(QWidget, metaclass=QWidgetABCMeta):
     def __init__(self, master=None, app=None):
         super().__init__(master)
         self.app = app
+        # TICK-908: children are built during __init__ by every view; scan
+        # them once the constructor chain finishes so semantic cursors are
+        # applied without every view opting in.
+        QTimer.singleShot(0, self._apply_cursors)
+
+    @staticmethod
+    def set_pointer(widget, cursor):
+        """TICK-908 — apply a semantic ``Qt.CursorShape`` to *widget*.
+
+        Wrapped in try/except so a deleted or style-incompatible widget
+        never breaks the mount path."""
+        try:
+            widget.setCursor(cursor)
+        except Exception:
+            pass
+
+    def _apply_cursors(self):
+        """TICK-908 — auto-apply semantic cursors to known child types.
+
+        Runs once after construction (and again on ``mount`` via
+        ``DataForgeApp.switch_view`` so lazily-built children and
+        evidence-mode button state are reflected). Buttons map
+        PointingHand when enabled / Forbidden when disabled (evidence
+        mode disables destructive buttons, so they read as forbidden);
+        tree viewports, splitters, and text inputs get their semantic
+        shapes from :data:`theme_tokens.CURSORS`."""
+        from PyQt5.QtWidgets import (
+            QPushButton, QTreeView, QSplitter, QLineEdit, QTextEdit,
+            QSpinBox, QComboBox,
+        )
+        try:
+            buttons = self.findChildren(QPushButton)
+        except RuntimeError:
+            return
+        for btn in buttons:
+            try:
+                shape = CURSORS["button"] if btn.isEnabled() else CURSORS["forbidden"]
+            except RuntimeError:
+                continue
+            self.set_pointer(btn, shape)
+        for tree in self.findChildren(QTreeView):
+            self.set_pointer(tree.viewport(), CURSORS["tree"])
+        for splitter in self.findChildren(QSplitter):
+            try:
+                if splitter.orientation() == Qt.Horizontal:
+                    shape = CURSORS["splitter_h"]
+                else:
+                    shape = CURSORS["splitter_v"]
+            except RuntimeError:
+                continue
+            self.set_pointer(splitter, shape)
+        for w in (self.findChildren(QLineEdit) + self.findChildren(QTextEdit)
+                  + self.findChildren(QSpinBox) + self.findChildren(QComboBox)):
+            self.set_pointer(w, CURSORS["text"])
 
     @abstractmethod
     def get_title(self) -> str:
