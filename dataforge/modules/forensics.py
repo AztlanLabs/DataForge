@@ -147,6 +147,8 @@ def parse_os_artifacts(root_path, progress_callback=None, cancel_token=None):
         "system_services": [],
     }
 
+    evidence_root = os.path.abspath(root_path)
+
     total_steps = 8
 
     # --- Step 1: Users ---
@@ -198,13 +200,14 @@ def parse_os_artifacts(root_path, progress_callback=None, cancel_token=None):
 
     for user_entry in artifacts["users"]:
         home = user_entry.get("home", "")
-        if not home.startswith("/"):
-            home = os.path.join(root_path, home.lstrip("/"))
+        full_home = os.path.join(evidence_root, home.lstrip("/"))
+        if not full_home.startswith(evidence_root):
+            continue  # Skip paths that escape evidence root
 
         history_files = [
-            os.path.join(home, ".bash_history"),
-            os.path.join(home, ".zsh_history"),
-            os.path.join(home, ".fish_history"),
+            os.path.join(full_home, ".bash_history"),
+            os.path.join(full_home, ".zsh_history"),
+            os.path.join(full_home, ".fish_history"),
         ]
         for hist_file in history_files:
             if os.path.isfile(hist_file):
@@ -914,7 +917,7 @@ def profile_directory_types(path, progress_callback=None, cancel_token=None):
             "mismatch_glyph": "\u26A0" if mismatch else "\u2713",
         })
         if progress_callback and total % 25 == 0:
-            progress_callback(total, total, f"Classifying: {entry.name}")
+            progress_callback(total, total, f"Classifying: {entry.filename}")
     if progress_callback:
         progress_callback(total, total, f"Classified {total} files")
     return {"total": total, "by_format": dict(summary), "rows": rows, "mismatch_count": mismatch_count}
@@ -1020,8 +1023,8 @@ def build_timeline(path, sort_key="mtime", progress_callback=None, cancel_token=
             ts = entry.modified_at
         elif sort_key == "ctime":
             ts = entry.created_at
-        else:  # atime — FileEntry has no atime, reuse modified_at as best available
-            ts = entry.modified_at
+        else:  # atime — real access time from FileEntry
+            ts = entry.atime
         # FileEntry already carries size/extension/name; reuse directly
         events.append({
             "path": entry.path,
@@ -1031,7 +1034,7 @@ def build_timeline(path, sort_key="mtime", progress_callback=None, cancel_token=
             "timestamp_iso": datetime.fromtimestamp(ts, tz=timezone.utc).isoformat(),
             "timestamp_unix": ts,
             "mtime": datetime.fromtimestamp(entry.modified_at, tz=timezone.utc).isoformat(),
-            "atime": datetime.fromtimestamp(entry.modified_at, tz=timezone.utc).isoformat(),
+            "atime": datetime.fromtimestamp(entry.atime, tz=timezone.utc).isoformat(),
             "ctime": datetime.fromtimestamp(entry.created_at, tz=timezone.utc).isoformat(),
             "owner_uid": None,
             "owner_gid": None,
@@ -1196,8 +1199,23 @@ def snapshot_file_state(paths, algorithms=None, progress_callback=None, cancel_t
     if algorithms is None:
         algorithms = ["md5", "sha256"]
 
+    expanded = []
+    for path in paths:
+        if os.path.isdir(path):
+            try:
+                children = [
+                    os.path.join(path, f) for f in os.listdir(path)
+                    if os.path.isfile(os.path.join(path, f))
+                ]
+            except OSError:
+                expanded.append(path)
+            else:
+                expanded.extend(children)
+        else:
+            expanded.append(path)
+
     hashes = calculate_hashes(
-        paths, algorithms=algorithms,
+        expanded, algorithms=algorithms,
         progress_callback=progress_callback, cancel_token=cancel_token,
     )
     snapshot = {
@@ -1252,10 +1270,10 @@ def verify_file_state(snapshot, progress_callback=None, cancel_token=None):
         diff = {}
         if "size" in entry and entry["size"] != stat.st_size:
             diff["size"] = (entry["size"], stat.st_size)
-        algo = (snapshot.get("algorithm") or ["md5"])[0]
-        computed = get_file_hash(path, algo=algo, cancel_token=cancel_token)
-        if computed and entry.get(algo) and computed != entry[algo]:
-            diff[algo] = (entry[algo], computed)
+        for algo in snapshot.get("algorithm") or ["md5"]:
+            computed = get_file_hash(path, algo=algo, cancel_token=cancel_token)
+            if computed and entry.get(algo) and computed != entry[algo]:
+                diff[algo] = (entry[algo], computed)
         results.append((entry, diff or None))
         if progress_callback:
             progress_callback(len(results), len(snapshot.get("entries", [])), os.path.basename(path))
