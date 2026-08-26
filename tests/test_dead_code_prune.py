@@ -60,13 +60,17 @@ def test_device_manager_scan_device_removed():
 
 def test_scan_device_no_import_path_remains():
     """No module still references the removed symbol."""
-    import subprocess
+    import pathlib
 
-    grep = subprocess.run(
-        ["rg", "-n", "scan_device", "dataforge"],
-        capture_output=True, text=True,
-    )
-    assert grep.returncode != 0, f"scan_device still referenced:\n{grep.stdout}"
+    found: list[str] = []
+    for path in pathlib.Path("dataforge").rglob("*.py"):
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if "scan_device" in text:
+            found.append(str(path))
+    assert not found, f"scan_device still referenced in: {found}"
 
 
 # ------------------------------------------------------------------
@@ -135,7 +139,15 @@ def test_utils_kept_symbols_work():
     assert "Documents" in CATEGORY_COLORS
     assert ".py" in CATEGORY_EXTENSIONS["Code"]
     assert parse_extensions(".jpg, png") == [".jpg", ".png"]
-    assert format_display_path("/tmp/root/a.txt", root="/tmp/root") == "a.txt"
+    # format_display_path respects config path_display_mode; force relative for test
+    from dataforge.core.config import config as _cfg
+
+    orig = _cfg.get("path_display_mode")
+    _cfg.set("path_display_mode", "relative")
+    try:
+        assert format_display_path("/tmp/root/a.txt", root="/tmp/root") == "a.txt"
+    finally:
+        _cfg.set("path_display_mode", orig if orig is not None else "full")
     ok, _ = check_disk_space(tempfile.gettempdir(), 1)
     assert ok is True
     renamed = normalize_filename("my file 001.txt", index=1, numeric_pattern=r"\d+",

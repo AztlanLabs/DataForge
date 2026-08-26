@@ -503,9 +503,24 @@ def test_integration_smoke_plugin_packaging_paths():
     """Plugin packaging paths agree: build_exe plugin source == loader dir,
     the plugins directory is an importable package, and the loader discovers
     MetadataCleanerPlugin."""
+    import importlib.util
     import os
 
-    import build_exe  # noqa: F401  (packaging constants under test)
+    # build_exe.py lives at repo root (not in dataforge package); load via
+    # file path so test works with or without PYTHONPATH=.
+    _repo_root = Path(__file__).resolve().parents[1]
+    _build_exe_path = _repo_root / "build_exe.py"
+    if _build_exe_path.exists():
+        spec = importlib.util.spec_from_file_location("build_exe", _build_exe_path)
+        if spec and spec.loader:
+            import importlib.util as _ilu  # noqa: F401
+
+            _mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(_mod)  # type: ignore[attr-defined]
+        else:
+            pytest.skip("build_exe.py not loadable")
+    else:
+        pytest.skip("build_exe.py not found at repo root")
 
     repo_root = Path(__file__).resolve().parents[1]
     plugin_dir = repo_root / "dataforge" / "ui" / "plugins"

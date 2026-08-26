@@ -48,15 +48,29 @@ python run_ui.py
 fm --help
 ```
 
-### Tests
+### Tests — Fast (per-ticket) vs Full (CI)
+
+**Fast per-ticket (for agents, ~1-15s, no coverage):**
 
 ```bash
-PYTHONPATH=. pytest -q
+python scripts/run_ticket_tests.py TICK-921          # reads test_target from ticket YAML
+python scripts/run_ticket_tests.py --file tests/test_dead_code_prune.py
+# or manually:
+QT_QPA_PLATFORM=offscreen pytest tests/test_dead_code_prune.py -q -o addopts= -p no:cov
 ```
 
-The nested project layout means plain `pytest -q` may not resolve `dataforge` unless the package is installed or the project root is placed on `PYTHONPATH`.
+Full suite is 1200+ tests and ~60s without coverage / ~260s with coverage — do NOT run it for every ticket iteration. Use the runner above.
 
-The full suite passes — 723 tests (contract suites cover `core/paths.py`, the version source, the `FileProvider` contract, audit log, CaseContext, Evidence Mode, daemon/client integration, service lifecycle, and packaging). The earlier collection failure (a stale `rename_with_regex` import) has been fixed. See [`docs/reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md) for verification details.
+**Full suite (only for final verification):**
+
+```bash
+QT_QPA_PLATFORM=offscreen pytest -q -o addopts= -p no:cov -n auto   # fast full, parallel (needs pytest-xdist, ~60s)
+PYTHONPATH=. pytest -q --cov=dataforge --cov-report=term-missing --cov-report=xml  # CI mode with coverage (~260s, 59%)
+```
+
+The nested project layout means plain `pytest -q` may not resolve `dataforge` unless the package is installed or the project root is placed on `PYTHONPATH`. The runner sets `PYTHONPATH=.` and `QT_QPA_PLATFORM=offscreen` for you.
+
+After TICK-912 the suite is consolidated: `tests/test_consolidated_suite.py` (44 tests) replaces 5 deprecated files (271 tests). See `scripts/tests_consolidate.py --audit` and [`docs/reviews/AUDIT_REPORT.md`](./reviews/AUDIT_REPORT.md) for verification details. Use `scripts/run_ticket_tests.py --full` to audit.
 
 ## Packaging and distribution
 
@@ -158,15 +172,18 @@ New top-level screens and plugins should inherit from `BaseView` and use its sha
 
 | File | Focus | Status |
 | --- | --- | --- |
-| `tests/test_comprehensive.py` | wide feature coverage across core modules, services, media, and actions | passes (147) |
-| `tests/test_integration.py` | end-to-end workflows and packaging/plugin paths | passes (18) |
-| `tests/test_contract_regressions.py` | CLI and GUI-facing contract expectations | passes (~110 — including 21 added in WS-C/WS-D) |
-| `tests/test_new_modules.py` | newer modules (hardware, forensics, recovery, metadata, etc.) | passes (9) |
+| `tests/test_consolidated_suite.py` | consolidated parametrized suite replacing 5 deprecated files (271 tests → 44) | passes (44+1 skipped) |
+| `tests/test_dead_code_prune.py` | TICK-913 dead-code prune verification | passes (10) |
+| `tests/test_cursor_pointers.py` | TICK-908 cursor pointers + QPainter hardening | passes (12) |
+| `tests/test_global_stability.py` | TICK-911 job lifecycle + queue depth + coalesce | passes (17) |
 | `tests/test_audit_evidence_mode.py` | audit log, CaseContext, Evidence Mode gate, forensic provenance | passes (21) |
 | `tests/test_daemon_client_integration.py` | daemon job queue, client auto-discover, in-process fallback | passes (21) |
 | `tests/test_service_lifecycle.py` | systemd/launchd/Windows lifecycle files | passes (34) |
 | `tests/test_packaging_nfpm.py` | nfpm deb/rpm packaging, postinst/prerm scripts | passes (51) |
-| `tests/verify_scenarios.py` | scenario-style validation helpers | standalone script |
+| `tests/test_consolidated_suite.py` | (see above) consolidated | passes (44) |
+| Deprecated (removed) | `test_comprehensive.py`, `test_integration.py`, `test_contract_regressions.py`, `test_new_modules.py`, `verify_scenarios.py` | removed at TICK-912 (271 tests) |
+
+Use `python scripts/run_ticket_tests.py TICK-xxx` for per-ticket fast runs. Full suite ~1225 tests, ~60s without coverage (xdist) / ~260s with coverage.
 
 ## Practical maintenance notes
 
