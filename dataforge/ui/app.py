@@ -32,6 +32,8 @@ from .theme_tokens import generate_qss, generate_palette, TYPE_SCALE, CURSORS
 from .resources.icons import build_icons, TONE_LIGHT, TONE_DARK
 from .job_manager import JobManager
 from ..core.config import config
+from ..core import case
+from ..core.logger import logger
 
 HEADER_COLORS = {
     "light": {
@@ -389,10 +391,30 @@ class DataForgeApp(QMainWindow):
         self.job_manager.evidence_mode = value
 
     def set_evidence_mode(self, enabled: bool) -> None:
-        """Enable or disable evidence mode."""
+        """Enable or disable evidence mode.
+
+        TICK-917: enforcement moved from JobManager keyword inspection to
+        the mutation boundary (FileActionService / MetadataEngine), which
+        reads the global CaseContext — so the toggle must publish it here.
+        """
         self.evidence_mode = enabled
+        case.set_evidence_mode(enabled)
         status = "EVIDENCE MODE — writes blocked" if enabled else "Evidence mode disabled"
         self.update_status(status)
+
+    def closeEvent(self, event) -> None:
+        """Cleanly shut down all background workers before Qt teardown (TICK-917).
+
+        JobManager.shutdown() cancels queued jobs, waits (bounded) for live
+        QThreads to observe their cancel tokens, then hard-waits remaining
+        workers so no QThread outlives the app. Idempotent — safe if Qt
+        fires closeEvent twice (e.g. QApplication.quitAllWindows).
+        """
+        try:
+            self.job_manager.shutdown(timeout=3.0)
+        except Exception:
+            logger.exception("Error while shutting down job manager")
+        super().closeEvent(event)
 
     def update_status(self, message: str):
         self.status_label.setText(message)
@@ -1027,8 +1049,10 @@ class DataForgeApp(QMainWindow):
             try:
                 if callback:
                     callback(result)
-            except Exception:
-                pass
+            except Exception as exc:
+                # TICK-917 P1.1: don't swallow — log and surface the failure.
+                logger.error("Completion callback failed: %s", exc, exc_info=True)
+                self.update_status(f"Callback error: {exc}")
             if is_cancelled:
                 self.update_status("Cancelled")
             self._on_job_completed()
@@ -1043,8 +1067,10 @@ class DataForgeApp(QMainWindow):
             if on_error:
                 try:
                     on_error(error)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    # TICK-917 P1.1: log and surface handler failures too.
+                    logger.error("Error handler failed: %s", exc, exc_info=True)
+                    self.update_status(f"Error handler failed: {exc}")
             else:
                 self.update_status(f"Error: {error}")
             self._on_job_completed()

@@ -15,6 +15,7 @@ from datetime import datetime
 from functools import lru_cache
 
 from ..core.config import config
+from ..core.case import is_evidence_mode
 from ..core.logger import logger
 from ..core.utils import format_size
 
@@ -233,6 +234,8 @@ class MetadataEngine:
         """
         if cancel_token and getattr(cancel_token, "is_set", lambda: False)():
             return {"success": False, "message": "Cancelled", "cancelled": True}
+        if is_evidence_mode() and not dry_run:
+            return {"success": False, "message": "Blocked by Evidence Mode", "blocked": True}
         if not os.path.isfile(path):
             return {"success": False, "message": f"File not found: {path}", "dry_run": dry_run}
 
@@ -275,6 +278,8 @@ class MetadataEngine:
         """
         if cancel_token and getattr(cancel_token, "is_set", lambda: False)():
             return {"success": False, "message": "Cancelled", "cancelled": True}
+        if is_evidence_mode() and not dry_run:
+            return {"success": False, "message": "Blocked by Evidence Mode", "blocked": True}
         if not os.path.isfile(path):
             return {"success": False, "message": f"File not found: {path}"}
 
