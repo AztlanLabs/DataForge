@@ -399,7 +399,8 @@ class RecoveryView(BaseView):
                 item.get("deletion_date", "—"),
                 item["formatted_size"],
                 item.get("trash_location", ""),
-            ))
+            ), path=item["path"])  # TICK-923 / P1.9: context actions must
+            # resolve the trash object path, never the deleted original_path.
             self.trash_item_map[item_id] = item
 
         self.app.update_status(f"Found {len(results)} files in trash ({format_size(total_size)}).")
@@ -435,6 +436,14 @@ class RecoveryView(BaseView):
         )
 
     def _on_restore_complete(self, result):
+        # TICK-923 / P1.9: cancellation must not be shown as completion.
+        if isinstance(result, dict) and result.get("cancelled"):
+            self.lbl_restore_status.setText("Restore cancelled.")
+            try:
+                self.app.update_status("Restore cancelled")
+            except Exception:
+                pass
+            return
         restored = result.get("restored", [])
         failed = result.get("failed", [])
 
@@ -508,6 +517,13 @@ class RecoveryView(BaseView):
         )
 
     def _on_carve_complete(self, result):
+        if isinstance(result, dict) and result.get("cancelled"):
+            self.lbl_deep_summary.setText("Carving cancelled.")
+            try:
+                self.app.update_status("Carving cancelled")
+            except Exception:
+                pass
+            return
         if "error" in result:
             self.lbl_deep_summary.setText(f"Error: {result['error']}")
             return
@@ -570,12 +586,19 @@ class RecoveryView(BaseView):
         self.app.run_workflow(
             run_photorec,
             self._on_photorec_complete,
-            image, output,
+            image, output, self._get_selected_file_types(),
             progress=True,
             error_title="PhotoRec Failed",
         )
 
     def _on_photorec_complete(self, result):
+        if isinstance(result, dict) and result.get("cancelled"):
+            self.lbl_deep_summary.setText("PhotoRec cancelled.")
+            try:
+                self.app.update_status("PhotoRec cancelled")
+            except Exception:
+                pass
+            return
         if "error" in result:
             self.lbl_deep_summary.setText(f"PhotoRec error: {result['error']}")
             self.app.show_error_dialog("PhotoRec Error", result["error"])

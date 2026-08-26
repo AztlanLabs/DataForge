@@ -77,6 +77,19 @@ def check_testdisk_available():
     return _command_available("testdisk")
 
 
+_TYPE_ALIASES = {"JPG": "JPEG"}
+
+
+def _normalize_type(name: str) -> str:
+    """Normalize a file-type identifier for case-insensitive matching (TICK-923).
+
+    Signature keys are uppercase (``"JPEG"``); CLI and UI callers may pass
+    ``"jpg"``, ``"Jpg"`` or ``" jpeg "`` — all normalize to ``"JPEG"``.
+    """
+    normalized = name.upper().strip()
+    return _TYPE_ALIASES.get(normalized, normalized)
+
+
 # ---------------------------------------------------------------------------
 # Trash recovery
 # ---------------------------------------------------------------------------
@@ -384,9 +397,11 @@ def carve_files_from_image(
 
     os.makedirs(output_dir, exist_ok=True)
 
-    # Select signatures to search for
+    # Select signatures to search for — type identifiers are matched
+    # case-insensitively (TICK-923 / P1.9: CLI lowercases, UI uses mixed case).
     if file_types is not None:
-        sigs = {k: v for k, v in SIGNATURES.items() if k in file_types}
+        normalized_types = {_normalize_type(t) for t in file_types}
+        sigs = {k: v for k, v in SIGNATURES.items() if k in normalized_types}
     else:
         sigs = dict(SIGNATURES)
 
@@ -638,6 +653,18 @@ def run_photorec(
         "/cmd", device_or_image,
         "search",
     ]
+
+    # TICK-923 / P1.9: honor the selected file types via PhotoRec's fileopt
+    # command (family codes are lowercase — e.g. "JPEG" -> "jpg").
+    if file_types:
+        families = ",".join(_normalize_type(t).lower() for t in file_types)
+        cmd = [
+            "photorec",
+            "/d", output_dir,
+            "/cmd", device_or_image,
+            f"fileopt,ext,keep,{families}",
+            "search",
+        ]
 
     if progress_callback:
         progress_callback(0, 0, "Starting PhotoRec recovery...")

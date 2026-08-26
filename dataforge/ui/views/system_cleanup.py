@@ -22,6 +22,7 @@ from ..widgets import EnhancedTreeview, CollapsibleCard, attach_tooltips, FilePr
 from ...core.utils import format_size
 from ...core.services import FileActionService
 from ...modules.system_cleanup import (
+    _get_browser_profile_paths,
     scan_junk_files,
     scan_browser_artifacts,
     estimate_cleanup_savings,
@@ -445,8 +446,21 @@ class SystemCleanupView(BaseView):
             self.app.show_warning_dialog("No Categories", "Select at least one junk category to scan.")
             return
 
+        # TICK-923 / P1.8: the "Include browser artifacts" checkbox must
+        # actually reach the scan — feed browser profile dirs as extra paths.
+        include_browser = False
+        try:
+            include_browser = self.chk_include_browser.isChecked()
+        except Exception:
+            pass
+
         extra_path = self.entry_path.text().strip()
-        extra_paths = [extra_path] if extra_path and os.path.isdir(extra_path) else None
+        extra_paths: list[str] = []
+        if extra_path and os.path.isdir(extra_path):
+            extra_paths.append(extra_path)
+        if include_browser:
+            extra_paths.extend(_get_browser_profile_paths())
+        extra_paths = extra_paths or None
 
         self.junk_results = {}
         self.item_entries = {}
@@ -494,8 +508,10 @@ class SystemCleanupView(BaseView):
         except Exception:
             pass
         try:
-            # Delegate to app's default error handler
-            self.app.show_workflow_error("Junk Scan Failed", error)
+            # Delegate to app's default error handler — signature is
+            # show_workflow_error(error, title=...) (TICK-923 / P1.8: the
+            # previous (title, error) order was reversed).
+            self.app.show_workflow_error(error, title="Junk Scan Failed")
         except Exception:
             try:
                 self.app.show_error_dialog("Junk Scan Failed", str(error))

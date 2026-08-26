@@ -170,6 +170,21 @@ BROWSER_ARTIFACT_PATTERNS = {
 }
 
 
+def _get_browser_profile_paths() -> list[str]:
+    """Return existing browser profile base/cache directories (TICK-923).
+
+    Profiles that are not installed (no directory on disk) are skipped so
+    the junk scan degrades gracefully when no browser is present.
+    """
+    paths: list[str] = []
+    for browser, info in _browser_profiles().items():
+        for key in ("base", "cache"):
+            p = info.get(key)
+            if p and os.path.isdir(p):
+                paths.append(p)
+    return paths
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -409,6 +424,21 @@ def scan_junk_files(
                         results.setdefault(category, []).append(entry)
                     elif is_junk:
                         results.setdefault(category, []).append(entry)
+
+    # TICK-923 / P1.8: overlapping categories (e.g. browser profile dirs
+    # nested under ~/.cache) can classify the same file twice — double-counting
+    # savings. Deduplicate across all categories by canonical path, keeping
+    # the first category that matched.
+    seen_canon: set[str] = set()
+    for category in list(results.keys()):
+        unique: list = []
+        for entry in results[category]:
+            canon = os.path.realpath(entry.path)
+            if canon in seen_canon:
+                continue
+            seen_canon.add(canon)
+            unique.append(entry)
+        results[category] = unique
 
     if progress_callback:
         progress_callback(total_dirs, total_dirs, "Scan complete")

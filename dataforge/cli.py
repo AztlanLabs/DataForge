@@ -397,7 +397,10 @@ def recover(trash, restore_trash, carve, out, types):
         if not out:
             click.echo("Error: --out directory is required when carving.", err=True)
             return
-        file_types = [t.strip().lower() for t in types.split(",")] if types else None
+        # TICK-923 / P1.9: pass type identifiers through as-is — the recovery
+        # module matches them case-insensitively (CLI lowercasing previously
+        # mismatched the uppercase SIGNATURES keys).
+        file_types = [t.strip() for t in types.split(",")] if types else None
         click.echo(f"Carving files from {carve} to {out}...")
         result = carve_files_from_image(carve, out, file_types=file_types)
         if "error" in result:
