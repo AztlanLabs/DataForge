@@ -36,6 +36,10 @@ class Daemon:
     the module layer.  Each incoming JSON-RPC request is dispatched to
     the appropriate module function via :meth:`handle_request`.
 
+    Importing this module is side-effect-free: no server is started, no
+    daemon instance is created and no threads spawn until ``Daemon()`` /
+    ``start()`` is explicitly called (TICK-911 invariant).
+
     Usage::
 
         daemon = Daemon()
@@ -79,7 +83,11 @@ class Daemon:
         return self.is_running()
 
     def submit(self, *args: Any, **kwargs: Any) -> Job:
-        """Submit a job to the queue."""
+        """Submit a job to the queue.
+
+        TICK-911: passes through to :meth:`JobQueue.submit`; a caller-owned
+        ``cancel_token`` may be supplied per job (``execute`` stays explicit).
+        """
         return self.queue.submit(*args, **kwargs)
 
     def get(self, job_id: str) -> Optional[Job]:
@@ -275,6 +283,7 @@ class Daemon:
         job = self.queue.submit(
             _automation_worker,
             params={"source": source, "dry_run": dry_run, **(params or {})},
+            execute=True,
         )
         return {"job_id": job.job_id, "automation": name}
 
@@ -379,6 +388,7 @@ class Daemon:
         job = self.queue.submit(
             _scan_worker,
             params={"root": root, "recursive": recursive, "max_depth": max_depth},
+            execute=True,
         )
         return {"job_id": job.job_id}
 
@@ -432,6 +442,7 @@ class Daemon:
         job = self.queue.submit(
             _search_worker,
             params={**params, "root": root},
+            execute=True,
         )
         return {"job_id": job.job_id}
 
@@ -471,6 +482,7 @@ class Daemon:
         job = self.queue.submit(
             _dupes_worker,
             params={**params, "root": root},
+            execute=True,
         )
         return {"job_id": job.job_id}
 
@@ -496,6 +508,7 @@ class Daemon:
             job = self.queue.submit(
                 _hash_single,
                 params={"path": path, "algo": algo},
+                execute=True,
             )
         elif paths:
             def _hash_multi(
@@ -516,6 +529,7 @@ class Daemon:
             job = self.queue.submit(
                 _hash_multi,
                 params={"paths": paths, "algo": algo},
+                execute=True,
             )
         elif algos:
             def _hash_algos(
@@ -530,6 +544,7 @@ class Daemon:
             job = self.queue.submit(
                 _hash_algos,
                 params={"path": path or "", "algos": algos},
+                execute=True,
             )
         else:
             raise ValueError("path or paths required")
@@ -575,6 +590,7 @@ class Daemon:
                 "operation": operation,
                 "algorithm": algorithm,
             },
+            execute=True,
         )
         return {"job_id": job.job_id}
 

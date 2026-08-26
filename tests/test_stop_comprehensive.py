@@ -402,10 +402,13 @@ def test_progress_chaining_preserved(manager, qapp):
             time.sleep(0.02)
         return {"done": True}
 
-    # TICK-914 P0.1: a caller-supplied progress_callback must NOT be invoked
-    # inline on the worker thread (it could mutate Qt widgets there). The
-    # signal on the GUI thread is the sole progress path, so orig_cb must
-    # stay untouched while progress still flows through the manager.
+    # TICK-914 P0.1 + TICK-911 merge: a UI-affine (QObject-bound)
+    # progress_callback must NOT be invoked inline on the worker thread (it
+    # could mutate Qt widgets there — QWidget::repaint recursive repaint
+    # SIGSEGV); it is delivered on the GUI thread via the queued
+    # progress_signal instead. Plain closures are chained inline (TICK-802
+    # contract, kept by TICK-911). The first half asserts the closure chain;
+    # the QObject-bound half asserts the P0.1 guard.
     orig_calls = []
 
     def orig_cb(c, t, m):
@@ -422,16 +425,64 @@ def test_progress_chaining_preserved(manager, qapp):
     )
     assert job_id is not None
     deadline = time.time() + 3
-    while time.time() < deadline and not results:
+    while time.time() < deadline and (len(orig_calls) < 3 or not results):
         time.sleep(0.05)
         QApplication.processEvents()
 
     assert len(results) == 1
     assert results[0] == {"done": True}
-    assert len(orig_calls) == 0, "inline orig_cb chaining removed by TICK-914 (P0.1)"
+    assert len(orig_calls) == 3, "plain closure progress callbacks chain inline (TICK-802/TICK-911)"
     job = manager.get_job(job_id)
     assert job is not None
     assert job.status == JobStatus.DONE
+
+
+def test_ui_affine_progress_callback_not_inline(qapp):
+    """GIVEN a QObject-bound progress_callback WHEN job runs THEN it is never
+    invoked on the worker thread (TICK-914 P0.1 — GUI-thread affinity)."""
+    from PyQt5.QtCore import QObject
+
+    class _Recorder(QObject):
+        def __init__(self):
+            super().__init__()
+            self.calls = []
+
+        def update_progress(self, current, total, step_name=""):
+            self.calls.append((current, total, step_name))
+
+    from dataforge.ui.job_manager import JobManager
+
+    mgr = JobManager(max_workers=1)
+
+    def task_with_progress(cancel_token=None, progress_callback=None):
+        for i in range(3):
+            if progress_callback:
+                progress_callback(i, 3, f"step {i}")
+            time.sleep(0.05)
+        return {"done": True}
+
+    recorder = _Recorder()
+    results = []
+    try:
+        job_id = mgr.submit(
+            target=task_with_progress,
+            kwargs={"progress_callback": recorder.update_progress},
+            on_success=lambda r: results.append(r),
+            progress=True,
+            task_name="ui-affine chain",
+        )
+        assert job_id is not None
+        deadline = time.time() + 3
+        while time.time() < deadline and not results:
+            time.sleep(0.05)
+            QApplication.processEvents()
+        assert results == [{"done": True}]
+        # QObject-bound callback must NOT have run inline on the worker thread
+        assert len(recorder.calls) == 0, (
+            "QObject-bound progress_callback must not run inline on the worker thread (P0.1)"
+        )
+    finally:
+        mgr.shutdown()
 
 
 # ------------------------------------------------------------------
