@@ -2,19 +2,22 @@ import os
 import re
 import shutil
 import tempfile
+import errno
 from PIL import Image
 from .logger import logger
 try:
     from pypdf import PdfReader, PdfWriter
+    HAS_PYPDF = True
 except ImportError:
     PdfReader = None
     PdfWriter = None
+    HAS_PYPDF = False
 
 Image.MAX_IMAGE_PIXELS = 100_000_000
 MAX_PDF_PAGES = 10_000
 
 
-def _merge_report(output_path, requested, merged, dry_run=False, cancelled=False, failed_paths=None):
+def _merge_report(output_path, requested, merged, dry_run=False, cancelled=False, failed_paths=None, success=None, message=""):
     failed_paths = failed_paths or []
     return {
         "operation": "merge_pdf",
@@ -25,10 +28,13 @@ def _merge_report(output_path, requested, merged, dry_run=False, cancelled=False
         "failed_paths": failed_paths,
         "dry_run": dry_run,
         "cancelled": cancelled,
+        "success": (merged > 0 and not cancelled) if success is None else success,
+        "message": message,
     }
 
 
-def _split_report(source_path, output_dir, requested, generated_paths, dry_run=False, cancelled=False):
+def _split_report(source_path, output_dir, requested, generated_paths, dry_run=False, cancelled=False, success=True, message="", errors=None):
+    errors = errors or []
     return {
         "operation": "split_pdf",
         "source_path": source_path,
@@ -38,10 +44,20 @@ def _split_report(source_path, output_dir, requested, generated_paths, dry_run=F
         "pages": generated_paths,
         "dry_run": dry_run,
         "cancelled": cancelled,
+        "success": success and not cancelled,
+        "message": message,
+        "errors": errors,
     }
 
 
-def _convert_report(source_path, output_path, target_format, resize_pct, dry_run=False):
+def _split_error_report(source_path, output_dir, message, dry_run=False):
+    return {
+        **_split_report(source_path, output_dir, 0, [], dry_run=dry_run, success=False, message=message),
+        "error": message,
+    }
+
+
+def _convert_report(source_path, output_path, target_format, resize_pct, dry_run=False, success=True, message=""):
     return {
         "operation": "convert_image",
         "source_path": source_path,
@@ -49,10 +65,12 @@ def _convert_report(source_path, output_path, target_format, resize_pct, dry_run
         "format": target_format,
         "resize_pct": resize_pct,
         "dry_run": dry_run,
+        "success": success,
+        "message": message,
     }
 
 
-def _compress_report(input_path, output_path, quality, dry_run=False, cancelled=False, ratio=None, message=""):
+def _compress_report(input_path, output_path, quality, dry_run=False, cancelled=False, ratio=None, message="", ratio_note=None, success=None):
     return {
         "operation": "compress_pdf",
         "input_path": input_path,
@@ -61,8 +79,9 @@ def _compress_report(input_path, output_path, quality, dry_run=False, cancelled=
         "dry_run": dry_run,
         "cancelled": cancelled,
         "ratio": ratio,
+        "ratio_note": ratio_note,
         "message": message,
-        "success": ratio is not None or dry_run,
+        "success": (ratio is not None or dry_run) if success is None else success,
     }
 
 
@@ -86,13 +105,54 @@ def _sanitize_base_name(name):
     return s[:80] or "output"
 
 
+def _atomic_replace(tmp_path, dest_path):
+    """Replace dest with tmp, falling back to shutil.move for EXDEV (cross-device)."""
+    try:
+        os.replace(tmp_path, dest_path)
+    except OSError as exc:
+        if exc.errno == errno.EXDEV:
+            shutil.move(tmp_path, dest_path)
+        else:
+            raise
+
+
+def _atomic_write(dest_path, writer):
+    """Write a pypdf writer to dest_path via same-dir mkstemp temp file + atomic replace."""
+    fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(dest_path)) or ".", suffix=".dataforge.tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            writer.write(f)
+        _atomic_replace(tmp_path, dest_path)
+    except BaseException:
+        try:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def _unique_output_path(out_path):
+    """Return a non-colliding output path, or the original if free."""
+    if not os.path.exists(out_path):
+        return out_path
+    base, ext = os.path.splitext(out_path)
+    for i in range(1, 10000):
+        candidate = f"{base}_{i}{ext}"
+        if not os.path.exists(candidate):
+            return candidate
+    return f"{base}_dup{ext}"
+
+
 def merge_pdfs(file_paths, output_path, dry_run=False, progress_callback=None, cancel_token=None):
     """Merge list of PDF paths into one. Hardened against crashes."""
-    if not PdfWriter:
-        raise ImportError("pypdf is required for PDF operations")
+    total = len(file_paths or [])
+    if not output_path:
+        return _merge_report(None, total, 0, dry_run=dry_run, success=False, message="output path required")
+    if not HAS_PYPDF:
+        return _merge_report(output_path, total, 0, dry_run=dry_run, failed_paths=list(file_paths or []), success=False, message="Install pypdf: pip install pypdf")
 
     writer = PdfWriter()
-    total = len(file_paths or [])
     merged = 0
     failed_paths = []
     readers = []  # keep open file handles until writer.write
@@ -156,15 +216,23 @@ def merge_pdfs(file_paths, output_path, dry_run=False, progress_callback=None, c
                         logger.error(f"PDF {path} has {num_pages} pages (max {MAX_PDF_PAGES}); skipping.")
                         failed_paths.append(path)
                         continue
+                    pages_added = 0
                     if not dry_run:
                         for page in reader.pages:
                             try:
                                 writer.add_page(page)
+                                pages_added += 1
                             except Exception as e:
                                 logger.error(f"Error adding page from {path}: {e}")
-                                # don't count as merged? but continue
+                                # don't count as merged; continue with next page
                                 continue
-                    merged += 1
+                    else:
+                        pages_added = num_pages
+                    if pages_added > 0:
+                        merged += 1
+                    else:
+                        # every page addition failed; this file contributed nothing
+                        failed_paths.append(path)
                 except Exception as e:
                     logger.error(f"Error reading {path}: {e}")
                     failed_paths.append(path)
@@ -186,23 +254,24 @@ def merge_pdfs(file_paths, output_path, dry_run=False, progress_callback=None, c
         if cancel_token and cancel_token.is_set():
             return _merge_report(output_path, total, merged, dry_run=dry_run, cancelled=True, failed_paths=failed_paths)
 
+        # Never write an empty/junk output when no file contributed pages
+        if merged == 0:
+            return _merge_report(output_path, total, 0, dry_run=False, failed_paths=failed_paths, success=False, message="No files contributed pages")
+
         # Ensure output dir exists
         if out_dir and not os.path.exists(out_dir):
             try:
                 os.makedirs(out_dir, exist_ok=True)
             except Exception as e:
                 logger.error(f"Could not create output dir {out_dir}: {e}")
-                # return failed?
-                return _merge_report(output_path, total, merged, dry_run=False, failed_paths=failed_paths)
+                return _merge_report(output_path, total, merged, dry_run=False, failed_paths=failed_paths, success=False, message=f"Could not create output dir: {e}")
 
-        # If no page was added and merged==0, still create empty? Write empty writer (will be minimal)
-        # Ensure we don't write if merged==0 and failed == total? Still write empty file to indicate?
+        # Atomic write: same-dir temp file, replace only after successful write
         try:
-            with open(output_path, "wb") as out:
-                writer.write(out)
+            _atomic_write(output_path, writer)
         except Exception as e:
             logger.error(f"Error writing merged PDF {output_path}: {e}")
-            raise
+            return _merge_report(output_path, total, merged, dry_run=False, failed_paths=failed_paths, success=False, message=str(e))
 
         return _merge_report(output_path, total, merged, dry_run=False, failed_paths=failed_paths)
     finally:
@@ -215,15 +284,15 @@ def merge_pdfs(file_paths, output_path, dry_run=False, progress_callback=None, c
 
 def split_pdf(path, output_dir, dry_run=False, progress_callback=None, cancel_token=None):
     """Split PDF into single pages. Returns report dict."""
-    if not PdfReader:
-        raise ImportError("pypdf is required for PDF operations")
+    if not HAS_PYPDF:
+        return _split_error_report(path, output_dir, "Install pypdf: pip install pypdf", dry_run=dry_run)
 
     if cancel_token and cancel_token.is_set():
         return _split_report(path, output_dir, 0, [], dry_run=dry_run, cancelled=True)
 
     # Validate input
     if not path or not os.path.exists(path):
-        return {"error": f"File not found: {path}", "pages": [], "source_path": path, "output_dir": output_dir}
+        return _split_error_report(path, output_dir, f"File not found: {path}", dry_run=dry_run)
 
     # Handle encrypted / read errors gracefully
     f = None
@@ -235,17 +304,17 @@ def split_pdf(path, output_dir, dry_run=False, progress_callback=None, cancel_to
                 try:
                     reader.decrypt("")
                     if getattr(reader, "is_encrypted", False):
-                        return {"error": "Encrypted PDF cannot be opened", "pages": [], "source_path": path, "output_dir": output_dir}
+                        return _split_error_report(path, output_dir, "Encrypted PDF cannot be opened", dry_run=dry_run)
                 except Exception as e:
-                    return {"error": f"Encrypted PDF: {e}", "pages": [], "source_path": path, "output_dir": output_dir}
+                    return _split_error_report(path, output_dir, f"Encrypted PDF: {e}", dry_run=dry_run)
             try:
                 total_pages = len(reader.pages)
             except Exception as e:
-                return {"error": f"Error reading PDF: {e}", "pages": [], "source_path": path, "output_dir": output_dir}
+                return _split_error_report(path, output_dir, f"Error reading PDF: {e}", dry_run=dry_run)
             if total_pages > MAX_PDF_PAGES:
-                return {"error": f"PDF has {total_pages} pages (max {MAX_PDF_PAGES})", "pages": []}
+                return _split_error_report(path, output_dir, f"PDF has {total_pages} pages (max {MAX_PDF_PAGES})", dry_run=dry_run)
         except Exception as e:
-            return {"error": f"Error reading PDF: {e}", "pages": [], "source_path": path, "output_dir": output_dir}
+            return _split_error_report(path, output_dir, f"Error reading PDF: {e}", dry_run=dry_run)
 
         # Sanitize base name
         base_name = os.path.splitext(os.path.basename(path))[0]
@@ -257,35 +326,47 @@ def split_pdf(path, output_dir, dry_run=False, progress_callback=None, cancel_to
                 try:
                     os.makedirs(output_dir, exist_ok=True)
                 except Exception as e:
-                    return {"error": f"Could not create output dir: {e}", "pages": []}
+                    return _split_error_report(path, output_dir, f"Could not create output dir: {e}", dry_run=dry_run)
 
         generated = []
+        errors = []
         # Need to keep reader open while generating? We already have f open and reader pages in memory; we can copy pages
         # For each page, create writer and write; keep reader alive until loop ends
         for i, page in enumerate(reader.pages):
             out_name = f"{base_name}_page_{i+1}.pdf"
             out_path = os.path.join(output_dir or os.path.dirname(os.path.abspath(path)), out_name)
-            generated.append(out_path)
 
             if cancel_token and cancel_token.is_set():
-                return _split_report(path, output_dir, total_pages, generated, dry_run=dry_run, cancelled=True)
+                return _split_report(path, output_dir, total_pages, generated, dry_run=dry_run, cancelled=True, success=False, errors=errors)
 
-            if not dry_run:
-                try:
-                    writer = PdfWriter()
+            if dry_run:
+                generated.append(out_path)
+                if progress_callback:
                     try:
-                        writer.add_page(page)
-                    except Exception as e:
-                        logger.error(f"Error adding page {i+1} from {path}: {e}")
-                        continue
-                    # sanitize ensures safe path; write
-                    # Ensure output_dir exists (already)
-                    with open(out_path, "wb") as out:
-                        writer.write(out)
+                        progress_callback(i + 1, total_pages, "Splitting PDF...")
+                    except Exception:
+                        pass
+                continue
+
+            try:
+                writer = PdfWriter()
+                try:
+                    writer.add_page(page)
                 except Exception as e:
-                    logger.error(f"Error writing split page {out_path}: {e}")
-                    # continue but keep entry in generated? Maybe keep but log
+                    logger.error(f"Error adding page {i+1} from {path}: {e}")
+                    errors.append({"path": out_path, "requested": total_pages, "success": False, "message": str(e), "error": str(e)})
+                    if progress_callback:
+                        try:
+                            progress_callback(i + 1, total_pages, "Splitting PDF...")
+                        except Exception:
+                            pass
                     continue
+                # Record path only after successful write
+                _atomic_write(out_path, writer)
+                generated.append(out_path)
+            except Exception as e:
+                logger.error(f"Error writing split page {out_path}: {e}")
+                errors.append({"path": out_path, "requested": total_pages, "success": False, "message": str(e), "error": str(e)})
 
             if progress_callback:
                 try:
@@ -293,7 +374,7 @@ def split_pdf(path, output_dir, dry_run=False, progress_callback=None, cancel_to
                 except Exception:
                     pass
 
-        return _split_report(path, output_dir, total_pages, generated, dry_run=dry_run)
+        return _split_report(path, output_dir, total_pages, generated, dry_run=dry_run, success=not errors, errors=errors)
     finally:
         if f is not None:
             try:
@@ -304,8 +385,8 @@ def split_pdf(path, output_dir, dry_run=False, progress_callback=None, cancel_to
 
 def compress_pdf(input_path, output_path, quality='medium', dry_run=False, progress_callback=None, cancel_token=None):
     """Compress PDF. Quality: low/medium/high. Returns report with ratio."""
-    if not PdfWriter or not PdfReader:
-        return _compress_report(input_path, output_path, quality, dry_run=dry_run, cancelled=False, ratio=None, message="pypdf not installed")
+    if not HAS_PYPDF:
+        return _compress_report(input_path, output_path, quality, dry_run=dry_run, cancelled=False, ratio=None, message="Install pypdf: pip install pypdf")
 
     if cancel_token and cancel_token.is_set():
         return _compress_report(input_path, output_path, quality, dry_run=dry_run, cancelled=True, ratio=None, message="cancelled")
@@ -319,10 +400,10 @@ def compress_pdf(input_path, output_path, quality='medium', dry_run=False, progr
             os.path.getsize(input_path)
         except Exception:
             pass
-        # fake ratio for preview
+        # ratio is an estimate for preview only; label it as such
         ratio_map = {"low": 0.5, "medium": 0.7, "high": 0.9}
         ratio = ratio_map.get(quality, 0.7)
-        return _compress_report(input_path, output_path, quality, dry_run=True, cancelled=False, ratio=ratio, message="dry run")
+        return _compress_report(input_path, output_path, quality, dry_run=True, cancelled=False, ratio=ratio, message="dry run", ratio_note="estimate based on lossless rewrite")
 
     # Ensure output dir
     out_dir = os.path.dirname(os.path.abspath(output_path)) if output_path else ""
@@ -364,50 +445,27 @@ def compress_pdf(input_path, output_path, quality='medium', dry_run=False, progr
             except Exception:
                 # fallback: try add blank?
                 continue
-            # try compress content streams per page if available
+
+        # Compress content streams per page (pypdf exposes compression on pages, not the writer)
+        for page in writer.pages:
             try:
-                # New pypdf: page.compress_content_streams()
-                if hasattr(writer.pages[-1], "compress_content_streams"):
-                    writer.pages[-1].compress_content_streams()
+                page.compress_content_streams()
             except Exception:
-                pass
+                pass  # Some pages may not support compression
 
-        # Writer-level compress if available
+        # Atomic write to output_path via same-dir temp file
         try:
-            if hasattr(writer, "compress_content_streams"):
-                writer.compress_content_streams()
-        except Exception:
-            pass
-
-        # Write to temp then move
-        tmp_path = output_path + ".tmp"
-        try:
-            with open(tmp_path, "wb") as out:
-                writer.write(out)
+            _atomic_write(output_path, writer)
         except Exception as e:
             return _compress_report(input_path, output_path, quality, dry_run=False, cancelled=False, ratio=None, message=str(e))
 
         # Compute ratio
         try:
             orig = os.path.getsize(input_path)
-            comp = os.path.getsize(tmp_path)
+            comp = os.path.getsize(output_path)
             ratio = comp / orig if orig else 1.0
         except Exception:
             ratio = None
-
-        # Move to final (atomic)
-        try:
-            # ensure not same file
-            if os.path.abspath(tmp_path) != os.path.abspath(output_path):
-                try:
-                    os.replace(tmp_path, output_path)
-                except OSError:
-                    shutil.move(tmp_path, output_path)
-            else:
-                # same? just already written
-                pass
-        except Exception as e:
-            return _compress_report(input_path, output_path, quality, dry_run=False, cancelled=False, ratio=ratio, message=str(e))
 
         if progress_callback:
             try:
@@ -425,13 +483,6 @@ def compress_pdf(input_path, output_path, quality='medium', dry_run=False, progr
                 fh.close()
             except Exception:
                 pass
-        # cleanup tmp if left
-        try:
-            tmp_candidate = output_path + ".tmp"
-            if os.path.exists(tmp_candidate):
-                os.remove(tmp_candidate)
-        except Exception:
-            pass
 
 
 def convert_pdf(input_path, output_path, to='jpg', dry_run=False, progress_callback=None, cancel_token=None):
@@ -520,7 +571,23 @@ def convert_pdf(input_path, output_path, to='jpg', dry_run=False, progress_callb
                     od = os.path.dirname(os.path.abspath(out_p))
                     if od and not os.path.exists(od):
                         os.makedirs(od, exist_ok=True)
-                    pix.save(out_p)
+                    # Atomic per-page write: temp file (jpg suffix for format inference) then replace
+                    fd, tmp_pix = tempfile.mkstemp(dir=od or ".", suffix=".jpg")
+                    os.close(fd)
+                    try:
+                        os.unlink(tmp_pix)
+                    except OSError:
+                        pass
+                    try:
+                        pix.save(tmp_pix)
+                        _atomic_replace(tmp_pix, out_p)
+                    except Exception:
+                        try:
+                            if os.path.exists(tmp_pix):
+                                os.unlink(tmp_pix)
+                        except OSError:
+                            pass
+                        raise
                     if progress_callback:
                         try:
                             progress_callback(i + 1, n, "Converting PDF to JPG...")
@@ -549,14 +616,36 @@ def convert_pdf(input_path, output_path, to='jpg', dry_run=False, progress_callb
                     progress_callback(0, 1, "Converting PDF to DOCX...")
                 except Exception:
                     pass
+            # Convert to same-dir temp then atomically replace
+            od = os.path.dirname(os.path.abspath(output_path)) or "."
+            fd, tmp_docx = tempfile.mkstemp(dir=od, suffix=".docx")
+            os.close(fd)
+            try:
+                os.unlink(tmp_docx)
+            except OSError:
+                pass
             cv = Converter(input_path)
             try:
-                cv.convert(output_path)
+                cv.convert(tmp_docx)
                 cv.close()
             except Exception:
                 try:
                     cv.close()
                 except Exception:
+                    pass
+                try:
+                    if os.path.exists(tmp_docx):
+                        os.unlink(tmp_docx)
+                except OSError:
+                    pass
+                raise
+            try:
+                _atomic_replace(tmp_docx, output_path)
+            except Exception:
+                try:
+                    if os.path.exists(tmp_docx):
+                        os.unlink(tmp_docx)
+                except OSError:
                     pass
                 raise
             if progress_callback:
@@ -590,10 +679,26 @@ def convert_pdf(input_path, output_path, to='jpg', dry_run=False, progress_callb
                 import pandas as pd  # type: ignore
                 if not dfs:
                     return _convert_pdf_report(input_path, output_path, to, dry_run=False, cancelled=False, success=False, message="No tables found in PDF")
-                # Combine sheets?
-                with pd.ExcelWriter(output_path) as writer:
-                    for idx, df in enumerate(dfs):
-                        df.to_excel(writer, sheet_name=f"Table_{idx+1}", index=False)
+                # Write to same-dir temp then atomically replace
+                od = os.path.dirname(os.path.abspath(output_path)) or "."
+                fd, tmp_xlsx = tempfile.mkstemp(dir=od, suffix=".xlsx")
+                os.close(fd)
+                try:
+                    os.unlink(tmp_xlsx)
+                except OSError:
+                    pass
+                try:
+                    with pd.ExcelWriter(tmp_xlsx) as writer:
+                        for idx, df in enumerate(dfs):
+                            df.to_excel(writer, sheet_name=f"Table_{idx+1}", index=False)
+                    _atomic_replace(tmp_xlsx, output_path)
+                except Exception:
+                    try:
+                        if os.path.exists(tmp_xlsx):
+                            os.unlink(tmp_xlsx)
+                    except OSError:
+                        pass
+                    raise
                 if progress_callback:
                     try:
                         progress_callback(1, 1, "Converted")
@@ -611,9 +716,25 @@ def convert_pdf(input_path, output_path, to='jpg', dry_run=False, progress_callb
         try:
             tables = camelot.read_pdf(input_path, pages="all")
             import pandas as pd
-            with pd.ExcelWriter(output_path) as writer:
-                for idx, t in enumerate(tables):
-                    t.df.to_excel(writer, sheet_name=f"Table_{idx+1}", index=False)
+            od = os.path.dirname(os.path.abspath(output_path)) or "."
+            fd, tmp_xlsx = tempfile.mkstemp(dir=od, suffix=".xlsx")
+            os.close(fd)
+            try:
+                os.unlink(tmp_xlsx)
+            except OSError:
+                pass
+            try:
+                with pd.ExcelWriter(tmp_xlsx) as writer:
+                    for idx, t in enumerate(tables):
+                        t.df.to_excel(writer, sheet_name=f"Table_{idx+1}", index=False)
+                _atomic_replace(tmp_xlsx, output_path)
+            except Exception:
+                try:
+                    if os.path.exists(tmp_xlsx):
+                        os.unlink(tmp_xlsx)
+                except OSError:
+                    pass
+                raise
             return _convert_pdf_report(input_path, output_path, to, dry_run=False, cancelled=False, success=True, message=f"Converted {len(tables)} tables")
         except Exception as e:
             return _convert_pdf_report(input_path, output_path, to, dry_run=False, cancelled=False, success=False, message=str(e))
@@ -739,7 +860,7 @@ def convert_image(path, target_format, resize_pct=100, dry_run=False, progress_c
                     pass
             return {"cancelled": True, "path": path, "message": "cancelled"}
 
-        # Determine output path
+        # Determine output path (pure path computation, no filesystem side effects)
         head, tail = os.path.split(path)
         name = os.path.splitext(tail)[0]
         # sanitize name
@@ -752,18 +873,9 @@ def convert_image(path, target_format, resize_pct=100, dry_run=False, progress_c
             out_ext = "jpg"
         out_name = f"{name}.{out_ext}"
         dest_dir = output_dir if output_dir else head
-        # Ensure dest_dir exists
-        if dest_dir and not os.path.exists(dest_dir):
-            try:
-                os.makedirs(dest_dir, exist_ok=True)
-            except Exception as e:
-                logger.error(f"Could not create dest dir {dest_dir}: {e}")
-                raise
-
         out_path = os.path.join(dest_dir or ".", out_name)
 
-        # Avoid overwriting source if same path and format unchanged? Still allow but temp handling avoids corruption
-        # If dry_run just return report
+        # Dry run must be side-effect-free: no directory creation, no writes
         if dry_run:
             if progress_callback:
                 try:
@@ -783,6 +895,25 @@ def convert_image(path, target_format, resize_pct=100, dry_run=False, progress_c
             except Exception:
                 pass
             return {"cancelled": True, "path": path, "message": "cancelled"}
+
+        # Same-file overwrite guard: never replace the source image
+        if os.path.abspath(out_path) == os.path.abspath(path):
+            try:
+                work.close()
+            except Exception:
+                pass
+            return _convert_report(path, out_path, pil_format, resize_pct, dry_run=False, success=False, message="Output path is the same as source; not overwriting")
+
+        # Collision detection: never silently overwrite an existing output
+        out_path = _unique_output_path(out_path)
+
+        # Ensure dest_dir exists (only reached when NOT dry_run)
+        if dest_dir and not os.path.exists(dest_dir):
+            try:
+                os.makedirs(dest_dir, exist_ok=True)
+            except Exception as e:
+                logger.error(f"Could not create dest dir {dest_dir}: {e}")
+                raise
 
         save_kwargs = {}
         if pil_format == 'JPEG':
