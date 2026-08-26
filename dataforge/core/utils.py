@@ -1,3 +1,15 @@
+"""Shared core helpers (TICK-913 audit — all symbols below are live).
+
+Live functions and where they are used:
+- CATEGORY_EXTENSIONS / CATEGORY_COLORS: dashboard, widgets, actions/filters
+- categorize_extension: dashboard, widgets, actions/organize
+- normalize_filename: core/services/file_actions, widgets (renamer)
+- format_size: every view + modules (search, media, performance, etc.)
+- format_display_path: search/duplicates views, widgets preview
+- parse_extensions: modules/search, actions/filters, ui/views/tools
+- check_disk_space: core/actions/{organize,io}
+- safe_zip_write: core/services/file_actions (archive paths)
+"""
 from .config import config
 import math
 import os

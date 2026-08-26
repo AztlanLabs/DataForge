@@ -1,7 +1,22 @@
+"""Duplicate-report export helpers (TICK-913).
+
+ReportGenerator is kept for backward compatibility (exercised by the test
+suite), but the pandas hard dependency has been made lazy: when pandas is
+not installed, ``duplicates_to_csv`` falls back to the stdlib ``csv``
+module so importing this module never fails.
+"""
+import csv
 import json
 from typing import List, Dict
 from ..core.common import FileEntry
-import pandas as pd
+
+try:
+    import pandas as pd
+    HAS_PANDAS = True
+except ImportError:
+    pd = None
+    HAS_PANDAS = False
+
 
 class ReportGenerator:
     @staticmethod
@@ -16,11 +31,20 @@ class ReportGenerator:
                     'filename': entry.filename,
                     'extension': entry.extension
                 })
-        
-        if rows:
+
+        if not rows:
+            return
+
+        if HAS_PANDAS:
             df = pd.DataFrame(rows)
             df.to_csv(output_file, index=False)
-    
+            return
+
+        with open(output_file, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+            writer.writeheader()
+            writer.writerows(rows)
+
     @staticmethod
     def duplicates_to_json(duplicates: Dict[str, List[FileEntry]], output_file: str):
         data = {}
@@ -32,10 +56,10 @@ class ReportGenerator:
                     'filename': e.filename
                 } for e in entries
             ]
-        
+
         with open(output_file, 'w') as f:
             json.dump(data, f, indent=4)
-            
+
     @staticmethod
     def duplicates_to_txt(duplicates: Dict[str, List[FileEntry]], output_file: str):
         with open(output_file, 'w') as f:

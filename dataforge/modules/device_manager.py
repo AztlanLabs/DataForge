@@ -9,7 +9,6 @@ import platform
 import subprocess
 
 from ..core.logger import logger
-from ..core.scanner import scan_directory
 from ..core.utils import format_size
 
 # psutil is optional
@@ -225,33 +224,3 @@ def get_device_info(mount_point):
             info["error"] = str(exc)
 
     return info
-
-
-def scan_device(mount_point, recursive=True, max_depth=-1, cancel_token=None, progress_callback=None):
-    """
-    Scan a storage device using the standard scanner.
-
-    Args:
-        mount_point: Root path of the device to scan.
-        recursive: Whether to scan recursively.
-        max_depth: Maximum directory depth (-1 = unlimited).
-        cancel_token: threading.Event for cancellation.
-        progress_callback: Progress reporting callback.
-
-    Returns:
-        list of FileEntry objects.
-    """
-    entries = []
-    count = 0
-
-    for entry in scan_directory(mount_point, recursive=recursive, max_depth=max_depth, cancel_token=cancel_token):
-        entries.append(entry)
-        count += 1
-
-        if progress_callback and count % 100 == 0:
-            progress_callback(count, 0, f"Scanned {count} files on {mount_point}")
-
-    if progress_callback:
-        progress_callback(count, count, f"Scan complete: {count} files")
-
-    return entries
