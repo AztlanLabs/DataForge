@@ -1725,7 +1725,7 @@ verification:
 
 | Ticket ID | Domain | Target Write Scope (exclusive) | Depends On | Scope |
 |---|---|---|---|---|
-| `TICK-919` | Core / Operations | `dataforge/core/operations/files.py` | Wave 11 | Result contract, rename confinement, transfer safety |
+| `TICK-919` | Core / Operations | `dataforge/core/operations/files.py` | Wave 11 | Result contract, rename confinement, transfer safety | ✅ DONE 2026-08-25 — `tests/test_operations_contract.py` 10/10, merge `4946839`, `OperationReport` dataclass (success independent of JobStatus.DONE), `rename_path` rejects separators/`.`/`..`/absolute + confinement check, `transfer_path` same-file guard (copy+move, dry-run aware) |
 | `TICK-920` | Core / Media Ops | `dataforge/core/media_ops.py` | Wave 11 | PDF merge/split/compress/convert correctness, image dry-run, atomic output | ✅ DONE 2026-08-25 — `tests/test_media_ops_contract.py` 14/14, merge `03fdec6`, no ImportError from entry points, merged counted by pages, per-page compress, dry-run side-effect-free, same-file guard, collision unique names, mkstemp atomic replace |
 | `TICK-921` | Modules / Metadata | `dataforge/modules/metadata.py`, `dataforge/modules/cleaner.py` | Wave 11 | PNG write, exiftool detection, capability model, selective removal |
 | `TICK-922` | Modules / Search+Dupes | `dataforge/modules/search.py`, `dataforge/modules/duplicates.py` | Wave 11 | Stale results, validation, content verification, cache invalidation |
