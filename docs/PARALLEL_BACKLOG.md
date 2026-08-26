@@ -1560,7 +1560,7 @@ verification:
 | Ticket ID | Domain | Target Write Scope (exclusive) | Depends On | Scope |
 |---|---|---|---|---|
 | `TICK-914` | UI / Job Manager | `dataforge/ui/job_manager.py` | Wave 10 | Progress callback safety, QThread lifecycle, affinity contract |
-| `TICK-915` | Engine / Jobs | `dataforge/engine/jobs.py` | `TICK-914` | max_workers enforcement, cancellation guard, state ownership, TypeError retry, shutdown |
+| `TICK-915` | Engine / Jobs | `dataforge/engine/jobs.py` | `TICK-914` | max_workers enforcement, cancellation guard, state ownership, TypeError retry, shutdown | ✅ DONE 2026-08-25 — `tests/test_job_engine_contract.py` 11/11, merge `4fd683d` (`ba0c3ff`), max_workers clamped+enforced, single-invocation `_invoke_worker`, shutdown terminalizes + clears `_futures`, sentinel `-1`→`None` |
 | `TICK-916` | Core / File Actions | `dataforge/core/services/file_actions.py` | `TICK-915` | Parallel exception indexing, cancellation accounting, temp file safety |
 | `TICK-917` | UI / App + Evidence | `dataforge/ui/app.py`, `dataforge/core/case.py` | `TICK-914` | Evidence mode at mutation boundary, closeEvent shutdown, callback signature |
 | `TICK-918` | Forensics + API | `dataforge/modules/forensics.py`, `dataforge/api/schema.py` | `TICK-915` | File-type profiling fix, progress total sentinel, timeline atime, integrity contract |
