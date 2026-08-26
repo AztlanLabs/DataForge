@@ -399,7 +399,7 @@ def find_duplicates(path: str, recursive: bool = True, max_depth: int = -1, prog
     for entry in fast_candidates:
         if cancel_token and cancel_token.is_set():
             raise InterruptedError("cancelled")
-        cached = file_cache.get_hash(entry.path, entry.size, entry.modified_at, algo)
+        cached = file_cache.get_hash(entry.path, entry.size, entry.modified_at, algo, inode=entry.st_ino)
         if cached:
             hash_map[cached].append(entry)
         else:
@@ -433,7 +433,7 @@ def find_duplicates(path: str, recursive: bool = True, max_depth: int = -1, prog
                     _path, file_hash = fut.result()
                     if file_hash:
                         hash_map[file_hash].append(entry)
-                        pending_rows.append((entry.path, entry.size, entry.modified_at, file_hash, algo))
+                        pending_rows.append((entry.path, entry.size, entry.modified_at, entry.st_ino, file_hash, algo))
                 except Exception as e:
                     logger.error(f"Error hashing {entry.path}: {e}")
         # Single deferred flush after pool — avoids SQLite SIGSEGV from concurrent insert+select

@@ -157,7 +157,8 @@ def test_set_hash_many_validates_shape(tmp_path):
 
 def test_cache_schema_version_constant():
     mod = importlib.import_module("dataforge.core.cache")
-    assert mod.CACHE_SCHEMA_VERSION == 2
+    # v3: inode column added to file_hashes (TICK-922 cache invalidation)
+    assert mod.CACHE_SCHEMA_VERSION == 3
     assert mod.MIGRATIONS_DIR.name == "migrations"
     assert mod.MIGRATIONS_DIR.exists()
 
