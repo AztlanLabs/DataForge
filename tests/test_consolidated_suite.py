@@ -433,11 +433,15 @@ def test_integration_smoke_evidence_mode_gates_mutations(tmp_path):
     victim.write_text("data", encoding="utf-8")
 
     ctx = CaseContext(case_id="CASE-1", operator="tester", evidence_mode=True)
-    svc = FileActionService(audit_log=AuditLog(db_path=str(tmp_path / "a.db")), case_context=ctx)
-    outcome = svc.delete_items([str(victim)], dry_run=False)
-    assert len(outcome.failures) == 1
-    assert "Evidence Mode" in outcome.failures[0].message
-    assert victim.exists()  # blocked before mutation
+    audit = AuditLog(db_path=str(tmp_path / "a.db"))
+    try:
+        svc = FileActionService(audit_log=audit, case_context=ctx)
+        outcome = svc.delete_items([str(victim)], dry_run=False)
+        assert len(outcome.failures) == 1
+        assert "Evidence Mode" in outcome.failures[0].message
+        assert victim.exists()  # blocked before mutation
+    finally:
+        audit.close()
 
 
 def test_integration_smoke_action_pipeline_filter_then_rename(tmp_path):
