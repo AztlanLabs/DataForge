@@ -18,17 +18,24 @@ dependencies = [
     "py-cpuinfo>=9.0.0",
     "defusedxml>=0.7.1",
     "pydantic>=2",
+    "msgpack>=1.0.0",
+    "platformdirs>=4.0.0",
     "fastapi>=0.115.0",
     "uvicorn>=0.34.0",
     "httpx>=0.28.0",
 ]
 
+[project.optional-dependencies]
+# GUI/media/forensics backends are optional: the `fm` CLI console script only
+# needs the core dependencies above. Install extras (or requirements.txt)
+# for full desktop/media support.
+gui = ["PyQt5>=5.15.0"]
+media = ["Pillow>=10.0.0", "pypdf>=6.14.2", "pymupdf>=1.28.0", "opencv-python-headless>=5.0.0.93", "pandas>=2.2.3"]
+forensics = ["psutil>=5.9.0", "python-magic>=0.4.27", "PyExifTool>=0.5.0", "mutagen>=1.47.0"]
+dev = ["pytest", "pytest-cov", "pytest-asyncio", "ruff", "mypy", "pre-commit", "pip-audit", "pyinstaller"]
+
 [project.scripts]
 fm = "dataforge.cli:main"
-
-# PyQt5 and Pillow are intentionally excluded from [project.dependencies]:
-# they only back the desktop GUI (run_ui.py), not the `fm` CLI console
-# script. Install from requirements.txt for full GUI/media support.
 
 [tool.setuptools.packages.find]
 include = ["dataforge*"]

@@ -67,6 +67,12 @@ def _try_windows_acquire(path: str, mode: str):
     """Try Windows VSS / win32 CreateFile path.
 
     Returns a file-like object on success, else None.
+
+    Contract: never raises. VSS *shadow-copy* acquisition is not implemented —
+    the vssadmin probe below only detects capability and then returns None so
+    the caller (acquire_file) falls back to direct open with retry. A None
+    return means "not acquired via this provider", not "file not found";
+    callers must treat it as a fallback trigger, never as an error.
     Mock-friendly: imports win32file/win32api inside function so tests can
     inject sys.modules['win32api'] etc.
     """
@@ -167,12 +173,12 @@ def _try_windows_acquire(path: str, mode: str):
             timeout=5,
         )
         if result.returncode == 0 and "Shadow Copy" in result.stdout:
-            # VSS available but we don't know shadow path for path
-            # As fallback, try to copy via shadow (simulated by direct open)
-            logger.debug("VSS available via vssadmin for %s", path)
-            # Real shadow copy creation would be:
-            # vssadmin create shadow /For=C: -> parse Shadow Copy Volume: \\?\GLOBALROOT\...
-            # For now return None to fall through to direct open
+            # VSS is available but shadow-copy acquisition is not implemented
+            # (no shadow path mapping). Log clearly and return None so the
+            # caller falls back to direct open — do not silently pretend.
+            logger.debug(
+                "VSS shadow-copy acquisition unsupported for %s — falling back to direct open", path
+            )
             return None
     except (FileNotFoundError, subprocess.SubprocessError, OSError):
         pass
@@ -230,17 +236,20 @@ def _try_linux_sudo_copy(path: str, mode: str):
                 else:
                     f = open(tmp_path, mode, encoding="utf-8", errors="replace")
 
-                # Wrap file so on close we also unlink tmp_path
+                # Wrap file so on close we also unlink tmp_path.
+                # Capture tmp_path by value (default arg): the outer variable
+                # is nulled below, which would otherwise leak the temp copy.
                 original_close = f.close
 
-                def _close_and_cleanup():
+                def _close_and_cleanup(_tmp=tmp_path, _orig=original_close):
                     try:
-                        original_close()
+                        _orig()
                     finally:
-                        try:
-                            os.unlink(tmp_path)
-                        except Exception:
-                            pass
+                        if _tmp and os.path.exists(_tmp):
+                            try:
+                                os.unlink(_tmp)
+                            except OSError:
+                                pass
 
                 f.close = _close_and_cleanup  # type: ignore
                 # Keep tmp_path for cleanup on exception; monkey close will handle
@@ -293,14 +302,15 @@ def _try_linux_sudo_copy(path: str, mode: str):
 
                 original_close = f.close
 
-                def _close2():
+                def _close2(_tmp=tmp_path, _orig=original_close):
                     try:
-                        original_close()
+                        _orig()
                     finally:
-                        try:
-                            os.unlink(tmp_path)
-                        except Exception:
-                            pass
+                        if _tmp and os.path.exists(_tmp):
+                            try:
+                                os.unlink(_tmp)
+                            except OSError:
+                                pass
 
                 f.close = _close2  # type: ignore
                 tmp_path = None

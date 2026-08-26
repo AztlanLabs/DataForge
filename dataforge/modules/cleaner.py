@@ -1,9 +1,6 @@
 import os
-from PIL import Image
 from ..core.logger import logger
 from .metadata import MetadataEngine
-
-Image.MAX_IMAGE_PIXELS = 100_000_000
 
 
 def remove_empty_folders(path, dry_run=True):
@@ -38,6 +35,9 @@ class MetadataCleaner:
             ext = os.path.splitext(path)[1].lower()
             if ext in ['.jpg', '.jpeg', '.png', '.tiff', '.webp']:
                 try:
+                    from PIL import Image  # lazy import — cleaner must import without Pillow
+
+                    Image.MAX_IMAGE_PIXELS = 100_000_000
                     with Image.open(path) as img:
                         exif = img.getexif()
                         if exif:
