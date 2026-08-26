@@ -126,8 +126,8 @@ class Job:
         self.status = JobStatus.CANCELLED
         if self.finished_at is None:
             self.finished_at = time.time()
-        # Avoid duplicate consecutive CANCELLED events
-        if not self.events or self.events[-1].status != JobStatus.CANCELLED:
+        # Avoid duplicate CANCELLED events (TICK-915: exactly one terminal event)
+        if not any(e.status == JobStatus.CANCELLED for e in self.events):
             self.events.append(
                 JobEvent(
                     job_id=self.job_id,
@@ -205,7 +205,7 @@ class JobQueue:
         ``self._lock``. Deduplicates when the last event already carries the
         same terminal status (e.g. ``cancel()`` raced with ``_run_job``).
         """
-        if not job.events or job.events[-1].status != status:
+        if not job.events or not any(e.status == status for e in job.events):
             job.events.append(
                 JobEvent(
                     job_id=job.job_id,
@@ -265,11 +265,16 @@ class JobQueue:
             d: Dict[str, Any] = dict(raw_params)
             if not d and not kwargs:
                 return func()
+            pos_only = {
+                k for k, p in params_meta.items()
+                if p.kind == inspect.Parameter.POSITIONAL_ONLY
+            }
             if params_meta and (has_var_kw or all(k in params_meta or k in kwargs for k in d)):
-                merged: Dict[str, Any] = {**d, **kwargs}
-                if not has_var_kw:
-                    merged = {k: v for k, v in merged.items() if k in params_meta or k in kwargs}
-                return func(**merged)
+                if not (pos_only & set(d)):
+                    merged: Dict[str, Any] = {**d, **kwargs}
+                    if not has_var_kw:
+                        merged = {k: v for k, v in merged.items() if k in params_meta or k in kwargs}
+                    return func(**merged)
             if kwargs:
                 # Params dict does not fit the signature; pass only the
                 # injected cancel_token/progress_callback kwargs.
