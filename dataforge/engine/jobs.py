@@ -167,9 +167,11 @@ class JobQueue:
     DEFAULT_QUEUE_DEPTH: int = _QUEUE_DEPTH
 
     def __init__(self, max_workers: int = 4, queue_depth: int = 8) -> None:
-        self.max_workers = max_workers
+        # TICK-915: clamp max_workers so a misconfigured value of 0/negative
+        # cannot crash ThreadPoolExecutor or silently disable the limit.
+        self.max_workers = max(1, int(max_workers))
         self.queue_depth = queue_depth
-        self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="dataforge-job")
+        self._executor = ThreadPoolExecutor(max_workers=self.max_workers, thread_name_prefix="dataforge-job")
         self._jobs: Dict[str, Job] = {}
         self._lock = threading.Lock()
         self._futures: Dict[str, Any] = {}
@@ -181,33 +183,64 @@ class JobQueue:
         with self._lock:
             return sum(1 for j in self._jobs.values() if j.status == JobStatus.QUEUED)
 
+    @staticmethod
+    def _append_terminal(
+        job: Job,
+        status: JobStatus,
+        message: str,
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Append the single terminal status event for a job.
+
+        TICK-915: exactly one terminal event per job. Callers must hold
+        ``self._lock``. Deduplicates when the last event already carries the
+        same terminal status (e.g. ``cancel()`` raced with ``_run_job``).
+        """
+        if not job.events or job.events[-1].status != status:
+            job.events.append(
+                JobEvent(
+                    job_id=job.job_id,
+                    type="status",
+                    status=status,
+                    message=message,
+                    payload=payload,
+                )
+            )
+
     def _invoke_worker(self, job: Job, func: Callable[..., Any]) -> Any:
         def _progress(current: int, total: int, message: str = "") -> None:
             if job.is_cancelled():
                 return
+            # TICK-915: -1 is an "unknown total" sentinel emitted by callers
+            # (e.g. daemon scan). JobEvent.total requires ge=0, so normalize
+            # negative totals to None before constructing the event.
+            safe_total: Optional[int] = None if total is not None and total < 0 else total
             evt = JobEvent(
                 job_id=job.job_id,
                 type="progress",
                 current=current,
-                total=total,
+                total=safe_total,
                 message=message,
             )
-            job.events.append(evt)
+            with self._lock:
+                job.events.append(evt)
             if job.progress_callback is not None:
                 try:
                     job.progress_callback(current, total, message)
                 except Exception:
                     pass
 
+        # TICK-915: inspect the signature exactly once and invoke the target
+        # exactly once. The previous retry loop re-ran targets after TypeError,
+        # which could execute a mutating target multiple times.
         try:
-            sig = inspect.signature(func)
-            params_meta = sig.parameters
-            has_cancel = "cancel_token" in params_meta
-            has_progress = "progress_callback" in params_meta
-            has_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params_meta.values())
+            params_meta = inspect.signature(func).parameters
         except (ValueError, TypeError):
-            sig = None
-            has_cancel = has_progress = has_var_kw = False
+            params_meta = {}
+
+        has_cancel = "cancel_token" in params_meta
+        has_progress = "progress_callback" in params_meta
+        has_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params_meta.values())
 
         kwargs: Dict[str, Any] = {}
         if has_cancel:
@@ -218,54 +251,33 @@ class JobQueue:
         raw_params: Any = job.params
         if raw_params is None:
             raw_params = {}
-        is_dict_params = isinstance(raw_params, dict)
 
-        attempts: list[Callable[[], Any]] = []
-
-        if is_dict_params:
-            d: Dict[str, Any] = raw_params
-            if sig is not None:
-                if has_var_kw or all(k in params_meta or k in kwargs for k in d):
-                    merged = {**d, **kwargs}
-                    if not has_var_kw:
-                        merged = {k: v for k, v in merged.items() if k in params_meta}
-                        if has_cancel and "cancel_token" not in merged:
-                            merged["cancel_token"] = job.cancel_token
-                        if has_progress and "progress_callback" not in merged:
-                            merged["progress_callback"] = _progress
-                    attempts.append(lambda m=merged: func(**m))  # type: ignore[misc]
-            attempts.append(lambda: func(d, **kwargs) if kwargs else func(d))
+        if isinstance(raw_params, dict):
+            d: Dict[str, Any] = dict(raw_params)
+            if not d and not kwargs:
+                return func()
+            if params_meta and (has_var_kw or all(k in params_meta or k in kwargs for k in d)):
+                merged: Dict[str, Any] = {**d, **kwargs}
+                if not has_var_kw:
+                    merged = {k: v for k, v in merged.items() if k in params_meta or k in kwargs}
+                return func(**merged)
             if kwargs:
-                attempts.append(lambda: func(**kwargs))
-            attempts.append(lambda: func())
-            if sig is not None and d:
-                filtered = {k: v for k, v in d.items() if k in params_meta}
-                if filtered and filtered != d:
-                    merged2 = {**filtered, **kwargs}
-                    attempts.append(lambda m=merged2: func(**m))  # type: ignore[misc]
-        else:
-            attempts.append(lambda: func(raw_params, **kwargs) if kwargs else func(raw_params))
-            if kwargs:
-                attempts.append(lambda: func(**kwargs))
-            attempts.append(lambda: func())
-
-        last_exc: Optional[Exception] = None
-        for attempt in attempts:
-            try:
-                return attempt()
-            except TypeError as exc:
-                last_exc = exc
-                continue
-            except Exception:
-                raise
-        if last_exc is not None:
-            raise last_exc
-        return func()
+                # Params dict does not fit the signature; pass only the
+                # injected cancel_token/progress_callback kwargs.
+                return func(**kwargs)
+            return func(d)
+        return func(raw_params, **kwargs) if kwargs else func(raw_params)
 
     def _run_job(self, job: Job, func: Callable[..., Any]) -> None:
+        # TICK-915: all Job field mutations happen under self._lock so the
+        # manager/daemon thread and executor threads cannot race.
         with self._lock:
             if job.status == JobStatus.CANCELLED:
                 job.finished_at = time.time()
+                self._append_job_record(job)
+                return
+            if job.status not in (JobStatus.QUEUED, JobStatus.PENDING):
+                # Already terminal (e.g. cancelled after future started).
                 self._append_job_record(job)
                 return
             job.status = JobStatus.RUNNING
@@ -283,14 +295,7 @@ class JobQueue:
             with self._lock:
                 job.status = JobStatus.CANCELLED
                 job.finished_at = time.time()
-                job.events.append(
-                    JobEvent(
-                        job_id=job.job_id,
-                        type="status",
-                        status=JobStatus.CANCELLED,
-                        message="cancelled",
-                    )
-                )
+                self._append_terminal(job, JobStatus.CANCELLED, "cancelled")
             self._append_job_record(job)
             return
         try:
@@ -307,25 +312,15 @@ class JobQueue:
                         job.results = {"cancelled": True, "result": result}
                     else:
                         job.results = result
-                    job.events.append(
-                        JobEvent(
-                            job_id=job.job_id,
-                            type="status",
-                            status=JobStatus.CANCELLED,
-                            message="cancelled",
-                        )
-                    )
+                    self._append_terminal(job, JobStatus.CANCELLED, "cancelled")
                 else:
                     job.results = result
                     job.status = JobStatus.DONE
-                    job.events.append(
-                        JobEvent(
-                            job_id=job.job_id,
-                            type="result",
-                            status=JobStatus.DONE,
-                            payload={"result": result} if isinstance(result, dict) else {"result": result},
-                            message="done",
-                        )
+                    self._append_terminal(
+                        job,
+                        JobStatus.DONE,
+                        "done",
+                        payload={"result": result},
                     )
                 job.finished_at = time.time()
             self._append_job_record(job)
@@ -335,39 +330,31 @@ class JobQueue:
                 job.results = {"cancelled": True, "message": str(exc)}
                 job.error = None
                 job.finished_at = time.time()
-                job.events.append(
-                    JobEvent(
-                        job_id=job.job_id,
-                        type="status",
-                        status=JobStatus.CANCELLED,
-                        message="cancelled",
-                    )
-                )
+                self._append_terminal(job, JobStatus.CANCELLED, "cancelled")
+            self._append_job_record(job)
+        except KeyboardInterrupt:  # TICK-915: normalize to cancelled, not FAILED
+            with self._lock:
+                job.status = JobStatus.CANCELLED
+                job.results = {"cancelled": True, "message": "interrupted"}
+                job.error = None
+                job.finished_at = time.time()
+                self._append_terminal(job, JobStatus.CANCELLED, "cancelled")
             self._append_job_record(job)
         except Exception as exc:  # pylint: disable=broad-except
             with self._lock:
-                if job.is_cancelled() or isinstance(exc, InterruptedError):
+                if job.is_cancelled():
                     job.status = JobStatus.CANCELLED
                     job.results = {"cancelled": True, "message": str(exc)}
                     job.error = None
-                    job.events.append(
-                        JobEvent(
-                            job_id=job.job_id,
-                            type="status",
-                            status=JobStatus.CANCELLED,
-                            message="cancelled",
-                        )
-                    )
+                    self._append_terminal(job, JobStatus.CANCELLED, "cancelled")
                 else:
                     job.error = str(exc)
                     job.status = JobStatus.FAILED
-                    job.events.append(
-                        JobEvent(
-                            job_id=job.job_id,
-                            type="error",
-                            status=JobStatus.FAILED,
-                            message=str(exc),
-                        )
+                    self._append_terminal(
+                        job,
+                        JobStatus.FAILED,
+                        str(exc),
+                        payload={"error": str(exc)},
                     )
                 job.finished_at = time.time()
             self._append_job_record(job)
@@ -386,6 +373,9 @@ class JobQueue:
         TICK-802: JobManager uses execute=False to avoid double execution;
         ManagedWorker is sole executor and JobQueue tracks metadata only.
         Direct JobQueue callers (tests, daemon) keep execute=True.
+        TICK-915: max_workers is enforced by the ThreadPoolExecutor for all
+        execute=True submissions. execute=False is kept for JobManager
+        compatibility (TICK-914 removes the double-executor split).
         """
         # Pop execute from kwargs if caller passed it as kwarg (for **kwargs merging)
         if "execute" in kwargs and isinstance(kwargs["execute"], bool):
@@ -434,13 +424,16 @@ class JobQueue:
         return job.status if job else None
 
     def cancel(self, job_id: str) -> bool:
-        job = self.get(job_id)
-        if job is None:
-            return False
-        if job.status in (JobStatus.DONE, JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.COMPLETED):
-            return False
-        job.cancel()
-        fut = self._futures.get(job_id)
+        # TICK-915: mutate Job state under the queue lock so cancel() cannot
+        # race with _run_job/_progress appending events.
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None:
+                return False
+            if job.status in (JobStatus.DONE, JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.COMPLETED):
+                return False
+            job.cancel()
+            fut = self._futures.get(job_id)
         if fut is not None:
             try:
                 fut.cancel()
@@ -467,7 +460,16 @@ class JobQueue:
         return list(job.events) if job else []
 
     def shutdown(self, wait: bool = True, cancel_futures: bool = False) -> None:
+        # TICK-915: terminalize all pending jobs before stopping the executor
+        # so no Job is left QUEUED/RUNNING after shutdown, and release future
+        # references so completed jobs do not accumulate.
+        with self._lock:
+            for job in self._jobs.values():
+                if job.status in (JobStatus.QUEUED, JobStatus.PENDING, JobStatus.RUNNING):
+                    job.cancel()
         self._executor.shutdown(wait=wait, cancel_futures=cancel_futures)
+        with self._lock:
+            self._futures.clear()
 
     def __len__(self) -> int:
         with self._lock:
