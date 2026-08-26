@@ -154,6 +154,38 @@ def test_exactly_one_terminal_event_per_job():
         q.shutdown(wait=True, cancel_futures=True)
 
 
+def test_cancel_with_progress_interleaving_single_terminal_event():
+    q = JobQueue(max_workers=2)
+    try:
+        started = threading.Event()
+
+        def slow(cancel_token=None, progress_callback=None):
+            started.set()
+            for i in range(1000):
+                if cancel_token and cancel_token.is_set():
+                    return {"cancelled": True}
+                if progress_callback:
+                    progress_callback(i, -1, "step")
+                time.sleep(0.01)
+            return {"done": True}
+
+        job = q.submit(slow)
+        assert started.wait(timeout=2)
+        time.sleep(0.05)
+        assert q.cancel(job.job_id) is True
+        _poll_status(job, JobStatus.CANCELLED)
+        deadline = time.time() + 5
+        while time.time() < deadline and job.results is None:
+            time.sleep(0.01)
+        cancelled = [
+            e for e in job.events
+            if e.type == "status" and e.status == JobStatus.CANCELLED
+        ]
+        assert len(cancelled) == 1, f"expected exactly 1 CANCELLED event, got {len(cancelled)}"
+    finally:
+        q.shutdown(wait=True, cancel_futures=True)
+
+
 # ------------------------------------------------------------------
 # TypeError retry removed (P1.20)
 # ------------------------------------------------------------------
@@ -171,6 +203,23 @@ def test_typeerror_retry_does_not_re_execute():
         _poll_status(job, JobStatus.FAILED, JobStatus.DONE, JobStatus.CANCELLED)
         assert job.status == JobStatus.FAILED
         assert len(counter) == 1, f"target invoked {len(counter)} times (expected 1)"
+    finally:
+        q.shutdown(wait=True, cancel_futures=True)
+
+
+def test_positional_only_params_invoked_once():
+    q = JobQueue(max_workers=2)
+    try:
+        received = []
+
+        def target(x, /):
+            received.append(x)
+            return {"ok": x}
+
+        job = q.submit(target, params={"x": 42})
+        _poll_status(job, JobStatus.DONE, JobStatus.FAILED, JobStatus.CANCELLED)
+        assert job.status == JobStatus.DONE, f"job failed: {job.error}"
+        assert received == [{"x": 42}]
     finally:
         q.shutdown(wait=True, cancel_futures=True)
 
