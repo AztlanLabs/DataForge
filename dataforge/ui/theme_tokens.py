@@ -25,6 +25,8 @@ from __future__ import annotations
 import base64
 from string import Template
 
+from PyQt5.QtCore import Qt
+
 __all__ = [
     "TOKENS",
     "TYPE_SCALE",
@@ -38,6 +40,7 @@ __all__ = [
     "GLYPH_SUCCESS",
     "GLYPH_WARNING",
     "GLYPH_ERROR",
+    "CURSORS",
 ]
 
 # ---------------------------------------------------------------------------
@@ -227,6 +230,26 @@ STATUS_GLYPHS: dict[str, str] = {
 GLYPH_SUCCESS = STATUS_GLYPHS["success"]
 GLYPH_WARNING = STATUS_GLYPHS["warning"]
 GLYPH_ERROR = STATUS_GLYPHS["error"]
+
+
+# U7 / TICK-908 — semantic cursor token table. QSS cannot express
+# ``cursor`` rules (CSS-only), so every interactive surface reads its
+# ``Qt.CursorShape`` from this single table instead of per-widget
+# hard-coding. Applied centrally by ``BaseView._apply_cursors`` and
+# ``DataForgeApp``; the wait/grab entries drive the app-level override
+# cursor while jobs run.
+CURSORS: dict[str, Qt.CursorShape] = {
+    "button": Qt.PointingHandCursor,
+    "tree": Qt.PointingHandCursor,
+    "splitter_h": Qt.SplitHCursor,
+    "splitter_v": Qt.SplitVCursor,
+    "header": Qt.PointingHandCursor,
+    "text": Qt.IBeamCursor,
+    "wait": Qt.WaitCursor,
+    "forbidden": Qt.ForbiddenCursor,
+    "grab": Qt.OpenHandCursor,
+    "grabbing": Qt.ClosedHandCursor,
+}
 
 
 def glyph_for_status(status: str) -> str:
