@@ -395,8 +395,9 @@ def test_job_manager_queue_full_error_callback(qapp):
 
 
 def test_evidence_mode_blocks_treeview_style_closures(manager):
-    """GIVEN evidence_mode WHEN EnhancedTreeview-style delete/rename closures THEN PermissionError."""
-    from dataforge.core.services import FileActionService  # noqa: F401  (never invoked)
+    """GIVEN evidence_mode WHEN EnhancedTreeview-style delete/rename closures THEN boundary blocks."""
+    from dataforge.core import case
+    from dataforge.core.services import FileActionService  # noqa: F401  (invoked by closures)
 
     def make_closure(kind: str):
         if kind == "delete":
@@ -413,29 +414,39 @@ def test_evidence_mode_blocks_treeview_style_closures(manager):
             return _do_copy
         raise AssertionError(kind)
 
-    manager.evidence_mode = True
-    errors = []
-    for kind in ("delete", "rename"):
-        errors.clear()
-        jid = manager.submit(
-            target=make_closure(kind),
-            on_error=lambda e: errors.append(e),
-            task_name=f"{kind} file",
-        )
-        assert jid is None, f"{kind} closure must be blocked in evidence mode"
-        assert len(errors) == 1
-        assert isinstance(errors[0], PermissionError)
-        assert "EVIDENCE MODE" in str(errors[0])
+    case.set_evidence_mode(True)
+    results = []
+    try:
+        # TICK-917: submit() no longer inspects target names — the mutation
+        # boundary (FileActionService) enforces evidence mode instead, so the
+        # jobs run and their destructive calls are blocked in the outcome.
+        for kind in ("delete", "rename"):
+            jid = manager.submit(
+                target=make_closure(kind),
+                on_success=results.append,
+                task_name=f"{kind} file",
+            )
+            assert jid is not None, f"{kind} closure must be accepted at submit (boundary enforces)"
+        # Pump the event loop until both queued on_success callbacks arrive.
+        deadline = time.time() + 3.0
+        while time.time() < deadline and len(results) < 2:
+            QApplication.processEvents()
+            time.sleep(0.02)
+        assert _wait_until(lambda: not manager.is_busy, timeout=3.0)
+        QApplication.processEvents()
 
-    # Non-destructive closure (copy) still allowed
-    jid = manager.submit(target=make_closure("copy"), task_name="copy file")
-    assert jid is not None
-    assert _wait_until(lambda: not manager.is_busy, timeout=3.0)
+        # Non-destructive closure (copy) still allowed
+        jid = manager.submit(target=make_closure("copy"), task_name="copy file")
+        assert jid is not None
+        assert _wait_until(lambda: not manager.is_busy, timeout=3.0)
 
-    # Keyword detection sees through nested qualnames (EnhancedTreeview pattern)
-    assert JobManager._is_destructive(make_closure("delete"))
-    assert JobManager._is_destructive(make_closure("rename"))
-    assert not JobManager._is_destructive(make_closure("copy"))
+        assert len(results) == 2
+        for outcome in results:
+            assert all(not rec.success for rec in outcome.records)
+            assert any("Evidence Mode" in rec.message for rec in outcome.records)
+    finally:
+        case.set_evidence_mode(False)
+        case.clear_context()
 
 
 def test_shutdown_waits_for_workers_and_is_idempotent(qapp):

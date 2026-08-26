@@ -335,26 +335,34 @@ def test_ui_shell_job_manager_submit_complete_and_cancel(qapp):
 
 
 def test_ui_shell_job_manager_evidence_mode_blocks_destructive(qapp):
-    """Evidence mode blocks tasks whose name looks destructive."""
+    """TICK-917: evidence mode blocks destructive mutations at the boundary."""
     from dataforge.api.schema import JobStatus
+    from dataforge.core import case
+    from dataforge.core.services import FileActionService
 
     manager = _job_manager()
     try:
-        errors = []
+        outcomes = []
 
         def delete_files(cancel_token=None, progress_callback=None):
-            return {"deleted": True}
+            return FileActionService.delete_items(["dummy"], dry_run=False)
 
-        manager.evidence_mode = True
-        jid = manager.submit(target=delete_files, on_error=errors.append, task_name="delete files")
-        assert jid is None
-        assert errors
+        case.set_evidence_mode(True)
+        jid = manager.submit(target=delete_files, on_success=outcomes.append, task_name="delete files")
+        assert jid is not None, "submit must accept the job (boundary enforces evidence mode)"
+        assert _drain_until(lambda: manager.get_status(jid) == JobStatus.DONE)
+        assert _drain_until(lambda: len(outcomes) == 1)
+        assert all(not rec.success for rec in outcomes[0].records)
+        assert any("Evidence Mode" in rec.message for rec in outcomes[0].records)
 
-        manager.evidence_mode = False
+        case.set_evidence_mode(False)
         jid = manager.submit(target=delete_files, on_success=lambda r: None, task_name="delete files")
         assert jid is not None
         assert _drain_until(lambda: manager.get_status(jid) == JobStatus.DONE)
     finally:
+        case.set_evidence_mode(False)
+        case.clear_context()
+        manager.shutdown()
         manager.shutdown()
 
 

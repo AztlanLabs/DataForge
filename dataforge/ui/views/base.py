@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from abc import ABCMeta, abstractmethod
+import inspect
 import re
 
 from .. import dialogs
@@ -534,8 +535,19 @@ class BaseView(QWidget, metaclass=QWidgetABCMeta):
         # We will re-implement tree selection restoration in the PyQt5 treeview wrapper.
         if hasattr(tree, "restore_selection"):
             tree.restore_selection(item_ids)
+        # TICK-917 P1.2: callbacks may accept zero arguments (e.g. on_img_select,
+        # on_preview_select, on_cleaner_preview). Inspect the signature so
+        # no-arg callbacks are invoked without an argument instead of raising
+        # TypeError (which was previously swallowed by run_background).
         if on_select:
-            on_select(None)
+            try:
+                arity = len(inspect.signature(on_select).parameters)
+            except (TypeError, ValueError):
+                arity = 1
+            if arity > 0:
+                on_select(None)
+            else:
+                on_select()
 
     @staticmethod
     def batch_outcome_counts(outcome):

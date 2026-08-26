@@ -87,3 +87,18 @@ def is_evidence_mode() -> bool:
     """Convenience: True when a CaseContext is active with evidence_mode=True."""
     ctx = _global_context
     return ctx is not None and ctx.evidence_mode
+
+
+def set_evidence_mode(enabled: bool) -> CaseContext:
+    """Enable or disable evidence mode on the global context (TICK-917).
+
+    Creates a fresh CaseContext when none is initialized yet, so the UI
+    toggle works even before a case has been opened. Returns the active
+    context (thread-safe via ``set_context``).
+    """
+    ctx = _global_context
+    if ctx is None:
+        ctx = CaseContext()
+    ctx.evidence_mode = bool(enabled)
+    set_context(ctx)
+    return ctx

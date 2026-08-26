@@ -196,24 +196,36 @@ def test_job_manager_multiple_concurrent(manager):
 
 
 def test_job_manager_evidence_mode_blocks(manager):
-    """Evidence mode blocks destructive operations."""
-    errors = []
+    """TICK-917: evidence mode blocks at the mutation boundary, not at submit."""
+    from dataforge.core import case
+    from dataforge.core.services import FileActionService
 
-    def on_error(error):
-        errors.append(error)
+    results = []
+    case.set_evidence_mode(True)
+    try:
+        def _delete_through_service(cancel_token=None, progress_callback=None):
+            return FileActionService.delete_items(["dummy"], dry_run=False)
 
-    manager.evidence_mode = True
+        # Submit must be accepted — enforcement moved to the boundary.
+        job_id = manager.submit(
+            target=_delete_through_service,
+            on_success=results.append,
+            task_name="delete files",
+        )
+        assert job_id is not None
 
-    # Destructive task should be blocked
-    job_id = manager.submit(
-        target=_delete_files,
-        on_error=on_error,
-        task_name="delete files",
-    )
+        deadline = time.time() + 3
+        while time.time() < deadline and not results:
+            time.sleep(0.05)
+            QApplication.processEvents()
 
-    assert job_id is None
-    assert len(errors) == 1
-    assert "EVIDENCE MODE" in str(errors[0])
+        assert len(results) == 1
+        outcome = results[0]
+        assert all(not rec.success for rec in outcome.records)
+        assert any("Evidence Mode" in rec.message for rec in outcome.records)
+    finally:
+        case.set_evidence_mode(False)
+        case.clear_context()
 
 
 def test_job_manager_evidence_mode_allows_non_destructive(manager):
@@ -345,11 +357,20 @@ def test_job_manager_cancel_all(manager):
     assert count >= 0  # may have already finished
 
 
-def test_destructive_keywords():
-    """Verify destructive keyword detection."""
-    assert JobManager._is_destructive(_delete_files)
-    assert not JobManager._is_destructive(_fast_task)
-    assert not JobManager._is_destructive(_slow_task)
+def test_evidence_mode_enforced_at_mutation_boundary():
+    """TICK-917: evidence mode gates FileActionService, not JobManager submit."""
+    from dataforge.core import case
+    from dataforge.core.services import FileActionService
+
+    case.set_evidence_mode(True)
+    try:
+        outcome = FileActionService.delete_items(["dummy"], dry_run=False)
+        assert len(outcome.records) == 1
+        assert not outcome.records[0].success
+        assert "Evidence Mode" in outcome.records[0].message
+    finally:
+        case.set_evidence_mode(False)
+        case.clear_context()
 
 
 def test_managed_worker_signals(qapp):

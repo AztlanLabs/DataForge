@@ -48,13 +48,6 @@ __all__ = ["JobManager", "ManagedWorker"]
 # total/total boundaries) to prevent QWidget repaint storms.
 _PROGRESS_COALESCE_MS = 0.1  # seconds
 
-# Destructive operation keywords — checked against target function name
-# when evidence_mode is enabled.
-_DESTRUCTIVE_KEYWORDS = frozenset({
-    "delete", "remove", "strip", "clean", "move", "rename",
-    "archive", "trash", "purge", "wipe", "secure_delete",
-})
-
 
 def _is_app_progress_callback(cb: Any) -> bool:
     """True when *cb* is a UI-affine progress callback (a QObject-bound method).
@@ -435,17 +428,10 @@ class JobManager(QObject):
     ) -> Optional[str]:
         """Submit a background job.
 
-        Returns the job_id, or None if rejected (evidence mode or queue full).
+        Returns the job_id, or None if rejected (queue full).
         """
         if kwargs is None:
             kwargs = {}
-
-        # Evidence mode check
-        if self._evidence_mode and self._is_destructive(target):
-            logger.warning("Evidence mode: blocked destructive operation %s", target)
-            if on_error:
-                on_error(PermissionError("EVIDENCE MODE — writes blocked"))
-            return None
 
         # TICK-911: reject before the queue fills so the user gets an explicit
         # error callback instead of a silently dropped job. Counts queued jobs
@@ -842,20 +828,6 @@ class JobManager(QObject):
             self.jobs_changed.emit()
         except Exception:
             pass
-
-    @staticmethod
-    def _is_destructive(target: Callable[..., Any]) -> bool:
-        """Check if a target function is a destructive operation.
-
-        TICK-911: inspects ``__name__``, ``__qualname__`` (catches nested
-        closures like ``EnhancedTreeview.delete_file.<locals>._do_delete``
-        that wrap direct ``FileActionService`` calls) and ``__module__``.
-        """
-        name = getattr(target, "__name__", "") or ""
-        qualname = getattr(target, "__qualname__", "") or ""
-        module = getattr(target, "__module__", "") or ""
-        combined = f"{name} {qualname} {module}".lower()
-        return any(kw in combined for kw in _DESTRUCTIVE_KEYWORDS)
 
     # ------------------------------------------------------------------
     # Cleanup
