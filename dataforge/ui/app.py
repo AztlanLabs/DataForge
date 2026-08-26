@@ -28,7 +28,7 @@ from .views.storage_devices import StorageDevicesView
 from .views.automations import AutomationsView
 from .views.about import AboutView
 from .plugin_loader import PluginLoader
-from .theme_tokens import generate_qss, generate_palette, TYPE_SCALE
+from .theme_tokens import generate_qss, generate_palette, TYPE_SCALE, CURSORS
 from .resources.icons import build_icons, TONE_LIGHT, TONE_DARK
 from .job_manager import JobManager
 from ..core.config import config
@@ -298,6 +298,10 @@ class DataForgeApp(QMainWindow):
         self.group_headers = {}
         self.group_buttons = {}
         self.group_containers = {}
+        # TICK-908: app-level WaitCursor override is ref-counted in Qt —
+        # track whether WE own the top-of-stack override so the pair
+        # set/restore calls never drift (concurrent jobs share one cursor).
+        self._busy_cursor_active = False
         # Hold active QPropertyAnimation objects so they don't get GC'd
         # mid-flight — Qt deletes the animation when its Python wrapper
         # is collected, which used to freeze the animation at the start
@@ -547,6 +551,7 @@ class DataForgeApp(QMainWindow):
             # double-glyph (text + icon) reported as bug.
             header_btn = QPushButton(group_name.upper(), self.nav_btn_widget)
             header_btn.setObjectName("groupHeader")
+            header_btn.setCursor(CURSORS["header"])
             color = HEADER_COLORS[theme_key].get(group_name, "#6b7280")
             header_btn.setStyleSheet(f"color: {color};")
             # 2e.7 — chevron icon for the group header. The collapse
@@ -583,6 +588,7 @@ class DataForgeApp(QMainWindow):
             for title in available:
                 btn = QPushButton(title, group_container)
                 btn.setCheckable(True)
+                btn.setCursor(CURSORS["button"])
                 # 2e.7 — attach the per-view monochrome icon to the
                 # sidebar button. The icon key is the registered
                 # title mapped via ``SIDEBAR_ICON_KEYS``; an unknown
@@ -743,9 +749,32 @@ class DataForgeApp(QMainWindow):
 
             # view already fetched above
             same_view = (view is self.current_view)
-            self.content_stack.setCurrentWidget(view)
+            # TICK-908: freeze repaints around the widget swap + mount so
+            # the crossfade effect does not race child-widget paint events
+            # (QBackingStore::endPaint "active painter" warnings during
+            # junk/hardware scans). Repaints coalesce into one pass when
+            # updates are re-enabled below.
+            try:
+                self.setUpdatesEnabled(False)
+            except Exception:
+                pass
+            try:
+                self.content_stack.setCurrentWidget(view)
+            except Exception:
+                pass
             try:
                 view.mount()
+            except Exception:
+                pass
+            try:
+                self.setUpdatesEnabled(True)
+                self.update()
+            except Exception:
+                pass
+            # TICK-908: re-scan the mounted view so lazily-built children
+            # and evidence-mode button states get their semantic cursors.
+            try:
+                view._apply_cursors()
             except Exception:
                 pass
             self.current_view = view
@@ -1034,9 +1063,34 @@ class DataForgeApp(QMainWindow):
         if job_id is None:
             # Rejected by evidence mode or queue full
             self._on_job_completed()
+        else:
+            self._set_busy_cursor()
+
+    def _set_busy_cursor(self) -> None:
+        """TICK-908 — app-level WaitCursor while any job is running.
+
+        ``QApplication.setOverrideCursor`` is ref-counted, so this only
+        pushes one override (guarded by :attr:`_busy_cursor_active`) and
+        ``_clear_busy_cursor`` pops it when the last job finishes."""
+        if not self._busy_cursor_active and self.job_manager.is_busy:
+            try:
+                QApplication.setOverrideCursor(CURSORS["wait"])
+                self._busy_cursor_active = True
+            except Exception:
+                self._busy_cursor_active = False
+
+    def _clear_busy_cursor(self) -> None:
+        """TICK-908 — pop the WaitCursor override once nothing is running."""
+        if self._busy_cursor_active and not self.job_manager.is_busy:
+            try:
+                QApplication.restoreOverrideCursor()
+            except Exception:
+                pass
+            self._busy_cursor_active = False
 
     def _on_job_completed(self) -> None:
         """Clean up UI when a job completes (success or error)."""
+        self._clear_busy_cursor()
         if not self.job_manager.is_busy:
             try:
                 self.cancel_btn.setVisible(False)
@@ -1174,23 +1228,18 @@ class DataForgeApp(QMainWindow):
         falling back to the platform's default look.
 
         Updating the QApplication-wide stylesheet is what makes Qt re-polish
-        every widget; doing it while updates are frozen (and showing the
-        busy cursor) keeps the change snappy and avoids the visible
-        "re-flow" flicker that previously made the toggle feel slow.
+        every widget; a brief WaitCursor override keeps the change snappy.
+        The previous ``setUpdatesEnabled(False)`` freeze was removed (TICK-908):
+        freezing repaints while holding an override cursor can deadlock the
+        paint system (QBackingStore::endPaint "active painter" warnings).
         """
         qapp = QApplication.instance()
         qapp.setOverrideCursor(Qt.WaitCursor)
-        # Freeze repaints across the application so the repolish pass
-        # applies in a single composite pass when we unfreeze below.
-        for w in qapp.topLevelWidgets():
-            w.setUpdatesEnabled(False)
         try:
             qapp.setStyle("Fusion")
             qapp.setPalette(DARK_PALETTE if is_dark else LIGHT_PALETTE)
             qapp.setStyleSheet(DARK_STYLE if is_dark else LIGHT_STYLE)
         finally:
-            for w in qapp.topLevelWidgets():
-                w.setUpdatesEnabled(True)
             qapp.restoreOverrideCursor()
             for w in qapp.topLevelWidgets():
                 w.update()
