@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import datetime
 import os
 import re
@@ -18,6 +18,30 @@ class OperationResult:
     destination_path: Optional[str]
     success: bool
     message: str
+    dry_run: bool = False
+
+
+@dataclass
+class OperationReport:
+    """Unified user-facing result contract (TICK-919 / audit P1.1).
+
+    ``success`` describes the operation itself and is deliberately
+    independent of ``JobStatus.DONE``: the job layer marks a worker DONE
+    when it returns without an unhandled exception, while ``report.success``
+    reflects whether the requested action actually succeeded. Handlers must
+    render the report, never infer success from job status.
+    """
+
+    operation: str
+    requested: int
+    completed: int
+    failed: int
+    skipped: int = 0
+    cancelled: bool = False
+    success: bool = True
+    errors: list[str] = field(default_factory=list)
+    outputs: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     dry_run: bool = False
 
 
@@ -145,6 +169,22 @@ def transfer_path(
         current_path=source_path,
     )
 
+    # Same-file guard (TICK-919 / audit P1.7): a transfer onto the source file
+    # itself would destroy it (copy truncates, move deletes). Check the resolved
+    # destination, and treat a destination_dir that resolves to the source file
+    # (e.g. transfer_path(f, f, "copy")) as the same conflict. Applied before
+    # the dry-run return so previews report the failure too.
+    try:
+        if os.path.exists(destination_path) and os.path.samefile(source_path, destination_path):
+            return OperationResult(action_name, source_path, destination_path, False, "Source and destination are the same file")
+        if os.path.exists(destination_dir) and not os.path.isdir(destination_dir):
+            if os.path.samefile(source_path, destination_dir):
+                return OperationResult(action_name, source_path, destination_path, False, "Source and destination are the same file")
+    except OSError:
+        # Path disappeared between checks — fall through; the transfer itself
+        # will surface the error.
+        pass
+
     verb = "Would move" if dry_run and action_name == "move" else "Would copy" if dry_run else "Moved" if action_name == "move" else "Copied"
     message = f"{verb}: {source_path} -> {destination_path}"
 
@@ -212,12 +252,25 @@ def rename_path(
     if not new_name:
         raise ValueError("new_name is required")
 
+    # Confinement (TICK-919 / audit P1.7): *new_name* must be a plain
+    # basename. An absolute path would replace the whole target path, and
+    # separators or ".." would move the file outside its source directory.
+    if os.path.sep in new_name or (os.name == "nt" and "/" in new_name):
+        raise ValueError(f"Invalid rename target (contains path separator): {new_name!r}")
+    if new_name in (".", "..", ""):
+        raise ValueError(f"Invalid rename target: {new_name!r}")
+
     current_name = os.path.basename(source_path)
     if new_name == current_name:
         return None
 
+    destination_path = os.path.join(os.path.dirname(source_path), new_name)
+    # Defense-in-depth: verify the resolved target stays in the source dir.
+    if os.path.normpath(os.path.dirname(destination_path)) != os.path.normpath(os.path.dirname(source_path)):
+        raise ValueError(f"Rename target escapes source directory: {new_name!r}")
+
     destination_path = resolve_collision_path(
-        os.path.join(os.path.dirname(source_path), new_name),
+        destination_path,
         reserved_paths=reserved_paths,
         current_path=source_path,
     )
