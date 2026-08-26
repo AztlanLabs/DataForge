@@ -382,7 +382,7 @@ class Daemon:
                     "is_dir": entry.is_dir,
                 })
                 if progress_callback and len(entries) % 100 == 0:
-                    progress_callback(len(entries), -1, f"Scanned {len(entries)} files")
+                    progress_callback(len(entries), None, f"Scanned {len(entries)} files")
             return {"total": len(entries), "files": entries}
 
         job = self.queue.submit(

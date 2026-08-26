@@ -71,7 +71,7 @@ def _do_rename(
         if progress_callback is not None:
             # best-effort progress during scan (total unknown yet)
             try:
-                progress_callback(len(entries), -1, "Scanning...")
+                progress_callback(len(entries), None, "Scanning...")
             except Exception:
                 pass
 

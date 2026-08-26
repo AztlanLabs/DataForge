@@ -69,6 +69,7 @@ class FileEntry:
     size: int
     created_at: float
     modified_at: float
+    atime: float = 0.0
     is_dir: bool = False
 
     # Hashes (calculated lazily or on demand)
