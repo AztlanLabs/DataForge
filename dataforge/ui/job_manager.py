@@ -163,7 +163,7 @@ class ManagedWorker(QThread):
                 last_emit = [0.0]
 
                 def progress_callback(current: int, total: int, step_name: str = "") -> None:
-                    now = time.time()
+                    now = time.monotonic()
                     emit_signal = True
                     if total > 0 and current != total and now - last_emit[0] < 0.1:
                         emit_signal = False
@@ -681,7 +681,9 @@ class JobManager(QObject):
         try:
             parent = self.parent()
             if parent is not None and hasattr(parent, "update_progress"):
-                now = time.time()
+                # monotonic(): an NTP clock step backwards must not zero the
+                # coalesce interval and defeat the repaint gate.
+                now = time.monotonic()
                 if (
                     total > 0
                     and current != total
