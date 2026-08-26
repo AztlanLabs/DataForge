@@ -1987,7 +1987,7 @@ verification:
 | `TICK-927` | Core / Dependencies | `dataforge/core/acquire.py`, `pyproject.toml`, `requirements.txt` | Wave 12 | Optional deps, acquire cleanup, VSS, package extras |
 | `TICK-928` | Engine / Daemon+API | `dataforge/engine/daemon.py`, `dataforge/api/transport/http_gateway.py` | Wave 12 | API field implementation, HTTP auth, event subscription |
 | `TICK-929` | Service + Transport | `dataforge/service/__main__.py`, `dataforge/service/linux/dataforge.service`, `dataforge/api/transport/uds.py`, `dataforge/api/transport/named_pipe.py` | Wave 12 | Service args, transport fixes, pipe security | ✅ DONE 2026-08-25 — `tests/test_service_transport_contract.py` 9/9, merge `cf20a3e` (`cd24b44`), `--dbus` accepted, unit flags parser-verified, UDS/pipe iterator terminal check first, pipe SDDL SECURITY_ATTRIBUTES, stop cancels accept+client tasks, client discovers HTTP |
-| `TICK-930` | Build / Packaging | `build_exe.py`, `buildspec/release/DataForge.spec`, `buildspec/debug/DataForge-debug.spec`, `packaging/wix/Product.wxs`, `packaging/nfpm.yaml` | Wave 12 | Platform maps, spec fixes, asset references |
+| `TICK-930` | Build / Packaging | `build_exe.py`, `buildspec/release/DataForge.spec`, `buildspec/debug/DataForge-debug.spec`, `packaging/wix/Product.wxs`, `packaging/nfpm.yaml` | Wave 12 | Platform maps, spec fixes, asset references | ✅ DONE 2026-08-25 — `tests/test_packaging_build.py` 13/13, merge `14340b5`, PLATFORM_MAP normalizes darwin↔macos (helpers tolerant of both spellings), specs resolve inputs via SPECPATH (no machine paths), debug spec back on PyQt5, WiX drops nonexistent dataforge-engine.exe + StartService, nfpm icon → SVG |
 
 ```yaml
 # TICK-927 — Dependencies + acquire + package extras
