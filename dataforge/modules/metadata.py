@@ -44,22 +44,33 @@ except ImportError:
     HAS_MUTAGEN = False
 
 
+# ExifTool binary names by platform (TICK-921): Linux/macOS ship `exiftool`,
+# Windows ships `exiftool.exe` / `exiftool(-k).exe` (the -k variant keeps the
+# console window open, but is still a valid CLI when called non-interactively).
+_EXIFTOOL_NAMES = ("exiftool", "exiftool.exe", "exiftool-k.exe", "exiftool(-k).exe")
+
+
 @lru_cache(maxsize=1)
 def _has_exiftool():
-    """Check if the exiftool CLI is available.
+    """Check if the exiftool CLI is available via shutil.which (TICK-921).
 
     Probed lazily (and memoised) on first real use rather than at import time,
     so simply importing this module — which happens for every GUI/CLI cold
-    start — does not shell out to an external binary.
+    start — does not shell out to an external binary. Cache is invalidated by
+    :func:`_clear_exiftool_cache` so a mid-session install is detected.
     """
-    try:
-        result = subprocess.run(
-            ["exiftool", "-ver"],
-            capture_output=True, timeout=5,
-        )
-        return result.returncode == 0
-    except Exception:
-        return False
+    for name in _EXIFTOOL_NAMES:
+        try:
+            if shutil.which(name) is not None:
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def _clear_exiftool_cache():
+    """Invalidate the memoised exiftool probe (e.g. after installation)."""
+    _has_exiftool.cache_clear()
 
 
 # Supported image extensions for Pillow
@@ -238,6 +249,8 @@ class MetadataEngine:
             return {"success": False, "message": "Blocked by Evidence Mode", "blocked": True}
         if not os.path.isfile(path):
             return {"success": False, "message": f"File not found: {path}", "dry_run": dry_run}
+        if not fields:
+            return {"success": True, "message": "No metadata fields to write.", "dry_run": dry_run}
 
         if dry_run:
             return {
@@ -253,6 +266,10 @@ class MetadataEngine:
 
         ext = os.path.splitext(path)[1].lower()
 
+        # pypdf for PDFs (TICK-921)
+        if ext in _PDF_EXTENSIONS and HAS_PYPDF:
+            return _write_pypdf(path, fields, cancel_token=cancel_token)
+
         # Pillow for images (limited write support)
         if ext in _IMAGE_EXTENSIONS and HAS_PILLOW:
             return _write_pillow(path, fields)
@@ -261,7 +278,7 @@ class MetadataEngine:
         if ext in _AUDIO_EXTENSIONS and HAS_MUTAGEN:
             return _write_mutagen(path, fields)
 
-        return {"success": False, "message": "Install exiftool for write support (no write handler for this format)."}
+        return {"success": False, "message": f"Install exiftool for write support (no write handler for {ext or 'this format'})."}
 
     @staticmethod
     def remove_metadata(path, fields=None, dry_run=True, cancel_token=None, progress_callback=None):
@@ -301,23 +318,24 @@ class MetadataEngine:
         if fields and ext in _IMAGE_EXTENSIONS and HAS_PILLOW:
             is_gps_only = all("gps" in str(f).lower() for f in fields)
             if is_gps_only:
-                # Try piexif selective GPS removal for JPEG
-                if ext in (".jpg", ".jpeg"):
+                try:
+                    import piexif  # type: ignore
+                except ImportError:
+                    piexif = None  # type: ignore[assignment]
+                if ext in (".jpg", ".jpeg") and piexif is not None:
                     try:
-                        import piexif  # type: ignore
-                        try:
-                            exif_dict = piexif.load(path)
-                            # Clear GPS IFD
-                            exif_dict["GPS"] = {}
-                            exif_bytes = piexif.dump(exif_dict)
-                            piexif.insert(exif_bytes, path)
-                            return {"success": True, "message": "GPS stripped via piexif (exiftool not available)."}
-                        except Exception as exc:
-                            return {"success": False, "message": f"GPS strip failed (piexif): {exc}. Install exiftool for GPS-only strip."}
-                    except ImportError:
-                        return {"success": False, "message": "Install exiftool for GPS-only strip (Pillow strip is all-or-nothing)."}
-                else:
-                    return {"success": False, "message": "Install exiftool for GPS-only strip (Pillow strip is all-or-nothing)."}
+                        # Try piexif selective GPS removal for JPEG
+                        exif_dict = piexif.load(path)
+                        # Clear GPS IFD
+                        exif_dict["GPS"] = {}
+                        exif_bytes = piexif.dump(exif_dict)
+                        piexif.insert(exif_bytes, path)
+                        return {"success": True, "message": "GPS stripped via piexif (exiftool not available)."}
+                    except Exception as exc:
+                        return {"success": False, "message": f"GPS strip failed (piexif): {exc}. Install exiftool for GPS-only strip."}
+                # TICK-921: GPS-only requests NEVER fall back to strip-all —
+                # return an honest error instead of destroying other metadata.
+                return {"success": False, "message": "GPS-only strip requires exiftool for this format. Install exiftool."}
 
         # Pillow: strip image metadata
         if ext in _IMAGE_EXTENSIONS and HAS_PILLOW:
@@ -347,31 +365,75 @@ class MetadataEngine:
 
     @staticmethod
     def get_supported_formats():
-        """Get list of supported format categories and their capabilities."""
+        """Get format capabilities (TICK-921).
+
+        Category level exposes ``read``/``write``/``strip`` booleans plus
+        ``write_fields`` (which mechanism writes what) and ``details``
+        (per-extension accuracy, e.g. PNG write requires only Pillow while
+        JPEG write without exiftool requires piexif).
+        """
+        image_read = HAS_PILLOW or _has_exiftool()
+        try:
+            import piexif  # type: ignore # noqa: F401
+            has_piexif = True
+        except ImportError:
+            has_piexif = False
+        # TICK-921: PNG text chunks are Pillow-native; JPEG EXIF needs piexif
+        image_write = _has_exiftool() or HAS_PILLOW
+        pdf_read = HAS_PYPDF or _has_exiftool()
+        pdf_write = _has_exiftool() or HAS_PYPDF
+        audio_rw = HAS_MUTAGEN or _has_exiftool()
+
+        def _image_write(ext: str) -> bool:
+            if ext == ".png":
+                return HAS_PILLOW
+            if ext in (".jpg", ".jpeg"):
+                return _has_exiftool() or has_piexif
+            return _has_exiftool()
+
         formats = {
             "images": {
                 "extensions": sorted(_IMAGE_EXTENSIONS),
-                "read": HAS_PILLOW or _has_exiftool(),
-                "write": _has_exiftool(),
-                "strip": HAS_PILLOW or _has_exiftool(),
+                "read": image_read,
+                "write": image_write,
+                "strip": image_read,
+                "write_fields": "exiftool: all; pillow: text chunks (PNG), piexif (JPEG)",
+                "details": {
+                    ext: {"read": image_read, "write": _image_write(ext)}
+                    for ext in sorted(_IMAGE_EXTENSIONS)
+                },
             },
             "pdf": {
                 "extensions": sorted(_PDF_EXTENSIONS),
-                "read": HAS_PYPDF or _has_exiftool(),
-                "write": _has_exiftool(),
-                "strip": HAS_PYPDF or _has_exiftool(),
+                "read": pdf_read,
+                "write": pdf_write,
+                "strip": pdf_write,
+                "write_fields": "exiftool: all; pypdf: Info dictionary",
+                "details": {
+                    ".pdf": {"read": pdf_read, "write": pdf_write},
+                },
             },
             "audio": {
                 "extensions": sorted(_AUDIO_EXTENSIONS),
-                "read": HAS_MUTAGEN or _has_exiftool(),
-                "write": HAS_MUTAGEN or _has_exiftool(),
-                "strip": HAS_MUTAGEN or _has_exiftool(),
+                "read": audio_rw,
+                "write": audio_rw,
+                "strip": audio_rw,
+                "write_fields": "exiftool: all; mutagen: native tags",
+                "details": {
+                    ext: {"read": audio_rw, "write": audio_rw}
+                    for ext in sorted(_AUDIO_EXTENSIONS)
+                },
             },
             "video": {
                 "extensions": sorted(_VIDEO_EXTENSIONS),
                 "read": _has_exiftool(),
                 "write": _has_exiftool(),
                 "strip": _has_exiftool(),
+                "write_fields": "exiftool: all",
+                "details": {
+                    ext: {"read": _has_exiftool(), "write": _has_exiftool()}
+                    for ext in sorted(_VIDEO_EXTENSIONS)
+                },
             },
         }
         if _has_exiftool():
@@ -575,10 +637,11 @@ def _parse_pillow_gps(gps_info):
 
 
 def _write_pillow(path, fields):
-    """Write image metadata using Pillow (limited).
+    """Write image metadata using Pillow (TICK-921).
 
-    Pillow itself cannot write arbitrary EXIF; try piexif fallback for JPEG
-    if available, otherwise return actionable error for UI to surface.
+    JPEG: piexif EXIF write when available (no exiftool required).
+    PNG: native text chunks via PngInfo (preserves existing chunks,
+    writes atomically via temp file + os.replace).
     """
     # Try piexif for JPEG if installed — allows limited EXIF write without exiftool
     try:
@@ -618,6 +681,35 @@ def _write_pillow(path, fields):
             return {"success": True, "message": f"Updated {len(fields)} field(s) via piexif."}
         except Exception as exc:
             return {"success": False, "message": f"Pillow/piexif write failed: {exc}. Install exiftool for full write support."}
+
+    # PNG text chunks via PngInfo — Pillow-native, no exiftool required (TICK-921)
+    if ext == ".png" and HAS_PILLOW:
+        tmp_path = None
+        try:
+            from PIL.PngImagePlugin import PngInfo
+
+            dir_ = os.path.dirname(os.path.abspath(path)) or "."
+            with Image.open(path) as img:
+                pnginfo = PngInfo()
+                # Preserve existing text chunks, then apply/update requested fields
+                for k, v in (getattr(img, "text", None) or {}).items():
+                    pnginfo.add_text(k, str(v))
+                for k, v in fields.items():
+                    pnginfo.add_text(k, str(v))
+                fd, tmp_path = tempfile.mkstemp(suffix=".png", dir=dir_)
+                os.close(fd)
+                img.save(tmp_path, pnginfo=pnginfo)
+            os.replace(tmp_path, path)
+            tmp_path = None
+            return {"success": True, "message": f"Wrote {len(fields)} text chunk(s) to PNG."}
+        except Exception as exc:
+            return {"success": False, "message": f"PNG write failed: {exc}. Install exiftool for full write support."}
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
 
     return {"success": False, "message": "Install exiftool for write support (Pillow write not supported)."}
 
@@ -776,6 +868,46 @@ def _read_pypdf(path):
         logger.debug(f"pypdf read error for {path}: {exc}")
 
     return result
+
+
+def _write_pypdf(path, fields, cancel_token=None):
+    """Write PDF metadata using pypdf (TICK-921), atomic via temp + os.replace.
+
+    Cancellation is honoured per-page so a long multi-hundred-page PDF can
+    still be aborted mid-write without leaving a corrupt target file.
+    """
+    if not HAS_PYPDF:
+        return {"success": False, "message": "pypdf not available."}
+
+    tmp_path = None
+    try:
+        dir_ = os.path.dirname(os.path.abspath(path)) or "."
+        reader = PdfReader(path)
+        writer = PdfWriter()
+        for page in reader.pages:
+            if cancel_token and getattr(cancel_token, "is_set", lambda: False)():
+                return {"success": False, "message": "Cancelled", "cancelled": True}
+            writer.add_page(page)
+        metadata = dict(reader.metadata or {})
+        for k, v in fields.items():
+            metadata[f"/{k}"] = str(v)
+        writer.add_metadata(metadata)
+
+        fd, tmp_path = tempfile.mkstemp(suffix=".pdf", dir=dir_)
+        os.close(fd)
+        with open(tmp_path, "wb") as f:
+            writer.write(f)
+        os.replace(tmp_path, path)
+        tmp_path = None
+        return {"success": True, "message": f"Wrote {len(fields)} field(s) to PDF."}
+    except Exception as exc:
+        return {"success": False, "message": f"PDF write failed: {exc}"}
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
 
 
 def _strip_pypdf(path):
