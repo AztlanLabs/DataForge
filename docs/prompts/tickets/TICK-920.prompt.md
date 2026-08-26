@@ -207,12 +207,12 @@ All 12 unit tests pass. All media operations return report dicts. Merge/split/co
 
 ## Git Workflow
 
-Follow this exact workflow for every ticket. Base branch is `dev`.
+Follow this exact workflow for every ticket. Base branch is `develop`.
 
 ### Step 1: Sync dev first
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 2: Branch from dev
@@ -249,10 +249,10 @@ git push origin fix/TICK-920-media-ops-pdf-image-correctness
 
 ### Step 7: Merge to dev
 ```bash
-git checkout dev
-git pull origin dev
-git merge --no-ff fix/TICK-920-media-ops-pdf-image-correctness -m "Merge fix/TICK-920 into dev"
-git push origin dev
+git checkout develop
+git pull origin develop
+git merge --no-ff fix/TICK-920-media-ops-pdf-image-correctness -m "Merge fix/TICK-920 into develop"
+git push origin develop
 ```
 
 ### Step 8: Clean up
@@ -263,8 +263,8 @@ git push origin --delete fix/TICK-920-media-ops-pdf-image-correctness
 
 ### Step 9: Reset to dev
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 10: Update backlog

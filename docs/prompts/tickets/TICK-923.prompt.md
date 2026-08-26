@@ -158,12 +158,12 @@ All 10 unit tests pass. Browser checkbox works. Error messages are correct. Savi
 
 ## Git Workflow
 
-Follow this exact workflow for every ticket. Base branch is `dev`.
+Follow this exact workflow for every ticket. Base branch is `develop`.
 
 ### Step 1: Sync dev first
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 2: Branch from dev
@@ -200,10 +200,10 @@ git push origin fix/TICK-923-cleanup-recovery-controls-filters
 
 ### Step 7: Merge to dev
 ```bash
-git checkout dev
-git pull origin dev
-git merge --no-ff fix/TICK-923-cleanup-recovery-controls-filters -m "Merge fix/TICK-923 into dev"
-git push origin dev
+git checkout develop
+git pull origin develop
+git merge --no-ff fix/TICK-923-cleanup-recovery-controls-filters -m "Merge fix/TICK-923 into develop"
+git push origin develop
 ```
 
 ### Step 8: Clean up
@@ -214,8 +214,8 @@ git push origin --delete fix/TICK-923-cleanup-recovery-controls-filters
 
 ### Step 9: Reset to dev
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 10: Update backlog

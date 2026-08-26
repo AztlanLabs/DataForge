@@ -166,12 +166,12 @@ All 12 unit tests pass. Evidence mode blocks all mutation types at the primitive
 
 ## Git Workflow
 
-Follow this exact workflow for every ticket. Base branch is `dev`.
+Follow this exact workflow for every ticket. Base branch is `develop`.
 
 ### Step 1: Sync dev first
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 2: Branch from dev
@@ -208,10 +208,10 @@ git push origin fix/TICK-917-evidence-mode-mutation-boundary
 
 ### Step 7: Merge to dev
 ```bash
-git checkout dev
-git pull origin dev
-git merge --no-ff fix/TICK-917-evidence-mode-mutation-boundary -m "Merge fix/TICK-917 into dev"
-git push origin dev
+git checkout develop
+git pull origin develop
+git merge --no-ff fix/TICK-917-evidence-mode-mutation-boundary -m "Merge fix/TICK-917 into develop"
+git push origin develop
 ```
 
 ### Step 8: Clean up
@@ -222,8 +222,8 @@ git push origin --delete fix/TICK-917-evidence-mode-mutation-boundary
 
 ### Step 9: Reset to dev
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 10: Update backlog

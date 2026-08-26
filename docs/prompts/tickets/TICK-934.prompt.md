@@ -139,12 +139,12 @@ All 5 previously failing tests pass. Full suite has 0 failures from stale fixtur
 
 ## Git Workflow
 
-Follow this exact workflow for every ticket. Base branch is `dev`.
+Follow this exact workflow for every ticket. Base branch is `develop`.
 
 ### Step 1: Sync dev first
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 2: Branch from dev
@@ -181,10 +181,10 @@ git push origin fix/TICK-934-fix-stale-test-fixtures
 
 ### Step 7: Merge to dev
 ```bash
-git checkout dev
-git pull origin dev
-git merge --no-ff fix/TICK-934-fix-stale-test-fixtures -m "Merge fix/TICK-934 into dev"
-git push origin dev
+git checkout develop
+git pull origin develop
+git merge --no-ff fix/TICK-934-fix-stale-test-fixtures -m "Merge fix/TICK-934 into develop"
+git push origin develop
 ```
 
 ### Step 8: Clean up
@@ -195,8 +195,8 @@ git push origin --delete fix/TICK-934-fix-stale-test-fixtures
 
 ### Step 9: Reset to dev
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 10: Update backlog
