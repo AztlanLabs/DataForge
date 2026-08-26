@@ -7,7 +7,6 @@ from .modules.duplicates import build_duplicate_export_rows, build_duplicate_rec
 from .modules.search import build_search_query, export_result_rows, iter_search_files, order_search_results, search_files
 from .modules.organizer import Organizer
 from .modules.renamer import bulk_rename
-from .modules.cleaner import remove_empty_folders
 from .modules.usage import analyze_size, generate_usage_report
 from .modules.integrity import IntegrityMonitor
 
@@ -239,6 +238,8 @@ def rename(path, pattern, repl, dry_run):
 @click.option('--dry-run/--execute', default=True)
 def clean(path, dry_run):
     """Remove empty folders."""
+    from .modules.cleaner import remove_empty_folders  # lazy: cleaner pulls in optional media deps
+
     log = remove_empty_folders(path, dry_run)
     for line in log:
         click.echo(line)
