@@ -109,6 +109,7 @@ def _build_from_stat(path: str, filename: str, extension: str, st: os.stat_resul
         size=st.st_size,
         created_at=st.st_ctime,
         modified_at=st.st_mtime,
+        atime=st.st_atime,
         is_dir=False,
         st_ino=getattr(st, "st_ino", 0),
         st_dev=getattr(st, "st_dev", 0),
