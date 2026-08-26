@@ -37,7 +37,7 @@ from typing import Any, Callable, Dict, List, Optional, Protocol
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
 
 from dataforge.api.schema import JobEvent, JobStatus
-from dataforge.engine.jobs import QUEUE_DEPTH, Job, JobQueue
+from dataforge.engine.jobs import QUEUE_DEPTH, Job, JobQueue, QueueFullError
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,23 @@ _DESTRUCTIVE_KEYWORDS = frozenset({
     "delete", "remove", "strip", "clean", "move", "rename",
     "archive", "trash", "purge", "wipe", "secure_delete",
 })
+
+
+def _is_app_progress_callback(cb: Any) -> bool:
+    """True when *cb* is a UI-affine progress callback (DataForgeApp.post_progress).
+
+    TICK-911: the app's ``post_progress`` mutates ``QProgressBar``/``QLabel``
+    and must never be invoked inline from the worker thread (P0.1 SIGSEGV:
+    ``QWidget::repaint: Recursive repaint detected``). When the worker sees it
+    we skip the inline call — the queued ``progress_signal`` delivers the same
+    event on the GUI thread via ``JobManager._on_progress`` instead.
+    """
+    self_obj = getattr(cb, "__self__", None)
+    return (
+        getattr(cb, "__name__", "") == "post_progress"
+        and self_obj is not None
+        and isinstance(self_obj, QObject)
+    )
 
 
 class ProgressCallback(Protocol):
@@ -126,16 +143,33 @@ class ManagedWorker(QThread):
                 kwargs_copy["cancel_token"] = self._cancel_token
 
             if "progress_callback" in params or has_var_kw:
-                # Preserve caller's progress_callback if provided, chain to signal
+                # Preserve caller's progress_callback if provided, chain to signal.
+                # TICK-911: coalesce *signal* emission to 100ms so a 32-worker
+                # progress flood (1000+ callbacks/sec) cannot repaint the status
+                # bar more than ~10x/sec (QBackingStore active painter). The
+                # final callback (current == total) always passes the throttle.
+                # The caller's own callback is still chained verbatim (TICK-802
+                # contract) unless it is UI-affine (DataForgeApp.post_progress) —
+                # that one must not run inline from the worker thread (P0.1
+                # SIGSEGV); the queued progress_signal delivers it on the GUI
+                # thread where JobManager._on_progress coalesces again globally.
                 orig_cb = kwargs_copy.get("progress_callback")
+                last_emit = [0.0]
 
                 def progress_callback(current: int, total: int, step_name: str = "") -> None:
+                    now = time.time()
+                    emit_signal = True
+                    if total > 0 and current != total and now - last_emit[0] < 0.1:
+                        emit_signal = False
+                    else:
+                        last_emit[0] = now
                     try:
-                        if orig_cb:
+                        if orig_cb is not None and not _is_app_progress_callback(orig_cb):
                             orig_cb(current, total, step_name)
                     except Exception:
                         pass
-                    self.progress_signal.emit(current, total, step_name)
+                    if emit_signal:
+                        self.progress_signal.emit(current, total, step_name)
 
                 kwargs_copy["progress_callback"] = progress_callback
 
@@ -312,12 +346,19 @@ class JobManager(QObject):
     # Qt signals for aggregate status
     jobs_changed = pyqtSignal()  # emitted when job list changes
 
-    def __init__(self, parent: Optional[QObject] = None, max_workers: int = 4) -> None:
+    def __init__(
+        self,
+        parent: Optional[QObject] = None,
+        max_workers: int = 4,
+        queue_depth: int = QUEUE_DEPTH,
+    ) -> None:
         super().__init__(parent)
-        self._queue = JobQueue(max_workers=max_workers, queue_depth=QUEUE_DEPTH)
+        self._queue = JobQueue(max_workers=max_workers, queue_depth=queue_depth)
         self._workers: Dict[str, ManagedWorker] = {}
         self._lock = threading.Lock()
         self._evidence_mode: bool = False
+        self._shutdown_done: bool = False
+        self._last_progress_forward: float = 0.0
 
     # ------------------------------------------------------------------
     # Properties
@@ -397,6 +438,20 @@ class JobManager(QObject):
                 on_error(PermissionError("EVIDENCE MODE — writes blocked"))
             return None
 
+        # TICK-911: reject before the queue fills so the user gets an explicit
+        # error callback instead of a silently dropped job. Counts queued jobs
+        # (RUNNING workers are still executing and will drain).
+        if self.queued_job_count >= self._queue.queue_depth:
+            logger.warning(
+                "Job queue full (%s queued ≥ depth %s), rejecting %s",
+                self.queued_job_count,
+                self._queue.queue_depth,
+                getattr(target, "__name__", target),
+            )
+            if on_error:
+                on_error(RuntimeError("Too many jobs, try again — queue is full"))
+            return None
+
         # TICK-802: Use JobQueue as pure registry (execute=False) — ManagedWorker is sole executor.
         # Prevents double execution (ThreadPool + QThread both running target).
         try:
@@ -406,6 +461,11 @@ class JobManager(QObject):
                 progress_callback=None,  # we bridge via ManagedWorker
                 execute=False,
             )
+        except QueueFullError as e:
+            logger.error("Job queue full: %s", e)
+            if on_error:
+                on_error(RuntimeError(str(e)))
+            return None
         except Exception as e:
             logger.error("Failed to submit job: %s", e)
             if on_error:
@@ -638,10 +698,22 @@ class JobManager(QObject):
         on the main thread (Qt queued connection) and forwards to the
         parent app's update_progress so the status bar leaves indeterminate
         mode and shows real 0..total progress.
+
+        TICK-911: coalesces globally (across all workers) to 100ms so a
+        32-worker flood still reaches ``update_progress`` at most ~10x/sec.
+        The final callback (current == total) always passes through.
         """
         try:
             parent = self.parent()
             if parent is not None and hasattr(parent, "update_progress"):
+                now = time.time()
+                if (
+                    total > 0
+                    and current != total
+                    and now - getattr(self, "_last_progress_forward", 0.0) < 0.1
+                ):
+                    return
+                self._last_progress_forward = now
                 parent.update_progress(current, total, message)
         except Exception:
             pass
@@ -661,17 +733,53 @@ class JobManager(QObject):
 
     @staticmethod
     def _is_destructive(target: Callable[..., Any]) -> bool:
-        """Check if a target function is a destructive operation."""
+        """Check if a target function is a destructive operation.
+
+        TICK-911: inspects ``__name__``, ``__qualname__`` (catches nested
+        closures like ``EnhancedTreeview.delete_file.<locals>._do_delete``
+        that wrap direct ``FileActionService`` calls) and ``__module__``.
+        """
         name = getattr(target, "__name__", "") or ""
         qualname = getattr(target, "__qualname__", "") or ""
-        combined = f"{name} {qualname}".lower()
+        module = getattr(target, "__module__", "") or ""
+        combined = f"{name} {qualname} {module}".lower()
         return any(kw in combined for kw in _DESTRUCTIVE_KEYWORDS)
 
     # ------------------------------------------------------------------
     # Cleanup
     # ------------------------------------------------------------------
 
-    def shutdown(self) -> None:
-        """Cancel all jobs and shut down the executor."""
+    def shutdown(self, timeout: float = 2.0) -> None:
+        """Cancel all jobs, wait for workers, and shut down the executor.
+
+        TICK-911: previously the queue executor was shut down but live
+        ``ManagedWorker`` QThreads were left dangling on app close — a
+        shutdown leak that can crash at exit. This now waits (bounded) for
+        workers to observe their cancel tokens, then tears them down.
+        Idempotent: calling it twice is safe.
+        """
+        if getattr(self, "_shutdown_done", False):
+            return
+        self._shutdown_done = True
         self.cancel_all()
+        # Give workers a bounded window to observe the cancel token and exit.
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            with self._lock:
+                running = [w for w in self._workers.values() if w.isRunning()]
+            if not running:
+                break
+            time.sleep(0.02)
+        with self._lock:
+            workers = list(self._workers.values())
+            self._workers.clear()
+        for w in workers:
+            try:
+                w.wait(200)
+            except Exception:
+                pass
+            try:
+                w.deleteLater()
+            except Exception:
+                pass
         self._queue.shutdown(wait=True, cancel_futures=True)

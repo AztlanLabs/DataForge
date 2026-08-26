@@ -41,6 +41,15 @@ _ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _QUEUE_DEPTH: int = 8
 QUEUE_DEPTH: int = _QUEUE_DEPTH
 
+
+class QueueFullError(queue.Full):
+    """Raised when ``JobQueue.submit`` exceeds the configured queue depth.
+
+    TICK-911: subclasses ``queue.Full`` (backwards compatible) but carries a
+    user-actionable message so UI layers can surface "Too many jobs, try
+    again" instead of a silent ``None``.
+    """
+
 _last_timestamp_ms: int = 0
 _last_random: int = 0
 _ulid_lock = threading.Lock()
@@ -378,40 +387,63 @@ class JobQueue:
         params: Optional[Any] = None,
         provider: Any = "local",
         progress_callback: Optional[Callable[..., Any]] = None,
+        *,
         execute: bool = True,
+        cancel_token: Optional[threading.Event] = None,
         **kwargs: Any,
     ) -> Job:
-        """Submit a job. When execute=False, registry-only (no ThreadPool run).
+        """Submit a job.
 
-        TICK-802: JobManager uses execute=False to avoid double execution;
-        ManagedWorker is sole executor and JobQueue tracks metadata only.
-        Direct JobQueue callers (tests, daemon) keep execute=True.
+        ``execute`` is keyword-only and must be an explicit bool — there is no
+        positional shorthand:
+
+        * ``execute=False`` — registry only. The Job is tracked (status,
+          events, cancel_token) but never runs; a ManagedWorker QThread is the
+          sole executor. This is the UI JobManager path (TICK-802/TICK-911).
+        * ``execute=True`` — run via the internal ThreadPoolExecutor. Used by
+          daemon transports and direct engine callers.
+
+        Passing a non-bool ``execute`` (e.g. ``None``) raises ``TypeError``
+        instead of silently falling into registry-only mode.
+
+        ``cancel_token`` optionally supplies a caller-owned ``threading.Event``
+        for the Job; when omitted the Job creates its own (``job.cancel()``
+        sets it). Per-job tokens let daemon clients cancel from outside.
+
+        Raises ``QueueFullError`` (a ``queue.Full`` subclass) when the number
+        of queued jobs already equals ``queue_depth``.
         """
-        # Pop execute from kwargs if caller passed it as kwarg (for **kwargs merging)
-        if "execute" in kwargs and isinstance(kwargs["execute"], bool):
-            # Only if explicitly passed via **kwargs and not already handled
-            pass
+        if not isinstance(execute, bool):
+            raise TypeError(
+                "execute must be an explicit bool "
+                "(True=run via ThreadPool, False=registry-only)"
+            )
         if params is None:
             norm_params: Any = {}
         else:
             norm_params = params
-        # Don't merge 'execute' into params
-        clean_kwargs = {k: v for k, v in kwargs.items() if k != "execute"}
-        if isinstance(norm_params, dict) and clean_kwargs:
-            norm_params = {**norm_params, **clean_kwargs}
-        elif clean_kwargs and not isinstance(norm_params, dict):
-            norm_params = clean_kwargs
+        if isinstance(norm_params, dict) and kwargs:
+            norm_params = {**norm_params, **kwargs}
+        elif kwargs and not isinstance(norm_params, dict):
+            norm_params = kwargs
         elif isinstance(norm_params, dict):
             norm_params = dict(norm_params)
-        if self._queued_count() >= self.queue_depth:
-            raise queue.Full(f"JobQueue depth {self.queue_depth} exceeded")
-        job = Job(
+        queued = self._queued_count()
+        if queued >= self.queue_depth:
+            raise QueueFullError(
+                f"Too many jobs, try again — JobQueue depth {self.queue_depth} "
+                f"exceeded ({queued} queued)"
+            )
+        job_kwargs: Dict[str, Any] = dict(
             provider=provider,
             params=norm_params if isinstance(norm_params, dict) else {"_value": norm_params},
             progress_callback=progress_callback,
             status=JobStatus.QUEUED,
         )
-        if not isinstance(params, dict) and params is not None and not clean_kwargs:
+        if cancel_token is not None:
+            job_kwargs["cancel_token"] = cancel_token
+        job = Job(**job_kwargs)
+        if not isinstance(params, dict) and params is not None and not kwargs:
             job.params = params  # type: ignore[assignment]
         with self._lock:
             self._jobs[job.job_id] = job
@@ -481,6 +513,7 @@ class JobQueue:
 __all__ = [
     "Job",
     "JobQueue",
+    "QueueFullError",
     "QUEUE_DEPTH",
     "generate_ulid",
 ]
