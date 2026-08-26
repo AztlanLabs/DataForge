@@ -34,7 +34,7 @@ import threading
 import time
 from typing import Any, Callable, Dict, List, Optional, Protocol
 
-from PyQt5.QtCore import QObject, QThread, pyqtSignal
+from PyQt5.QtCore import QObject, Qt, QThread, pyqtSignal, pyqtSlot
 
 from dataforge.api.schema import JobEvent, JobStatus
 from dataforge.engine.jobs import QUEUE_DEPTH, Job, JobQueue
@@ -42,6 +42,11 @@ from dataforge.engine.jobs import QUEUE_DEPTH, Job, JobQueue
 logger = logging.getLogger(__name__)
 
 __all__ = ["JobManager", "ManagedWorker"]
+
+# TICK-914 P0.4: minimum interval between delivered progress updates.
+# Updates closer than this are coalesced away (except 0/total and
+# total/total boundaries) to prevent QWidget repaint storms.
+_PROGRESS_COALESCE_MS = 0.1  # seconds
 
 # Destructive operation keywords — checked against target function name
 # when evidence_mode is enabled.
@@ -126,15 +131,13 @@ class ManagedWorker(QThread):
                 kwargs_copy["cancel_token"] = self._cancel_token
 
             if "progress_callback" in params or has_var_kw:
-                # Preserve caller's progress_callback if provided, chain to signal
-                orig_cb = kwargs_copy.get("progress_callback")
+                # TICK-914: emit progress_signal ONLY. Never invoke a caller
+                # supplied progress_callback inline — it may mutate Qt widgets
+                # from this worker thread (P0.1 cross-thread widget mutation).
+                # The signal is the sole progress path; JobManager dispatches
+                # it on the GUI thread via an explicit queued connection.
 
                 def progress_callback(current: int, total: int, step_name: str = "") -> None:
-                    try:
-                        if orig_cb:
-                            orig_cb(current, total, step_name)
-                    except Exception:
-                        pass
                     self.progress_signal.emit(current, total, step_name)
 
                 kwargs_copy["progress_callback"] = progress_callback
@@ -316,6 +319,9 @@ class JobManager(QObject):
         super().__init__(parent)
         self._queue = JobQueue(max_workers=max_workers, queue_depth=QUEUE_DEPTH)
         self._workers: Dict[str, ManagedWorker] = {}
+        self._callbacks: Dict[str, Dict[str, Any]] = {}
+        self._last_progress_at: Dict[str, float] = {}
+        self._delivered_terminal: Dict[str, str] = {}
         self._lock = threading.Lock()
         self._evidence_mode: bool = False
 
@@ -427,99 +433,30 @@ class JobManager(QObject):
             job=job,
         )
 
-        # Internal handlers to keep JobQueue metadata in sync (must be before user handlers)
-        def _internal_on_result(result: Any) -> None:
-            j = self._queue.get(job.job_id)
-            if j is not None:
-                with self._queue._lock:
-                    is_cancelled_result = isinstance(result, dict) and result.get("cancelled") is True
-                    token_cancelled = j.is_cancelled()
-                    if is_cancelled_result or token_cancelled:
-                        j.status = JobStatus.CANCELLED
-                        j.results = result if isinstance(result, dict) else {"cancelled": True, "result": result}
-                        if j.finished_at is None:
-                            j.finished_at = time.time()
-                        if not j.events or j.events[-1].status != JobStatus.CANCELLED:
-                            j.events.append(
-                                JobEvent(
-                                    job_id=j.job_id,
-                                    type="status",
-                                    status=JobStatus.CANCELLED,
-                                    message="cancelled",
-                                )
-                            )
-                    else:
-                        j.status = JobStatus.DONE
-                        j.results = result
-                        j.finished_at = time.time()
-                        j.events.append(
-                            JobEvent(
-                                job_id=j.job_id,
-                                type="result",
-                                status=JobStatus.DONE,
-                                payload={"result": result} if isinstance(result, dict) else {"result": result},
-                                message="done",
-                            )
-                        )
-                try:
-                    self.jobs_changed.emit()
-                except Exception:
-                    pass
+        # Store per-job callbacks for GUI-thread dispatch (TICK-914 P0.2).
+        # Every callback entry point has an explicit affinity contract: the
+        # dispatch slots below are pyqtSlot methods on JobManager (a QObject
+        # living in the GUI thread), connected with Qt.QueuedConnection.
+        with self._lock:
+            self._callbacks[job.job_id] = {
+                "on_success": on_success,
+                "on_error": on_error,
+                "progress": progress,
+            }
 
-        def _internal_on_error(err: Exception) -> None:
-            j = self._queue.get(job.job_id)
-            if j is not None:
-                with self._queue._lock:
-                    is_cancel = j.is_cancelled() or isinstance(err, InterruptedError) or "cancelled" in str(err).lower()
-                    if is_cancel:
-                        j.status = JobStatus.CANCELLED
-                        j.results = {"cancelled": True, "message": str(err)}
-                        j.error = None
-                        if j.finished_at is None:
-                            j.finished_at = time.time()
-                        if not j.events or j.events[-1].status != JobStatus.CANCELLED:
-                            j.events.append(
-                                JobEvent(
-                                    job_id=j.job_id,
-                                    type="status",
-                                    status=JobStatus.CANCELLED,
-                                    message="cancelled",
-                                )
-                            )
-                    else:
-                        j.status = JobStatus.FAILED
-                        j.error = str(err)
-                        j.finished_at = time.time()
-                        j.events.append(
-                            JobEvent(
-                                job_id=j.job_id,
-                                type="error",
-                                status=JobStatus.FAILED,
-                                message=str(err),
-                            )
-                        )
-                try:
-                    self.jobs_changed.emit()
-                except Exception:
-                    pass
+        # Connect signals — explicit queued delivery to the GUI thread.
+        # Internal JobQueue metadata sync runs on the GUI thread too, then
+        # user callbacks are forwarded from the dispatch slots.
+        worker.result_signal.connect(self._dispatch_result, Qt.QueuedConnection)
+        worker.error_signal.connect(self._dispatch_error, Qt.QueuedConnection)
+        worker.progress_signal.connect(self._dispatch_progress, Qt.QueuedConnection)
 
-        # Connect internal sync handlers first
-        worker.result_signal.connect(_internal_on_result)
-        worker.error_signal.connect(_internal_on_error)
-
-        # Connect signals
-        if progress:
-            worker.progress_signal.connect(
-                lambda c, t, m, jid=job.job_id: self._on_progress(jid, c, t, m)
-            )
-
-        if on_success:
-            worker.result_signal.connect(on_success)
-
-        if on_error:
-            worker.error_signal.connect(on_error)
-
-        worker.finished_signal.connect(self._on_worker_finished)
+        # TICK-914 P0.3: connect cleanup to the NATIVE QThread.finished
+        # (fires only after run() returns and the thread has stopped), not
+        # to finished_signal which is emitted inside run() while the thread
+        # is still running. A direct connect would raise TypeError (native
+        # finished has no arguments), so capture the job_id in a lambda.
+        worker.finished.connect(lambda jid=job.job_id: self._on_worker_finished(jid))
 
         # Store and start
         with self._lock:
@@ -628,36 +565,206 @@ class JobManager(QObject):
         return job.status if job else None
 
     # ------------------------------------------------------------------
-    # Internal
+    # Internal — GUI-thread dispatch slots (explicit affinity contract)
     # ------------------------------------------------------------------
+    #
+    # These @pyqtSlot methods live on JobManager, a QObject created in the
+    # GUI thread. ManagedWorker signals are connected to them with explicit
+    # Qt.QueuedConnection, so every callback entry point runs on the GUI
+    # thread — never on the worker QThread (TICK-914 P0.1/P0.2).
 
-    def _on_progress(self, job_id: str, current: int, total: int, message: str) -> None:
-        """Bridge progress from ManagedWorker to parent DataForgeApp.
+    def _job_id_for_sender(self) -> Optional[str]:
+        sender = self.sender()
+        if sender is None:
+            return None
+        with self._lock:
+            for jid, w in self._workers.items():
+                if w is sender:
+                    return jid
+        return None
 
-        The ManagedWorker emits progress_signal on its thread; this slot runs
-        on the main thread (Qt queued connection) and forwards to the
-        parent app's update_progress so the status bar leaves indeterminate
-        mode and shows real 0..total progress.
+    @pyqtSlot(int, int, str)
+    def _dispatch_progress(self, current: int, total: int, message: str) -> None:
+        """Deliver a progress update on the GUI thread.
+
+        Runs on the GUI thread (JobManager lives there; the worker's
+        progress_signal is connected with Qt.QueuedConnection). Coalesces
+        noisy updates to prevent repaint storms (TICK-914 P0.4): updates
+        closer than 100ms apart are dropped except for the 0/total and
+        total/total boundaries.
         """
+        job_id = self._job_id_for_sender()
+        if job_id is None:
+            return
+        # Post-terminal events are discarded (TICK-914 P0.6).
+        if job_id in self._delivered_terminal:
+            return
+        with self._lock:
+            callbacks = self._callbacks.get(job_id)
+            progress_enabled = bool(callbacks and callbacks.get("progress"))
+        if not progress_enabled:
+            return
+        # Coalesce: skip if <100ms since last delivered update, except
+        # boundaries (0/total and total/total).
+        now = time.monotonic()
+        last = self._last_progress_at.get(job_id, 0.0)
+        if now - last < _PROGRESS_COALESCE_MS and current != 0 and current != total:
+            return
+        self._last_progress_at[job_id] = now
         try:
             parent = self.parent()
             if parent is not None and hasattr(parent, "update_progress"):
                 parent.update_progress(current, total, message)
         except Exception:
             pass
-        # Also emit jobs_changed so any aggregate UI can refresh
         try:
             self.jobs_changed.emit()
         except Exception:
             pass
 
+    @pyqtSlot(object)
+    def _dispatch_result(self, result: Any) -> None:
+        """Sync JobQueue metadata and forward success on the GUI thread."""
+        job_id = self._job_id_for_sender()
+        if job_id is None:
+            return
+        if job_id in self._delivered_terminal:
+            return
+        self._delivered_terminal[job_id] = "result"
+        self._sync_job_result(job_id, result)
+        with self._lock:
+            callbacks = self._callbacks.get(job_id)
+            on_success = callbacks.get("on_success") if callbacks else None
+        if on_success:
+            try:
+                on_success(result)
+            except Exception:
+                logger.exception("on_success callback failed for job %s", job_id)
+
+    @pyqtSlot(Exception)
+    def _dispatch_error(self, error: Exception) -> None:
+        """Sync JobQueue metadata and forward error on the GUI thread."""
+        job_id = self._job_id_for_sender()
+        if job_id is None:
+            return
+        if job_id in self._delivered_terminal:
+            return
+        self._delivered_terminal[job_id] = "error"
+        self._sync_job_error(job_id, error)
+        with self._lock:
+            callbacks = self._callbacks.get(job_id)
+            on_error = callbacks.get("on_error") if callbacks else None
+        if on_error:
+            try:
+                on_error(error)
+            except Exception:
+                logger.exception("on_error callback failed for job %s", job_id)
+
+    def _sync_job_result(self, job_id: str, result: Any) -> None:
+        """Keep JobQueue metadata in sync after a job succeeds.
+
+        Runs on the GUI thread (called from _dispatch_result). The queue's
+        own lock protects the shared Job object.
+        """
+        j = self._queue.get(job_id)
+        if j is not None:
+            with self._queue._lock:
+                is_cancelled_result = isinstance(result, dict) and result.get("cancelled") is True
+                token_cancelled = j.is_cancelled()
+                if is_cancelled_result or token_cancelled:
+                    j.status = JobStatus.CANCELLED
+                    j.results = result if isinstance(result, dict) else {"cancelled": True, "result": result}
+                    if j.finished_at is None:
+                        j.finished_at = time.time()
+                    if not j.events or j.events[-1].status != JobStatus.CANCELLED:
+                        j.events.append(
+                            JobEvent(
+                                job_id=j.job_id,
+                                type="status",
+                                status=JobStatus.CANCELLED,
+                                message="cancelled",
+                            )
+                        )
+                else:
+                    j.status = JobStatus.DONE
+                    j.results = result
+                    j.finished_at = time.time()
+                    j.events.append(
+                        JobEvent(
+                            job_id=j.job_id,
+                            type="result",
+                            status=JobStatus.DONE,
+                            payload={"result": result} if isinstance(result, dict) else {"result": result},
+                            message="done",
+                        )
+                    )
+            try:
+                self.jobs_changed.emit()
+            except Exception:
+                pass
+
+    def _sync_job_error(self, job_id: str, err: Exception) -> None:
+        """Keep JobQueue metadata in sync after a job fails.
+
+        Runs on the GUI thread (called from _dispatch_error).
+        """
+        j = self._queue.get(job_id)
+        if j is not None:
+            with self._queue._lock:
+                is_cancel = j.is_cancelled() or isinstance(err, InterruptedError) or "cancelled" in str(err).lower()
+                if is_cancel:
+                    j.status = JobStatus.CANCELLED
+                    j.results = {"cancelled": True, "message": str(err)}
+                    j.error = None
+                    if j.finished_at is None:
+                        j.finished_at = time.time()
+                    if not j.events or j.events[-1].status != JobStatus.CANCELLED:
+                        j.events.append(
+                            JobEvent(
+                                job_id=j.job_id,
+                                type="status",
+                                status=JobStatus.CANCELLED,
+                                message="cancelled",
+                            )
+                        )
+                else:
+                    j.status = JobStatus.FAILED
+                    j.error = str(err)
+                    j.finished_at = time.time()
+                    j.events.append(
+                        JobEvent(
+                            job_id=j.job_id,
+                            type="error",
+                            status=JobStatus.FAILED,
+                            message=str(err),
+                        )
+                    )
+            try:
+                self.jobs_changed.emit()
+            except Exception:
+                pass
+
     def _on_worker_finished(self, job_id: str) -> None:
-        """Clean up when a ManagedWorker finishes."""
+        """Clean up when a ManagedWorker's native thread has stopped.
+
+        Connected to the native QThread.finished signal (see submit), which
+        fires only after run() returns and the thread has terminated — so
+        deleteLater() here never destroys a running QThread (TICK-914 P0.3).
+        """
         with self._lock:
             worker = self._workers.pop(job_id, None)
-        if worker:
-            worker.deleteLater()
-        self.jobs_changed.emit()
+            self._callbacks.pop(job_id, None)
+            self._last_progress_at.pop(job_id, None)
+            self._delivered_terminal.pop(job_id, None)
+        if worker is not None:
+            try:
+                worker.deleteLater()
+            except RuntimeError:
+                pass
+        try:
+            self.jobs_changed.emit()
+        except Exception:
+            pass
 
     @staticmethod
     def _is_destructive(target: Callable[..., Any]) -> bool:
@@ -672,6 +779,19 @@ class JobManager(QObject):
     # ------------------------------------------------------------------
 
     def shutdown(self) -> None:
-        """Cancel all jobs and shut down the executor."""
+        """Cancel all jobs, wait for worker threads, shut down the executor.
+
+        TICK-914 P0.3: waits for every active ManagedWorker's native thread
+        (worker.wait()) before tearing down, so no QThread is destroyed
+        while still running. Called from DataForgeApp.closeEvent (TICK-917).
+        """
         self.cancel_all()
+        with self._lock:
+            workers = list(self._workers.values())
+        for worker in workers:
+            try:
+                if worker.isRunning():
+                    worker.wait(5000)
+            except RuntimeError:
+                pass
         self._queue.shutdown(wait=True, cancel_futures=True)
