@@ -33,6 +33,7 @@ class ReportGenerator:
                 })
 
         if not rows:
+            open(output_file, 'w', newline='').close()
             return
 
         if HAS_PANDAS:

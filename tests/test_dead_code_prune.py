@@ -104,6 +104,14 @@ def test_duplicates_to_csv_fallback_without_pandas(monkeypatch, tmp_path):
     assert {"path", "size_bytes", "filename", "extension"} <= set(rows[0].keys())
 
 
+def test_duplicates_to_csv_empty_creates_file(tmp_path):
+    """Empty input must still produce an (empty) export file, not fail silently."""
+    out = tmp_path / "empty.csv"
+    ReportGenerator.duplicates_to_csv({}, str(out))
+    assert out.exists()
+    assert out.read_text() == ""
+
+
 def test_duplicates_to_json_and_txt_work(tmp_path):
     json_out = tmp_path / "dupes.json"
     ReportGenerator.duplicates_to_json(_sample_duplicates(), str(json_out))
