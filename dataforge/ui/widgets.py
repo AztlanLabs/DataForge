@@ -492,6 +492,19 @@ class EnhancedTreeview(QWidget):
         self._header_commands = {}
         self.tree.header().sectionClicked.connect(self._on_header_clicked)
         self.item_map = {}
+        # TICK-925: default to multi-row selection so plural actions
+        # (strip/write/transfer/delete) can operate on several rows.
+        self.tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
+
+    def clear(self):
+        """Clear all rows and per-row state (item_map + path roles) atomically.
+
+        TICK-925 P1.7: item_map and _item_path_role must be cleared together,
+        otherwise reused item ids resolve stale paths after a rebuild.
+        """
+        self._item_path_role.clear()
+        self.item_map.clear()
+        self.tree.clear()
 
     def set_path_resolver(self, resolver):
         """Register a callable(item_id) -> full path / None so right-click
