@@ -1,12 +1,19 @@
 # -*- mode: python ; coding: utf-8 -*-
+# TICK-930 P1.19: no hardcoded user paths — resolve inputs relative to this
+# spec file. Stack is PyQt5 (the retired Tk stack is gone).
+
+import os
+
+# SPECPATH is the directory containing this spec file (buildspec/debug).
+PROJECT_ROOT = os.path.abspath(os.path.join(SPECPATH, os.pardir, os.pardir))
 
 
 a = Analysis(
-    ['C:\\Users\\coron\\OneDrive\\Documents\\Python\\DataForge\\run_ui.py'],
+    [os.path.join(PROJECT_ROOT, 'run_ui.py')],
     pathex=[],
     binaries=[],
-    datas=[('C:\\Users\\coron\\OneDrive\\Documents\\Python\\DataForge\\dataforge\\ui\\plugins', 'dataforge/ui/plugins')],
-    hiddenimports=['ttkbootstrap', 'PIL', 'PIL.ImageTk', 'send2trash', 'pypdf'],
+    datas=[(os.path.join(PROJECT_ROOT, 'dataforge', 'ui', 'plugins'), 'dataforge/ui/plugins')],
+    hiddenimports=['PyQt5', 'PyQt5.QtCore', 'PyQt5.QtWidgets', 'PyQt5.QtGui', 'PIL', 'send2trash', 'pypdf'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

@@ -34,9 +34,9 @@ contents:
     file_info:
       mode: 0644
 
-  # Application icon
-  - src: packaging/assets/dataforge.png
-    dst: /usr/share/icons/hicolor/256x256/apps/dataforge.png
+  # Application icon (TICK-930: only SVG ships in packaging/assets)
+  - src: packaging/assets/dataforge.svg
+    dst: /usr/share/icons/hicolor/scalable/apps/dataforge.svg
     type: config
     file_info:
       mode: 0644

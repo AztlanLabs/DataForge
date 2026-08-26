@@ -37,6 +37,14 @@ PLATFORM_HIDDEN_IMPORTS = {
         'objc',
         'pkg_resources',
     ),
+    # TICK-930 P1.19: detect_platform() returns 'macos'; keep both spellings
+    # so lookups succeed regardless of which name is used.
+    'macos': (
+        'Foundation',
+        'AppKit',
+        'objc',
+        'pkg_resources',
+    ),
     'linux': (
         'gi',
         'gi.repository.Gtk',
@@ -54,12 +62,41 @@ PLATFORM_EXCLUDES = {
         'gtk',
         'gi',
     ),
+    'macos': (
+        'gtk',
+        'gi',
+    ),
     'linux': (
         'win32api',
         'win32con',
         'win32gui',
     ),
 }
+
+# TICK-930 P1.19: detect_platform() returns 'macos' but the lookup dicts
+# above are keyed by sys.platform values ('darwin'). Map one to the other.
+PLATFORM_MAP = {
+    'linux': 'linux',
+    'darwin': 'macos',
+    'win32': 'windows',
+}
+
+
+def normalize_platform(platform_name: str) -> str:
+    """Map raw sys.platform values to canonical build platform names."""
+    return PLATFORM_MAP.get(platform_name, platform_name)
+
+
+def get_platform_hidden_imports(platform_name: str) -> tuple:
+    """Platform-specific hidden imports, tolerant of macos/darwin naming."""
+    key = PLATFORM_MAP.get(platform_name, platform_name)
+    return PLATFORM_HIDDEN_IMPORTS.get(key, ())
+
+
+def get_platform_excludes(platform_name: str) -> tuple:
+    """Platform-specific excludes, tolerant of macos/darwin naming."""
+    key = PLATFORM_MAP.get(platform_name, platform_name)
+    return PLATFORM_EXCLUDES.get(key, ())
 
 
 def detect_platform() -> str:
@@ -117,11 +154,11 @@ def build_common_args(
         args.append(f'--hidden-import={hidden_import}')
 
     # Add platform-specific hidden imports
-    for hidden_import in PLATFORM_HIDDEN_IMPORTS.get(platform_name, ()):
+    for hidden_import in get_platform_hidden_imports(platform_name):
         args.append(f'--hidden-import={hidden_import}')
 
     # Add platform-specific excludes
-    for exclude in PLATFORM_EXCLUDES.get(platform_name, ()):
+    for exclude in get_platform_excludes(platform_name):
         args.append(f'--exclude-module={exclude}')
 
     # Add icon if available

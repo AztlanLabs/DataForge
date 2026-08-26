@@ -1,11 +1,18 @@
 # -*- mode: python ; coding: utf-8 -*-
+# TICK-930 P1.19: no hardcoded machine paths — resolve inputs relative to
+# this spec file so the build works on any machine/CI checkout.
+
+import os
+
+# SPECPATH is the directory containing this spec file (buildspec/release).
+PROJECT_ROOT = os.path.abspath(os.path.join(SPECPATH, os.pardir, os.pardir))
 
 
 a = Analysis(
-    ['/mnt/pharos/Data/Documents/Python/DataForge/run_ui.py'],
+    [os.path.join(PROJECT_ROOT, 'run_ui.py')],
     pathex=[],
     binaries=[],
-    datas=[('/mnt/pharos/Data/Documents/Python/DataForge/dataforge/ui/plugins', 'dataforge/ui/plugins')],
+    datas=[(os.path.join(PROJECT_ROOT, 'dataforge', 'ui', 'plugins'), 'dataforge/ui/plugins')],
     hiddenimports=['PyQt5', 'PyQt5.QtCore', 'PyQt5.QtWidgets', 'PyQt5.QtGui', 'PIL', 'send2trash', 'pypdf'],
     hookspath=[],
     hooksconfig={},

@@ -24,9 +24,6 @@
                         <File Id="DataForgeEXE" Source="dist\onedir\DataForge\DataForge.exe" KeyPath="yes">
                         </File>
                     </Component>
-                    <Component Id="EngineExecutable" Guid="C3D4E5F6-A7B8-4C9D-8E0F-123456789ABD">
-                        <File Id="EngineEXE" Source="dist\onedir\DataForge\dataforge-engine.exe" KeyPath="no" />
-                    </Component>
                 </Directory>
             </Directory>
             <Directory Id="ProgramMenuFolder">
@@ -58,13 +55,5 @@
         <Property Id="ARPCOMMENTS" Value="File System Management with Steroids and Superpowers" />
         <Property Id="ARPNOREPAIR" Value="yes" />
         <Property Id="ARPNOMODIFY" Value="yes" />
-
-        <!-- Custom action for service registration (post-install) -->
-        <CustomAction Id="StartService" Directory="INSTALLFOLDER"
-                      ExeCommand='sc create DataForgeEngine binPath= "[INSTALLFOLDER]dataforge-engine.exe" start= delayed-auto &amp; sc start DataForgeEngine'
-                      Execute="deferred" Return="ignore" Impersonate="no" />
-        <InstallExecuteSequence>
-            <Custom Action="StartService" After="InstallFinalize">NOT Installed</Custom>
-        </InstallExecuteSequence>
     </Product>
 </Wix>
