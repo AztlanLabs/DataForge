@@ -180,12 +180,12 @@ All 8 unit tests pass. CLI works without Pillow. Extras defined. Acquire cleanup
 
 ## Git Workflow
 
-Follow this exact workflow for every ticket. Base branch is `dev`.
+Follow this exact workflow for every ticket. Base branch is `develop`.
 
 ### Step 1: Sync dev first
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 2: Branch from dev
@@ -222,10 +222,10 @@ git push origin feat/TICK-927-dependencies-optional-imports-extras
 
 ### Step 7: Merge to dev
 ```bash
-git checkout dev
-git pull origin dev
-git merge --no-ff feat/TICK-927-dependencies-optional-imports-extras -m "Merge feat/TICK-927 into dev"
-git push origin dev
+git checkout develop
+git pull origin develop
+git merge --no-ff feat/TICK-927-dependencies-optional-imports-extras -m "Merge feat/TICK-927 into develop"
+git push origin develop
 ```
 
 ### Step 8: Clean up
@@ -236,8 +236,8 @@ git push origin --delete feat/TICK-927-dependencies-optional-imports-extras
 
 ### Step 9: Reset to dev
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 10: Update backlog

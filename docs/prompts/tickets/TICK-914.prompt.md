@@ -170,12 +170,12 @@ All 10 unit tests pass. No Qt warnings in stderr. `ruff` clean. The `orig_cb` ch
 
 ## Git Workflow
 
-Follow this exact workflow for every ticket. Base branch is `dev`.
+Follow this exact workflow for every ticket. Base branch is `develop`.
 
 ### Step 1: Sync dev first
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 2: Branch from dev
@@ -212,10 +212,10 @@ git push origin fix/TICK-914-progress-callback-qthread-lifecycle
 
 ### Step 7: Merge to dev
 ```bash
-git checkout dev
-git pull origin dev
-git merge --no-ff fix/TICK-914-progress-callback-qthread-lifecycle -m "Merge fix/TICK-914 into dev"
-git push origin dev
+git checkout develop
+git pull origin develop
+git merge --no-ff fix/TICK-914-progress-callback-qthread-lifecycle -m "Merge fix/TICK-914 into develop"
+git push origin develop
 ```
 
 ### Step 8: Clean up
@@ -226,8 +226,8 @@ git push origin --delete fix/TICK-914-progress-callback-qthread-lifecycle
 
 ### Step 9: Reset to dev
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 10: Update backlog

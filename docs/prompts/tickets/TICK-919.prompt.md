@@ -133,12 +133,12 @@ All 10 unit tests pass. Rename is confined. Same-file is detected. Result contra
 
 ## Git Workflow
 
-Follow this exact workflow for every ticket. Base branch is `dev`.
+Follow this exact workflow for every ticket. Base branch is `develop`.
 
 ### Step 1: Sync dev first
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 2: Branch from dev
@@ -175,10 +175,10 @@ git push origin feat/TICK-919-operations-result-contract
 
 ### Step 7: Merge to dev
 ```bash
-git checkout dev
-git pull origin dev
-git merge --no-ff feat/TICK-919-operations-result-contract -m "Merge feat/TICK-919 into dev"
-git push origin dev
+git checkout develop
+git pull origin develop
+git merge --no-ff feat/TICK-919-operations-result-contract -m "Merge feat/TICK-919 into develop"
+git push origin develop
 ```
 
 ### Step 8: Clean up
@@ -189,8 +189,8 @@ git push origin --delete feat/TICK-919-operations-result-contract
 
 ### Step 9: Reset to dev
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 10: Update backlog

@@ -173,12 +173,12 @@ All 10 unit tests pass. PNG writes work. Exiftool detection is robust. Capabilit
 
 ## Git Workflow
 
-Follow this exact workflow for every ticket. Base branch is `dev`.
+Follow this exact workflow for every ticket. Base branch is `develop`.
 
 ### Step 1: Sync dev first
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 2: Branch from dev
@@ -215,10 +215,10 @@ git push origin feat/TICK-921-metadata-png-write-capabilities
 
 ### Step 7: Merge to dev
 ```bash
-git checkout dev
-git pull origin dev
-git merge --no-ff feat/TICK-921-metadata-png-write-capabilities -m "Merge feat/TICK-921 into dev"
-git push origin dev
+git checkout develop
+git pull origin develop
+git merge --no-ff feat/TICK-921-metadata-png-write-capabilities -m "Merge feat/TICK-921 into develop"
+git push origin develop
 ```
 
 ### Step 8: Clean up
@@ -229,8 +229,8 @@ git push origin --delete feat/TICK-921-metadata-png-write-capabilities
 
 ### Step 9: Reset to dev
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 10: Update backlog

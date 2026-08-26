@@ -156,12 +156,12 @@ All 8 unit tests pass. Service starts with its arguments. Transports work correc
 
 ## Git Workflow
 
-Follow this exact workflow for every ticket. Base branch is `dev`.
+Follow this exact workflow for every ticket. Base branch is `develop`.
 
 ### Step 1: Sync dev first
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 2: Branch from dev
@@ -198,10 +198,10 @@ git push origin fix/TICK-929-service-arguments-transport
 
 ### Step 7: Merge to dev
 ```bash
-git checkout dev
-git pull origin dev
-git merge --no-ff fix/TICK-929-service-arguments-transport -m "Merge fix/TICK-929 into dev"
-git push origin dev
+git checkout develop
+git pull origin develop
+git merge --no-ff fix/TICK-929-service-arguments-transport -m "Merge fix/TICK-929 into develop"
+git push origin develop
 ```
 
 ### Step 8: Clean up
@@ -212,8 +212,8 @@ git push origin --delete fix/TICK-929-service-arguments-transport
 
 ### Step 9: Reset to dev
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 10: Update backlog

@@ -151,12 +151,12 @@ All 11 unit tests pass. API fields work or are removed. HTTP auth enforced. Even
 
 ## Git Workflow
 
-Follow this exact workflow for every ticket. Base branch is `dev`.
+Follow this exact workflow for every ticket. Base branch is `develop`.
 
 ### Step 1: Sync dev first
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 2: Branch from dev
@@ -193,10 +193,10 @@ git push origin fix/TICK-928-daemon-api-fields-http-auth
 
 ### Step 7: Merge to dev
 ```bash
-git checkout dev
-git pull origin dev
-git merge --no-ff fix/TICK-928-daemon-api-fields-http-auth -m "Merge fix/TICK-928 into dev"
-git push origin dev
+git checkout develop
+git pull origin develop
+git merge --no-ff fix/TICK-928-daemon-api-fields-http-auth -m "Merge fix/TICK-928 into develop"
+git push origin develop
 ```
 
 ### Step 8: Clean up
@@ -207,8 +207,8 @@ git push origin --delete fix/TICK-928-daemon-api-fields-http-auth
 
 ### Step 9: Reset to dev
 ```bash
-git checkout dev
-git pull origin dev
+git checkout develop
+git pull origin develop
 ```
 
 ### Step 10: Update backlog
