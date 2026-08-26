@@ -410,6 +410,16 @@ Once files are found, use the 'Bulk Actions' card to:
 
         self.preview_panel.update_file(path, root=self.entry_path.text().strip())
 
+    def _validate_search_params(self, path, min_size, max_size):
+        if not path or not os.path.exists(path):
+            raise ValueError(f"Invalid search path: {path}")
+        if min_size is not None and min_size < 0:
+            raise ValueError(f"min_size must be >= 0: {min_size}")
+        if max_size is not None and max_size < 0:
+            raise ValueError(f"max_size must be >= 0: {max_size}")
+        if min_size is not None and max_size is not None and min_size > max_size:
+            raise ValueError(f"min_size ({min_size}) > max_size ({max_size})")
+
     def start_search(self):
         path = self.entry_path.text().strip()
         if not path:
@@ -434,6 +444,12 @@ Once files are found, use the 'Bulk Actions' card to:
                 max_size_bytes = int(float(max_s) * 1024 * 1024)
         except ValueError:
             self.app.show_error_dialog("Error", "Invalid Size value")
+            return
+
+        try:
+            self._validate_search_params(path, min_size_bytes, max_size_bytes)
+        except ValueError as exc:
+            self.app.show_error_dialog("Search Error", str(exc))
             return
 
         newer_days = None
@@ -465,7 +481,9 @@ Once files are found, use the 'Bulk Actions' card to:
             self.app.show_error_dialog("Search Error", str(exc))
             return
             
-        # Clear tree
+        # Clear stale results + tree before the new search starts so
+        # export/actions can never operate on the previous result set.
+        self.current_results = []
         self.tree.item_map.clear()
         self.tree.tree.clear()
             

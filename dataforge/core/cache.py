@@ -10,7 +10,7 @@ from .logger import logger
 # ---------------------------------------------------------------------------
 # Schema versioning — INSTALL_UPGRADE_LIFECYCLE §7.2
 # ---------------------------------------------------------------------------
-CACHE_SCHEMA_VERSION: int = 2
+CACHE_SCHEMA_VERSION: int = 3
 
 # Migrations live under dataforge/engine/migrations/*.sql (Wave 0 contract:
 # directory exists, not yet populated; Wave 1 (TICK-104) fills impl).
@@ -35,7 +35,7 @@ class CacheManager:
         self.db_path = db_path
         self.conn = None
         self._lock = threading.RLock()
-        self._batch_buffer: List[tuple[str, int, float, str, str]] = []
+        self._batch_buffer: List[tuple[str, int, float, int, str, str]] = []
         self._batch_size_val: int = 1000
         self._user_version: int = 0
         self._pending_migrations: List[Path] = []
@@ -76,10 +76,18 @@ class CacheManager:
                     path TEXT PRIMARY KEY,
                     size INTEGER,
                     mtime REAL,
+                    inode INTEGER DEFAULT 0,
                     hash TEXT,
                     algo TEXT
                 )
             """)
+            try:
+                cols = [r[1] for r in self.conn.execute("PRAGMA table_info(file_hashes)")]
+                if "inode" not in cols:
+                    self.conn.execute("ALTER TABLE file_hashes ADD COLUMN inode INTEGER DEFAULT 0")
+                    self.conn.commit()
+            except sqlite3.Error as e:
+                logger.error(f"Failed to add inode column to cache: {e}")
             try:
                 self.conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_hash_lookup ON file_hashes(algo, size, mtime)"
@@ -162,7 +170,7 @@ class CacheManager:
         self._batch_buffer.clear()
         try:
             self.conn.executemany(
-                "INSERT OR REPLACE INTO file_hashes (path, size, mtime, hash, algo) VALUES (?, ?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO file_hashes (path, size, mtime, inode, hash, algo) VALUES (?, ?, ?, ?, ?, ?)",
                 rows,
             )
             self.conn.commit()
@@ -179,24 +187,28 @@ class CacheManager:
             self._flush_batch_locked()
         return None
 
-    def get_hash(self, path, size, mtime, algo='md5'):
+    def get_hash(self, path, size, mtime, algo='md5', inode=0):
         if self.conn is None:
             return None
         with self._lock:
             # Check buffered writes first (most recent wins)
-            for b_path, b_size, b_mtime, b_hash, b_algo in reversed(self._batch_buffer):
-                if b_path == path and b_size == size and b_mtime == mtime and b_algo == algo:
+            for b_path, b_size, b_mtime, b_inode, b_hash, b_algo in reversed(self._batch_buffer):
+                if b_path == path and b_size == size and b_mtime == mtime and b_inode == inode and b_algo == algo:
                     try:
                         self._hits += 1
                     except Exception:
                         pass
                     return b_hash
             cursor = self.conn.cursor()
-            cursor.execute(
-                "SELECT hash FROM file_hashes WHERE path=? AND size=? AND mtime=? AND algo=?",
-                (path, size, mtime, algo)
-            )
-            row = cursor.fetchone()
+            try:
+                cursor.execute(
+                    "SELECT hash FROM file_hashes WHERE path=? AND size=? AND mtime=? AND inode=? AND algo=?",
+                    (path, size, mtime, inode, algo)
+                )
+                row = cursor.fetchone()
+            except sqlite3.Error as e:
+                logger.error(f"Failed to read cached hash for {path}: {e}")
+                row = None
             result = row[0] if row else None
             try:
                 if result is not None:
@@ -207,29 +219,34 @@ class CacheManager:
                 pass
             return result
 
-    def set_hash(self, path, size, mtime, hash_val, algo='md5'):
+    def set_hash(self, path, size, mtime, hash_val, algo='md5', inode=0):
         if self.conn is None:
             return None
         try:
             with self._lock:
-                self._batch_buffer.append((path, size, mtime, hash_val, algo))
+                self._batch_buffer.append((path, size, mtime, inode, hash_val, algo))
                 if len(self._batch_buffer) >= self._batch_size:
                     self._flush_batch_locked()
         except sqlite3.Error as e:
             logger.error(f"Failed to cache hash for {path}: {e}")
         return None
 
-    def set_hash_many(self, rows: List[tuple[str, int, float, str, str]]) -> None:
+    def set_hash_many(self, rows: List[tuple]) -> None:
         if self.conn is None:
             return None
         if not isinstance(rows, list):
             raise TypeError("rows must be a list of tuples")
+        normalized = []
         for idx, row in enumerate(rows):
             if not isinstance(row, (list, tuple)):
                 raise TypeError(f"row {idx} must be tuple/list, got {type(row).__name__}")
-            if len(row) != 5:
-                raise ValueError(f"row {idx} must have 5 elements (path,size,mtime,hash,algo), got {len(row)}")
-            path, size, mtime, hash_val, algo = row
+            if len(row) not in (5, 6):
+                raise ValueError(f"row {idx} must have 5 or 6 elements (path,size,mtime,[inode,]hash,algo), got {len(row)}")
+            if len(row) == 5:
+                path, size, mtime, hash_val, algo = row
+                inode = 0
+            else:
+                path, size, mtime, inode, hash_val, algo = row
             if not isinstance(path, str):
                 raise TypeError(f"row {idx} path must be str, got {type(path).__name__}")
             if not isinstance(size, int):
@@ -240,13 +257,14 @@ class CacheManager:
                 raise TypeError(f"row {idx} hash must be str, got {type(hash_val).__name__}")
             if not isinstance(algo, str):
                 raise TypeError(f"row {idx} algo must be str, got {type(algo).__name__}")
+            normalized.append((path, size, mtime, inode, hash_val, algo))
         if not rows:
             return None
         try:
             with self._lock:
                 self.conn.executemany(
-                    "INSERT OR REPLACE INTO file_hashes (path, size, mtime, hash, algo) VALUES (?, ?, ?, ?, ?)",
-                    rows,
+                    "INSERT OR REPLACE INTO file_hashes (path, size, mtime, inode, hash, algo) VALUES (?, ?, ?, ?, ?, ?)",
+                    normalized,
                 )
                 self.conn.commit()
         except sqlite3.Error as e:

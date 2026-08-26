@@ -9,6 +9,7 @@ from .base import BaseView
 from .. import dialogs
 from ..widgets import EnhancedTreeview, FilePreviewPanel, CollapsibleCard, attach_tooltips
 from ...core.config import config
+from ...core.hasher import get_file_hash
 from ...core.services import FileActionService
 from ...core.utils import format_size, format_display_path
 from ...modules.duplicates import (
@@ -400,7 +401,7 @@ class DuplicatesView(BaseView):
             return
 
         strategy = self.keep_strategy_combo.currentText() or self.KEEP_STRATEGIES[0]
-        selected_records = select_duplicate_records(self.visible_records, keep_strategy=strategy)
+        selected_records = select_duplicate_records(self.visible_records, keep_strategy=strategy, verify_content=True)
         selected_ids = [item_id for item_id, record in self.item_records.items() if record in selected_records]
 
         if not selected_ids:
@@ -492,6 +493,8 @@ class DuplicatesView(BaseView):
 
     def _selected_targets(self):
         targets = []
+        skipped = 0
+        algo = self.hash_algo_combo.currentText() or "sha256"
         for item_id in self.tree.selection():
             record = self.item_records.get(item_id)
             if not record:
@@ -499,12 +502,21 @@ class DuplicatesView(BaseView):
             entry = record["entry"]
             if not os.path.exists(entry.path):
                 continue
+            # Re-verify against the recorded group hash so a manually selected
+            # "duplicate" can never be destroyed based on scan hashes alone
+            # (hash collision / file changed since the scan).
+            current_hash = get_file_hash(entry.path, algo)
+            if not current_hash or current_hash != record["hash"]:
+                skipped += 1
+                continue
             targets.append({
                 "item_id": item_id,
                 "hash": record["hash"],
                 "entry": entry,
                 "source_path": entry.path,
             })
+        if skipped:
+            self.app.update_status(f"Duplicate action skipped {skipped} file(s) whose content no longer matches their group.")
         return targets
 
     def _visible_records_to_tree_ids(self, records):
@@ -648,6 +660,9 @@ class DuplicatesView(BaseView):
     def _rebuild_tree(self):
         self.tree.item_map.clear()
         self.tree.tree.clear()
+        # TICK-922: item ids are reused after a rebuild (len(item_map) resets),
+        # so stale path overrides must not survive into the new tree.
+        self.tree._item_path_role.clear()
         self.item_records = {}
         self.group_items = {}
 
