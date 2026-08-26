@@ -1735,7 +1735,7 @@ verification:
 | `TICK-922` | Modules / Search+Dupes | `dataforge/modules/search.py`, `dataforge/modules/duplicates.py` | Wave 11 | Stale results, validation, content verification, cache invalidation | ✅ DONE 2026-08-25 — `tests/test_search_dupes_contract.py` 10/10, merge `3835a3e` (`1bcf5e9`), `current_results` cleared at search start, `_validate_search_params` (path/size ranges), select-extras + manual targets re-verify content (hash recheck, 0 data-loss window), cache key + `file_hashes` schema add inode (self-healing v3 migration, 5/6-tuple rows), `_item_path_role` cleared on tree rebuild |
 | `TICK-923` | Modules / Cleanup+Recovery | `dataforge/modules/system_cleanup.py`, `dataforge/modules/recovery.py` | Wave 11 | Browser checkbox, type filters, cancellation display, path confinement |
 | `TICK-924` | UI / Media View | `dataforge/ui/views/media.py` | `TICK-920` | Path precedence, preview snapshot, collision detection, tree access removal | ✅ DONE 2026-08-25 — `tests/test_media_view_contract.py` 8/8, merge `e885e3d` (`a7b6819`), `_pdf_item_path` precedence fix, `_merge_preview_paths` immutable snapshot at confirm, no `img_tree` access in `_img_convert_worker`, batch output collision abort |
-| `TICK-925` | UI / Metadata+Search+Dupes Views | `dataforge/ui/views/metadata_view.py`, `dataforge/ui/views/search.py`, `dataforge/ui/views/duplicates.py` | `TICK-921`, `TICK-922` | Stale state refresh, selection mode, path resolvers |
+| `TICK-925` | UI / Metadata+Search+Dupes Views | `dataforge/ui/views/metadata_view.py`, `dataforge/ui/views/search.py`, `dataforge/ui/views/duplicates.py` | `TICK-921`, `TICK-922` | Stale state refresh, selection mode, path resolvers | ✅ DONE 2026-08-25 — `tests/test_view_state_contract.py` 9/9, merge `883e9b6`, re-read-before-refresh in strip/write (all panels), `EnhancedTreeview.clear()` clears item_map+path roles atomically (root cause in widgets.py), ExtendedSelection default, search clears results at start |
 | `TICK-926` | UI / Cleanup+Recovery+Tools Views | `dataforge/ui/views/system_cleanup.py`, `dataforge/ui/views/recovery_view.py`, `dataforge/ui/views/tools.py`, `dataforge/ui/views/forensics_view.py` | `TICK-923` | Checkbox wiring, PhotoRec types, renamer rules, hash verification |
 
 ```yaml
@@ -1923,6 +1923,12 @@ description: |
   Clear stale duplicate path-role maps on tree rebuild. Enable extended
   selection where plural actions are advertised. Add explicit path resolvers
   for duplicate and recovery trees. Clear search results on new search.
+  Merged 883e9b6: strip/write re-read item_metadata_map BEFORE _on_file_select
+  so GPS/timestamps panels refresh with post-op state; EnhancedTreeview.clear()
+  resets item_map + _item_path_role together (TICK-922's per-site clears
+  superseded by the atomic widget method); ExtendedSelection is now the widget
+  default (storage/forensics views that need single-selection override
+  explicitly); start_search() clears current_results + tree immediately.
 acceptance_criteria:
   - "GIVEN metadata strip completes THEN all panels show updated state"
   - "GIVEN metadata write completes THEN GPS/timestamps panels refresh"
