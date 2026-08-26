@@ -357,8 +357,7 @@ class MetadataView(BaseView):
 
         self.scanned_metadata = []
         self.item_metadata_map = {}
-        self.file_tree.tree.clear()
-        self.file_tree.item_map.clear()
+        self.file_tree.clear()
         self.lbl_scan_summary.setText("Scanning for metadata...")
         self.app.update_status("Scanning for metadata...")
 
@@ -425,8 +424,7 @@ class MetadataView(BaseView):
         )
 
         # Build file tree
-        self.file_tree.tree.clear()
-        self.file_tree.item_map.clear()
+        self.file_tree.clear()
         self.item_metadata_map = {}
 
         for meta in results:
@@ -648,12 +646,9 @@ class MetadataView(BaseView):
         self.lbl_action_status.setText(f"Stripped: {success} | Failed: {failed}")
         self.app.update_status(f"Metadata strip complete: {success} succeeded, {failed} failed.")
 
-        # Refresh preview for selected item if any succeeded
+        # TICK-925 P1.6: re-read metadata FIRST, then refresh so all panels
+        # (overview, raw, GPS, timestamps) show post-strip state.
         if success and hasattr(self, "file_tree"):
-            try:
-                self._on_file_select()
-            except Exception:
-                pass
             # Update item_metadata_map by re-reading succeeded paths
             for r in results:
                 if r.get("success") and r.get("path"):
@@ -664,6 +659,10 @@ class MetadataView(BaseView):
                                 self.item_metadata_map[iid] = meta
                     except Exception:
                         pass
+            try:
+                self._on_file_select()
+            except Exception:
+                pass
 
         if failed:
             details = []
@@ -757,12 +756,9 @@ class MetadataView(BaseView):
             self.app.update_status(f"Metadata write complete: {success} succeeded.")
             self.app.show_info_dialog("Write Complete", f"Metadata written to {success} file(s).")
 
-        # Refresh preview / item_metadata_map for succeeded paths
+        # TICK-925 P1.6: re-read metadata FIRST, then refresh ALL panels
+        # (overview, raw, GPS, timestamps) via _on_file_select().
         if success:
-            try:
-                self._on_file_select()
-            except Exception:
-                pass
             for r in results:
                 if r.get("success") and r.get("path"):
                     try:
@@ -772,14 +768,8 @@ class MetadataView(BaseView):
                                 self.item_metadata_map[iid] = meta
                     except Exception:
                         pass
-            # Also refresh overview display if single selection
             try:
-                sel = self.file_tree.selection()
-                if sel:
-                    meta = self.item_metadata_map.get(sel[0])
-                    if meta:
-                        self._display_overview(meta)
-                        self._display_raw(meta)
+                self._on_file_select()
             except Exception:
                 pass
 

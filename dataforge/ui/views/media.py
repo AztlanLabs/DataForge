@@ -46,6 +46,11 @@ class MediaView(BaseView):
         self._init_pdf_tools(self.notebook)
         self._init_image_tools(self.notebook)
 
+    def _pdf_item_path(self, iid):
+        """Resolve a PDF row's filesystem path: authoritative resolver first, then displayed value."""
+        vals = self.pdf_tree.item(iid)['values']
+        return self.pdf_tree.get_item_path(iid) or (vals[0] if vals else "")
+
     def _init_pdf_tools(self, parent):
         tab = QWidget()
         layout = QVBoxLayout(tab)
@@ -527,14 +532,9 @@ class MediaView(BaseView):
         # We will build a page_map for merge worker if needed.
         for iid in items:
             # Skip child pages in top-level list? get_children only returns top-level, so fine
-            vals = self.pdf_tree.item(iid)['values']
-            if vals:
-                paths.append(vals[0])
-            else:
-                # fallback via resolver
-                p = self.pdf_tree.get_item_path(iid)
-                if p:
-                    paths.append(p)
+            p = self._pdf_item_path(iid)
+            if p:
+                paths.append(p)
         
         out, _ = dialogs.get_save_file_name(self, "Save Merged PDF", "", "PDF Files (*.pdf)")
         if not out: return
@@ -695,7 +695,7 @@ class MediaView(BaseView):
             qitem = self.pdf_tree.item_map.get(iid)
             if qitem and qitem.parent():
                 iid = qitem.parent().data(0, Qt.UserRole)
-            path = self.pdf_tree.get_item_path(iid) or self.pdf_tree.item(iid)['values'][0] if self.pdf_tree.item(iid)['values'] else ""
+            path = self._pdf_item_path(iid)
             if not path or not os.path.exists(path):
                 if self.app:
                     self.app.show_warning_dialog("Not Found", f"File not found: {path}")
@@ -772,8 +772,7 @@ class MediaView(BaseView):
             qitem = self.pdf_tree.item_map.get(iid)
             if qitem and qitem.parent():
                 iid = qitem.parent().data(0, Qt.UserRole)
-            vals = self.pdf_tree.item(iid)['values']
-            path = vals[0] if vals else self.pdf_tree.get_item_path(iid)
+            path = self._pdf_item_path(iid)
             if not path or not os.path.exists(path):
                 if self.app:
                     self.app.show_warning_dialog("Not Found", f"File not found: {path}")
@@ -856,6 +855,7 @@ class MediaView(BaseView):
 
     def _on_preview_pdf_merge_complete(self, outcome):
         if outcome.get("cancelled"):
+            self._merge_preview_paths = []
             self.app.update_status("PDF merge preview cancelled")
             return
 
@@ -866,6 +866,19 @@ class MediaView(BaseView):
         summary = f"Merge {count} PDF(s) into {os.path.basename(outcome['output_path'])}."
         if not self.confirm_preview("Confirm PDF Merge", summary, lines=lines, action_label=f"merge {count} PDF(s)"):
             self.app.update_status("PDF merge preview cancelled")
+            self._merge_preview_paths = []
+            return
+
+        # Immutable snapshot: capture paths at preview/confirm time; execute must
+        # never re-read the tree, which may have changed since the preview.
+        self._merge_preview_paths = []
+        for item_id in self.pdf_tree.get_children():
+            p = self._pdf_item_path(item_id)
+            if p:
+                self._merge_preview_paths.append(p)
+        if not self._merge_preview_paths:
+            self.app.update_status("PDF merge aborted - no valid PDF paths")
+            self.app.show_warning_dialog("Merge Aborted", "No valid PDF paths were available at preview time.")
             return
 
         # Capture page orders for worker
@@ -882,8 +895,7 @@ class MediaView(BaseView):
                     if m:
                         order.append(int(m.group(1)) - 1)
                 if order:
-                    pvals = self.pdf_tree.item(iid)['values']
-                    p = pvals[0] if pvals else self.pdf_tree.get_item_path(iid)
+                    p = self._pdf_item_path(iid)
                     if p:
                         page_orders[p] = order
         self._pending_page_orders = page_orders if page_orders else None
@@ -892,7 +904,7 @@ class MediaView(BaseView):
         self.app.run_workflow(
             self._pdf_merge_worker,
             self._on_pdf_merge_complete,
-            [self.pdf_tree.item(item_id)['values'][0] if self.pdf_tree.item(item_id)['values'] else self.pdf_tree.get_item_path(item_id) for item_id in self.pdf_tree.get_children()],
+            list(self._merge_preview_paths),
             outcome["output_path"],
             progress=True,
             error_title="PDF Merge Failed",
@@ -900,6 +912,7 @@ class MediaView(BaseView):
 
     def _on_pdf_merge_complete(self, result):
         self._pending_page_orders = None
+        self._merge_preview_paths = []
         if result.get("cancelled"):
             self.app.update_status(f"PDF merge cancelled after {result.get('merged', 0)} files")
             requested = result["requested"]
@@ -1042,6 +1055,7 @@ class MediaView(BaseView):
                 "item_id": job["item_id"],
                 "source_path": job["path"],
                 "output_path": preview_result["output_path"],
+                "size": job.get("size", ""),
             })
 
             if progress_callback:
@@ -1083,6 +1097,17 @@ class MediaView(BaseView):
         from ...core.media_ops import convert_image
         from ...core.utils import format_size
 
+        # Collision detection: multiple sources mapping to one output path must
+        # abort the batch instead of silently overwriting.
+        output_paths = {}
+        for preview in previews:
+            dest_path = preview.get("output_path")
+            if not dest_path:
+                continue
+            if dest_path in output_paths:
+                return {"cancelled": False, "results": [], "collision": True, "message": f"Collision: multiple files map to {dest_path}"}
+            output_paths[dest_path] = preview
+
         results = []
         total = len(previews)
         for index, preview in enumerate(previews, start=1):
@@ -1102,7 +1127,7 @@ class MediaView(BaseView):
                 results.append({
                     "item_id": preview["item_id"],
                     "path": preview["source_path"],
-                    "size": self.img_tree.item(preview["item_id"])["values"][1],
+                    "size": preview.get("size", ""),
                     "status": f"Error: {exc}",
                 })
 
@@ -1114,6 +1139,11 @@ class MediaView(BaseView):
     def _on_img_convert_complete(self, outcome):
         if not outcome:
             self.app.update_status("Batch Complete")
+            return
+
+        if outcome.get("collision"):
+            self.app.update_status("Batch aborted - output collision")
+            self.app.show_warning_dialog("Collision", outcome.get("message", "Multiple files map to the same output path."))
             return
 
         completed = 0

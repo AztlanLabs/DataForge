@@ -69,20 +69,32 @@ Wave gate: do not start this ticket until every `depends_on` ticket in earlier w
 
 ### 3. Verify (Definition of Done per `CONTRIBUTING.md:458` + CI)
 
+**Fast per-ticket (required, ~1-15s, no coverage):**
+
 ```bash
-# per-ticket target
-PYTHONPATH=. python -m pytest tests/test_{{ticket}}.py -q
+python scripts/run_ticket_tests.py {{TICKET_ID}}          # reads test_target + validation_command from ticket YAML, runs QT_QPA_PLATFORM=offscreen -o addopts= -p no:cov
+# or directly:
+QT_QPA_PLATFORM=offscreen pytest tests/test_{{ticket}}.py -q -o addopts= -p no:cov
+```
 
-# full suite before push (allow 2 world-writable plugin failures on NTFS mounts — fix with chmod 755 on ext4)
-PYTHONPATH=. python -m pytest -q
+**Full suite (only for final pre-push check, slow):**
 
+```bash
+QT_QPA_PLATFORM=offscreen pytest -q -o addopts= -p no:cov -n auto  # fast full without coverage (~60s, needs pytest-xdist)
+# CI mode with coverage (slow, ~260s) — only run if you need coverage.xml:
+PYTHONPATH=. pytest -q --cov=dataforge --cov-report=term-missing --cov-report=xml
+```
+
+Do NOT run the full suite with coverage for every ticket iteration — it takes 4+ minutes and is not needed per-ticket. Use the ticket runner above.
+
+```bash
 # lint + type (ruff blocking, mypy advisory as in .github/workflows/ci.yml)
 ruff check dataforge tests
 mypy dataforge/<changed file> || true
 pip-audit -r requirements.txt || true
 ```
 
-Each `requirements.acceptance_criteria` line is a `GIVEN/WHEN/THEN` you must demonstrate — run the exact command from `verification.validation_command`. Gate: every `P0` perf change must keep result count identical to sequential baseline on a 100k-file fixture (see `PERFORMANCE_INVESTIGATION.md §7`).
+Each `requirements.acceptance_criteria` line is a `GIVEN/WHEN/THEN` you must demonstrate — run the exact command from `verification.validation_command` via the runner. Gate: every `P0` perf change must keep result count identical to sequential baseline on a 100k-file fixture (see `PERFORMANCE_INVESTIGATION.md §7`).
 
 ### 4. Commit
 

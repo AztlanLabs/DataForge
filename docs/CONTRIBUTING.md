@@ -216,12 +216,30 @@ chore(repo): add commitlint git hook
 
 ## 5. Testing
 
-### Running Tests
+### Running Tests — Fast vs Full
+
+**For AI agents / per-ticket work: run ONLY your ticket's test (fast, ~1-8s):**
 
 ```bash
-PYTHONPATH=. pytest -q                    # all tests
-PYTHONPATH=. pytest tests/test_comprehensive.py -v   # one file, verbose
+python scripts/run_ticket_tests.py TICK-921          # reads test_target from ticket YAML, runs with QT_QPA_PLATFORM=offscreen, no coverage
+python scripts/run_ticket_tests.py --file tests/test_dead_code_prune.py  # direct file
+# Equivalent manual (also fast, no coverage):
+QT_QPA_PLATFORM=offscreen pytest tests/test_dead_code_prune.py -q -o addopts= -p no:cov
+```
+
+**Full suite: only for final verification before push (slow, ~60-260s with coverage):**
+
+```bash
+PYTHONPATH=. pytest -q --cov=dataforge --cov-report=term-missing --cov-report=xml  # CI mode (with coverage, ~260s)
+QT_QPA_PLATFORM=offscreen pytest -q -o addopts= -p no:cov -n auto  # fast full without coverage, parallel via xdist (~60s, requires pytest-xdist)
+```
+
+**Other filters:**
+
+```bash
+PYTHONPATH=. pytest tests/test_comprehensive.py -v   # one file, verbose (deprecated suite, use consolidated instead)
 PYTHONPATH=. pytest -k "symlink" -v       # filter by keyword
+PYTHONPATH=. pytest --collect-only -q     # list tests without running
 ```
 
 ### Test Structure

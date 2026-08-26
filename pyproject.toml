@@ -78,3 +78,12 @@ show_missing = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+minversion = "7.0"
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "ticket: ticket-specific regression guard",
+]
+# Fast default: no coverage. CI explicitly adds --cov. Agents must use
+# scripts/run_ticket_tests.py for per-ticket ~1-8s runs, not full --cov (~260s).
+addopts = "-o console_output_style=classic"
