@@ -1,4 +1,5 @@
 from .files import (
+    OperationReport,
     apply_result_to_entry,
     delete_path,
     format_operation_message,
@@ -10,6 +11,7 @@ from .files import (
 )
 
 __all__ = [
+    "OperationReport",
     "apply_result_to_entry",
     "delete_path",
     "format_operation_message",
