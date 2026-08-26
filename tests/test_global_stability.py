@@ -310,13 +310,22 @@ def test_progress_signal_throttled_per_worker(qapp):
     """A single worker firing 1000 callbacks emits ~10x/sec Qt signals."""
     mgr = JobManager(max_workers=2, queue_depth=16)
     try:
-        flood = _make_flood_task(1000)
+        gate = threading.Event()
+
+        def gated_flood(cancel_token=None, progress_callback=None):
+            # Merge fix: the 1000-callback flood completes in <10ms, which can
+            # out-run the test thread's signal connect below. Gate the flood
+            # until the recorder is attached so the assertion is deterministic.
+            gate.wait(timeout=5)
+            return _make_flood_task(1000)(cancel_token, progress_callback)
+
         signals = []
         t0 = time.time()
-        job_id = mgr.submit(target=flood, progress=True, task_name="flood 1")
+        job_id = mgr.submit(target=gated_flood, progress=True, task_name="flood 1")
         assert job_id is not None
         worker = mgr._workers[job_id]
         worker.progress_signal.connect(lambda c, t, m: signals.append((c, t, m)))
+        gate.set()
 
         assert _wait_until(lambda: not mgr.is_busy, timeout=5.0)
         elapsed = time.time() - t0
