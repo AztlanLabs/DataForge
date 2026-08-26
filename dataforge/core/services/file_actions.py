@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import functools
 import os
 import re
+import tempfile
 import threading
 import zipfile
 from typing import Any, Callable, Iterable, Optional
@@ -264,10 +265,12 @@ class FileActionService:
         records: list[BatchActionRecord] = []
         items = list(items)
         total = len(items)
+        cancelled = False
 
         for index, item in enumerate(items, start=1):
             if cancel_token and cancel_token.is_set():
-                return BatchActionOutcome(action=action, records=records, cancelled=True)
+                cancelled = True
+                break
 
             source_path = _normalize_path_value(path_getter(item))
             record = operation(item, source_path, index)
@@ -277,7 +280,14 @@ class FileActionService:
             if progress_callback:
                 progress_callback(index, total, progress_message)
 
-        return BatchActionOutcome(action=action, records=records)
+        if cancelled:
+            for remaining in range(len(records), total):
+                item = items[remaining]
+                source_path = _normalize_path_value(path_getter(item))
+                rec = BatchActionRecord(item=item, source_path=source_path, message="Cancelled", success=False, skipped=True)
+                records.append(rec)
+
+        return BatchActionOutcome(action=action, records=records, cancelled=cancelled)
 
     @classmethod
     def _run_batch_parallel(
@@ -299,59 +309,74 @@ class FileActionService:
         records: list[BatchActionRecord] = [None] * total  # type: ignore[list-item]
         counter_lock = threading.Lock()
         completed_count = 0
+        cancelled = False
 
         def _do_one(idx: int, item: Any) -> tuple[int, BatchActionRecord]:
             source_path = _normalize_path_value(path_getter(item))
             record = operation(item, source_path, idx + 1)
             return idx, record
 
+        def _collect(done: Iterable[Any]) -> None:
+            for fut in done:
+                idx = pending.pop(fut)  # remove from pending, not from future_to_idx
+                if fut.cancelled():
+                    continue
+                exc = fut.exception()
+                if exc is not None:
+                    # idx is valid — create failure record
+                    item = items[idx]
+                    sp = _normalize_path_value(path_getter(item))
+                    msg = f"ERROR: {exc}"
+                    result = OperationResult(action, sp, None, False, msg)
+                    rec = BatchActionRecord(item=item, source_path=sp, message=msg, result=result, success=False)
+                    records[idx] = rec
+                    cls._log_record(rec)
+                    continue
+
+                idx, record = fut.result()
+                records[idx] = record
+                cls._log_record(record)
+
+                with counter_lock:
+                    nonlocal completed_count
+                    completed_count += 1
+                    if progress_callback:
+                        progress_callback(completed_count, total, progress_message)
+
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = {}
-            for idx, item in enumerate(items):
+            if cancel_token and cancel_token.is_set():
+                # Cancel already requested — do not submit any work (all skipped)
+                cancelled = True
+                future_to_idx = {}
+            else:
+                future_to_idx = {pool.submit(_do_one, idx, item): idx for idx, item in enumerate(items)}
+            pending = dict(future_to_idx)
+
+            while pending:
                 if cancel_token and cancel_token.is_set():
-                    break
-                futures[pool.submit(_do_one, idx, item)] = idx
+                    cancelled = True
+                    for fut in pending:
+                        fut.cancel()
+                    # Drain in-flight futures so completed work is counted accurately
+                    done, _ = wait(pending, timeout=0.1, return_when=FIRST_COMPLETED)
+                    _collect(done)
+                    continue
 
-            while futures:
-                if cancel_token and cancel_token.is_set():
-                    for f in futures:
-                        f.cancel()
-                    break
+                done, _ = wait(pending, timeout=0.1, return_when=FIRST_COMPLETED)
+                _collect(done)
 
-                done, _ = wait(futures, timeout=0.1, return_when=FIRST_COMPLETED)
-                for fut in done:
-                    futures.pop(fut, None)
-                    if fut.cancelled():
-                        continue
-                    exc = fut.exception()
-                    if exc is not None:
-                        idx = futures.get(fut, -1)
-                        if idx < 0:
-                            for k, v in list(futures.items()):
-                                if k is fut:
-                                    idx = v
-                                    break
-                        if idx >= 0:
-                            item = items[idx]
-                            sp = _normalize_path_value(path_getter(item))
-                            msg = f"ERROR: {exc}"
-                            result = OperationResult(action, sp, None, False, msg)
-                            rec = BatchActionRecord(item=item, source_path=sp, message=msg, result=result, success=False)
-                            records[idx] = rec
-                            cls._log_record(rec)
-                        continue
+        # Fill remaining None slots: every requested item must have one record
+        for idx, rec in enumerate(records):
+            if rec is None:
+                item = items[idx]
+                sp = _normalize_path_value(path_getter(item))
+                if cancelled:
+                    rec = BatchActionRecord(item=item, source_path=sp, message="Cancelled", success=False, skipped=True)
+                else:
+                    rec = BatchActionRecord(item=item, source_path=sp, message="Not processed", success=False)
+                records[idx] = rec
+                cls._log_record(rec)
 
-                    idx, record = fut.result()
-                    records[idx] = record
-                    cls._log_record(record)
-
-                    with counter_lock:
-                        completed_count += 1
-                        if progress_callback:
-                            progress_callback(completed_count, total, progress_message)
-
-        records = [r for r in records if r is not None]
-        cancelled = cancel_token is not None and cancel_token.is_set()
         return BatchActionOutcome(action=action, records=records, cancelled=cancelled)
 
     @staticmethod
@@ -792,10 +817,12 @@ class FileActionService:
                 return outcome
 
             destination = _normalize_path_value(destination)
-            tmp_path = destination + ".tmp"
             output_dir = os.path.dirname(destination)
             if output_dir:
                 os.makedirs(output_dir, exist_ok=True)
+
+            fd, tmp_path = tempfile.mkstemp(dir=output_dir or ".", suffix=".dataforge.tmp")
+            os.close(fd)
 
             existing_names: set[str] = set()
             any_failed = False
@@ -807,6 +834,12 @@ class FileActionService:
                                 os.remove(tmp_path)
                             except OSError:
                                 pass
+                            for remaining in range(index - 1, total):
+                                remaining_item = items[remaining]
+                                remaining_sp = _normalize_path_value(path_getter(remaining_item))
+                                records.append(
+                                    BatchActionRecord(item=remaining_item, source_path=remaining_sp, message="Cancelled", success=False, skipped=True)
+                                )
                             outcome = BatchActionOutcome(action="archive", records=records, cancelled=True)
                             self._record_audit("archive", audit_sources, audit_dests_single, outcome, dry_run)
                             return outcome
@@ -851,7 +884,8 @@ class FileActionService:
             output_dir = os.path.dirname(archive_path)
             if output_dir:
                 os.makedirs(output_dir, exist_ok=True)
-            tmp_path = archive_path + ".tmp"
+            fd, tmp_path = tempfile.mkstemp(dir=output_dir or ".", suffix=".dataforge.tmp")
+            os.close(fd)
             try:
                 with zipfile.ZipFile(tmp_path, "w", compression) as archive_handle:
                     safe_zip_write(archive_handle, source_path, os.path.basename(source_path), set())

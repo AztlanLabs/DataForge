@@ -21,7 +21,7 @@
 
 **P1.7 — Predictable temp files:** Archive operations use `destination + ".tmp"` at `file_actions.py:794-835`. Concurrent operations sharing a destination can conflict. A pre-existing symlink at the `.tmp` path can redirect writes.
 
-**P1.20 — Provider unused:** `FileActionService` stores a provider at `file_actions.py:126-143` but all operations use local `os`/`shutil` directly.
+*(P1.20 provider is intentionally NOT wired here — provider dispatch is TICK-928's concern.)*
 
 ## Objectives
 

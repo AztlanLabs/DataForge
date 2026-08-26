@@ -1634,6 +1634,7 @@ wave: 11
 depends_on: [TICK-915]
 exclusive_write_files:
   - dataforge/core/services/file_actions.py
+  - dataforge/core/operations/files.py  # rename confinement step adopted from TICK-919 (Step 3 option B)
 audit_refs:
   - "STABILITY_AUDIT_2026-08-23.md P0.6"
   - "STABILITY_AUDIT_2026-08-23.md P1.7"
@@ -1643,7 +1644,10 @@ description: |
   exception records. Ensure one record per requested item including failures
   and cancelled items. Fix cancellation to wait for in-flight mutations and
   report accurate completed/failed counts. Use unique secure temp files for
-  archives. Confine rename_path() to validated basenames.
+  archives. Confine rename_path() to validated basenames — TICK-919 landed
+  the rename confinement first (merge 4946839); TICK-916 verifies the same
+  contract via tests/test_file_actions_contract.py and keeps its parallel
+  exception/cancellation/temp fixes in file_actions.py.
 acceptance_criteria:
   - "GIVEN 10 items and 1 worker exception THEN outcome has exactly 10 records AND 1 failure"
   - "GIVEN cancellation during parallel move THEN outcome reports completed + failed + unstarted counts"
@@ -1739,7 +1743,7 @@ verification:
 ticket_id: TICK-919
 title: "Core operations: unified result contract, rename confinement, transfer safety"
 wave: 12
-depends_on: [Wave 11]
+depends_on: [Wave 11, TICK-916]
 exclusive_write_files:
   - dataforge/core/operations/files.py
 audit_refs:
@@ -1749,7 +1753,10 @@ description: |
   Define OperationReport dataclass with operation, requested, completed, failed,
   skipped, cancelled, success, errors, outputs, warnings, dry_run fields. Fix
   rename_path() to confine new_name to the source directory (reject separators
-  and ..). Ensure transfer_path() never overwrites without explicit confirmation.
+  and ..) — the basename validation itself was already adopted by TICK-916
+  (Step 3 option B); this ticket must not re-introduce it and focuses on the
+  remaining result contract + transfer overwrite confirmation work. Ensure
+  transfer_path() never overwrites without explicit confirmation.
 acceptance_criteria:
   - "GIVEN a batch operation THEN result has requested == input count AND accurate completed/failed/skipped"
   - "GIVEN rename with absolute path component THEN rejected with clear error"

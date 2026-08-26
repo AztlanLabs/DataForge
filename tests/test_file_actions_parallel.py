@@ -307,7 +307,7 @@ class TestArchiveIndividualParallel:
 
 
 class TestCancelToken:
-    def test_cancel_transfer_returns_partial(self, tmp_path):
+    def test_cancel_transfer_accounts_all_items(self, tmp_path):
         src = tmp_path / "src"
         src.mkdir()
         for i in range(20):
@@ -323,9 +323,10 @@ class TestCancelToken:
         )
 
         assert outcome.cancelled
-        assert len(outcome.records) < 20
+        assert len(outcome.records) == 20
+        assert len(outcome.skipped_records) == 20
 
-    def test_cancel_delete_returns_partial(self, tmp_path):
+    def test_cancel_delete_accounts_all_items(self, tmp_path):
         for i in range(20):
             (tmp_path / f"f{i}.txt").write_text(f"content {i}")
         cancel = threading.Event()
@@ -337,7 +338,8 @@ class TestCancelToken:
         )
 
         assert outcome.cancelled
-        assert len(outcome.records) < 20
+        assert len(outcome.records) == 20
+        assert len(outcome.skipped_records) == 20
 
 
 class TestProgressCallback:
