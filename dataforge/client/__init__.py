@@ -36,6 +36,22 @@ logger = logging.getLogger(__name__)
 __all__ = ["DataForge", "DataForgeJob", "DataForgeClient"]
 
 
+def _parse_http_endpoint(endpoint: str):
+    """Split an ``http://host:port`` endpoint into ``(host, port)``."""
+    url = endpoint
+    for prefix in ("http://", "https://"):
+        if url.startswith(prefix):
+            url = url[len(prefix):]
+            break
+    if ":" in url:
+        host, _, port = url.rpartition(":")
+        try:
+            return host, int(port)
+        except ValueError:
+            pass
+    return url, 80
+
+
 class DataForgeJob:
     """Handle to a submitted engine job.
 
@@ -260,7 +276,20 @@ class DataForge:
             except (ImportError, OSError):
                 pass
 
-        # 5. HTTP fallback — not implemented yet (requires HTTP transport)
+        # 5. HTTP fallback
+        try:
+            from dataforge.api.transport.http_gateway import HttpGateway
+
+            endpoint = HttpGateway.auto_discover()
+            if endpoint:
+                transport = HttpGateway()
+                host, port = _parse_http_endpoint(endpoint)
+                transport.host = host
+                transport.port = port
+                return transport
+        except Exception:
+            pass
+
         return None
 
     # ------------------------------------------------------------------

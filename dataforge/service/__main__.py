@@ -99,8 +99,8 @@ async def _run_named_pipe_server(
     await server.stop()
 
 
-def main(argv: Optional[list] = None) -> int:
-    """Main entry point for the DataForge engine service."""
+def build_parser() -> argparse.ArgumentParser:
+    """Build the service argument parser."""
     parser = argparse.ArgumentParser(
         prog="dataforge-engine",
         description="DataForge engine daemon",
@@ -114,6 +114,11 @@ def main(argv: Optional[list] = None) -> int:
         "--pipe",
         help="Named Pipe path (Windows)",
         default=None,
+    )
+    parser.add_argument(
+        "--dbus",
+        action="store_true",
+        help="Enable D-Bus transport (Linux)",
     )
     parser.add_argument(
         "--workers",
@@ -132,7 +137,12 @@ def main(argv: Optional[list] = None) -> int:
         action="store_true",
         help="Enable debug logging",
     )
+    return parser
 
+
+def main(argv: Optional[list] = None) -> int:
+    """Main entry point for the DataForge engine service."""
+    parser = build_parser()
     args = parser.parse_args(argv)
     _setup_logging(args.verbose)
 

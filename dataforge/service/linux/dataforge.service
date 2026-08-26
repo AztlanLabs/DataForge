@@ -18,6 +18,10 @@ Requires=dataforge.socket
 
 [Service]
 Type=simple
+# Engine entrypoint (dataforge-engine). All flags below are supported by the
+# service parser (dataforge/service/__main__.py): --socket, --dbus.
+# The packaged unit (packaging/systemd/dataforge.service) must use the same
+# engine entrypoint and flag set; GUI bundle flags belong in run_ui.py.
 ExecStart=%h/.local/bin/dataforge-engine --socket %t/dataforge/engine.sock --dbus
 Restart=on-failure
 RestartSec=5

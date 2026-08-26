@@ -200,11 +200,13 @@ class _UdsEventIterator:
     async def __anext__(self) -> Dict[str, Any]:
         while True:
             frame = await self._transport.recv()
-            if frame.get("job_id") == self._job_id:
-                return frame
-            # If the frame signals end-of-stream for this job, stop
+            # Terminal event for this job ends the stream. Check BEFORE the
+            # same-job yield, otherwise the terminal check is unreachable and
+            # the iterator never stops.
             if frame.get("type") in ("result", "error") and frame.get("job_id") == self._job_id:
                 raise StopAsyncIteration
+            if frame.get("job_id") == self._job_id:
+                return frame
 
 
 # ------------------------------------------------------------------

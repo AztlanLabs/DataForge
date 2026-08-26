@@ -252,10 +252,13 @@ class _NamedPipeEventIterator:
     async def __anext__(self) -> Dict[str, Any]:
         while True:
             frame = await self._transport.recv()
-            if frame.get("job_id") == self._job_id:
-                return frame
+            # Terminal event for this job ends the stream. Check BEFORE the
+            # same-job yield, otherwise the terminal check is unreachable and
+            # the iterator never stops.
             if frame.get("type") in ("result", "error") and frame.get("job_id") == self._job_id:
                 raise StopAsyncIteration
+            if frame.get("job_id") == self._job_id:
+                return frame
 
 
 # ------------------------------------------------------------------
@@ -285,6 +288,20 @@ class NamedPipeServer:
         self._handler = handler
         self._running = False
         self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._accept_task: Optional[asyncio.Task] = None
+        self._client_tasks: set = set()
+        self._handles: list = []
+
+    def _build_security_attributes(self) -> Any:
+        """Build win32 SECURITY_ATTRIBUTES with the pipe SDDL, or None."""
+        if _pywintypes is None:
+            return None
+        try:
+            security_attributes = _pywintypes.SECURITY_ATTRIBUTES()
+            security_attributes.Sddl = _PIPE_SDDL
+            return security_attributes
+        except Exception:
+            return None
 
     async def start(self) -> None:
         """Start the named pipe server."""
@@ -292,13 +309,35 @@ class NamedPipeServer:
             raise OSError("NamedPipeServer requires Windows with pywin32")
         self._loop = asyncio.get_running_loop()
         self._running = True
-        # Run the accept loop in a background task
-        asyncio.create_task(self._accept_loop())
+        # Run the accept loop in a background task (kept so stop() can cancel it)
+        self._accept_task = asyncio.create_task(self._accept_loop())
         logger.info("Named Pipe server listening on %s", self._pipe_name)
 
     async def stop(self) -> None:
-        """Stop the server."""
+        """Stop the server, cancelling blocked accept/read operations."""
         self._running = False
+        # Cancel the accept loop task (may be blocked in ConnectNamedPipe)
+        if self._accept_task is not None:
+            self._accept_task.cancel()
+            try:
+                await self._accept_task
+            except BaseException:
+                pass
+            self._accept_task = None
+        # Cancel in-flight client handler tasks; closing handles below unblocks
+        # any pending executor reads.
+        if self._client_tasks:
+            for task in list(self._client_tasks):
+                task.cancel()
+            await asyncio.gather(*self._client_tasks, return_exceptions=True)
+            self._client_tasks.clear()
+        for handle in list(self._handles):
+            try:
+                if _win32file is not None:
+                    _win32file.CloseHandle(handle)
+            except OSError:
+                pass
+        self._handles.clear()
         logger.info("Named Pipe server stopped")
 
     async def _accept_loop(self) -> None:
@@ -309,17 +348,22 @@ class NamedPipeServer:
                 handle = await self._loop.run_in_executor(None, self._create_pipe_instance)
                 if handle is None:
                     continue
+                self._handles.append(handle)
                 # Wait for a client to connect
                 await self._loop.run_in_executor(None, self._wait_for_client, handle)
                 # Handle this client (for simplicity, handle one at a time)
-                asyncio.create_task(self._handle_client(handle))
+                task = asyncio.create_task(self._handle_client(handle))
+                self._client_tasks.add(task)
+                task.add_done_callback(self._client_tasks.discard)
+            except asyncio.CancelledError:
+                break
             except Exception as exc:
                 if self._running:
                     logger.error("Pipe accept error: %s", exc)
                 break
 
     def _create_pipe_instance(self) -> Any:
-        """Create a new named pipe instance."""
+        """Create a new named pipe instance with the declared SDDL."""
         assert _win32pipe is not None and _win32file is not None
         try:
             handle = _win32pipe.CreateNamedPipe(
@@ -330,7 +374,7 @@ class NamedPipeServer:
                 65536,  # out buffer
                 65536,  # in buffer
                 0,  # default timeout
-                None,  # default security attributes (uses SDDL if set)
+                self._build_security_attributes(),  # SDDL-backed security attributes
             )
             return handle
         except OSError:
@@ -371,6 +415,10 @@ class NamedPipeServer:
         except (ConnectionError, OSError):
             pass
         finally:
+            try:
+                self._handles.discard(handle)
+            except Exception:
+                pass
             try:
                 if _win32pipe is not None:
                     _win32pipe.DisconnectNamedPipe(handle)
