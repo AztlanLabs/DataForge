@@ -402,7 +402,10 @@ def test_progress_chaining_preserved(manager, qapp):
             time.sleep(0.02)
         return {"done": True}
 
-    # Caller provides orig callback that should still be called
+    # TICK-914 P0.1: a caller-supplied progress_callback must NOT be invoked
+    # inline on the worker thread (it could mutate Qt widgets there). The
+    # signal on the GUI thread is the sole progress path, so orig_cb must
+    # stay untouched while progress still flows through the manager.
     orig_calls = []
 
     def orig_cb(c, t, m):
@@ -418,7 +421,6 @@ def test_progress_chaining_preserved(manager, qapp):
         task_name="progress chain",
     )
     assert job_id is not None
-    # Capture manager's progress via signal? Instead check orig + job events
     deadline = time.time() + 3
     while time.time() < deadline and not results:
         time.sleep(0.05)
@@ -426,7 +428,7 @@ def test_progress_chaining_preserved(manager, qapp):
 
     assert len(results) == 1
     assert results[0] == {"done": True}
-    assert len(orig_calls) >= 3, "orig progress_callback should be chained"
+    assert len(orig_calls) == 0, "inline orig_cb chaining removed by TICK-914 (P0.1)"
     job = manager.get_job(job_id)
     assert job is not None
     assert job.status == JobStatus.DONE
